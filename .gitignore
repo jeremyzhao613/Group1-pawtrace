@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build
+dist/
+**/dist/
+build/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Database (local / generated)
+*.sqlite
+*.sqlite3
+backend/data/*.sqlite
+backend/data/*.sqlite3
+
+# Prisma
+# Keep migrations tracked; ignore local DB if any
+
+# Coverage
+coverage/
+
+# Misc
+*.local

@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id
+  username     String   @unique
+  passwordHash String?
+  displayName  String
+  avatar       String   @default("")
+  bio          String   @default("")
+  campus       String   @default("")
+  contact      String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  pets         Pet[]
+  lastLocation LastLocation?
+}
+
+model Pet {
+  id        String   @id
+  ownerId   String?
+  owner     User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  name      String
+  type      String   @default("Pet")
+  breed     String   @default("Unknown")
+  age       String   @default("Unknown")
+  gender    String   @default("Unknown")
+  avatar    String
+  traits    Json     @default("[]")
+  health    String   @default("")
+  status    String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  contactId String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([contactId])
+}
+
+model LocationPoint {
+  id        String   @id
+  source    String?
+  tagId     String?
+  deviceId  String?
+  userId    String?
+  timestamp String
+  lat       Float
+  lon       Float
+  accuracy  Float?
+  altitude  Float?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([deviceId])
+}
+
+model LastLocation {
+  userId    String @id
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lat       Float
+  lon       Float
+  accuracy  Float?
+  timestamp String
+  source    String   @default("app-gps")
+  updatedAt DateTime @updatedAt
+}
+
+model HealthMeasurement {
+  id                 String   @id
+  deviceId           String?
+  userId             String?
+  tagId              String?
+  timestamp          String
+  heartRateBpm       Float?
+  soundLevelDb       Float?
+  batteryPct         Float?
+  steps              Float?
+  tempC              Float?
+  accelPeak          Float?
+  activity           String?
+  lat                Float?
+  lon                Float?
+  locationAccuracy   Float?
+  locationTimestamp  String?
+  quality            String?
+  metadata           Json?
+  receivedAt         String
+  createdAt          DateTime @default(now())
+
+  @@index([userId])
+  @@index([deviceId])
+}
+
+model StickyNote {
+  id        String   @id
+  text      String
+  createdAt DateTime @default(now())
+}
+
+model MonitoringUserProfile {
+  id               String   @id
+  capturedAt       DateTime @default(now())
+  profileJson      Json
+  personalInfoJson Json?
+  metadataJson     Json?
+}
+
+model MonitoringPetProfile {
+  id           String   @id
+  capturedAt   DateTime @default(now())
+  ownerLabel   String
+  petJson      Json
+  metadataJson Json?
+}
+
+model MonitoringPurchase {
+  id           String   @id
+  capturedAt   DateTime @default(now())
+  purchaseJson Json
+  metadataJson Json?
+}
+
+model MonitoringChatLog {
+  id          String   @id
+  contactId   String
+  messagesJson Json
+  reply       String
+  capturedAt  DateTime @default(now())
+}

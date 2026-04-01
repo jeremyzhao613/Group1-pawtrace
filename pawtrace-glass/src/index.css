@@ -1,0 +1,159 @@
+@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Sora:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+:root {
+  --bg: #050403;
+  --panel: rgba(18, 13, 9, 0.78);
+  --panel-strong: rgba(26, 18, 12, 0.92);
+  --gold: #d6a75a;
+  --amber: #f0ba6d;
+  --ivory: #f6efe6;
+  --teal: #74c6c0;
+  --success: #8fd4a4;
+  --danger: #ff9b78;
+  --line: rgba(255, 224, 171, 0.14);
+  --text: #f6f2eb;
+  --muted: #aa9f92;
+  --display-font: "Rajdhani", sans-serif;
+  --body-font: "Sora", sans-serif;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: var(--bg);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    font-family: var(--body-font);
+    background:
+      radial-gradient(circle at 18% 18%, rgba(214, 167, 90, 0.16), transparent 30%),
+      radial-gradient(circle at 82% 14%, rgba(116, 198, 192, 0.1), transparent 24%),
+      radial-gradient(circle at 50% 72%, rgba(255, 255, 255, 0.05), transparent 18%),
+      linear-gradient(180deg, #090705 0%, #050403 48%, #0b0806 100%);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  button {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: var(--display-font);
+  }
+
+  .ambient-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 84px 84px;
+    mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+  }
+
+  .hud-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 220, 162, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255, 218, 158, 0.05), rgba(255, 218, 158, 0) 35%),
+      var(--panel);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 24px 80px rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(20px);
+  }
+
+  .hud-panel::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: 26px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    pointer-events: none;
+  }
+
+  .eyebrow {
+    font-family: var(--display-font);
+    font-size: 0.68rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(245, 239, 230, 0.56);
+  }
+
+  .hud-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(7, 6, 4, 0.46);
+    padding: 0.45rem 0.75rem;
+    font-family: var(--display-font);
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(246, 242, 235, 0.74);
+    backdrop-filter: blur(12px);
+  }
+
+  .metric-value {
+    font-family: var(--display-font);
+    letter-spacing: 0.06em;
+  }
+
+  .scene-mask {
+    background:
+      radial-gradient(circle at center, transparent 0%, transparent 46%, rgba(0, 0, 0, 0.35) 100%),
+      linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 28%, rgba(0, 0, 0, 0.25) 100%);
+  }
+
+  .poi-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(6, 5, 4, 0.78);
+    padding: 0.55rem 0.8rem;
+    font-family: var(--display-font);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(16px);
+  }
+
+  .poi-label.active {
+    border-color: rgba(214, 167, 90, 0.62);
+    box-shadow:
+      0 0 0 1px rgba(214, 167, 90, 0.32),
+      0 18px 42px rgba(0, 0, 0, 0.36);
+  }
+
+  .subtle-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .subtle-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(214, 167, 90, 0.26);
+  }
+
+  .subtle-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

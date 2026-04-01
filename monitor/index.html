@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawTrace · 监控台</title>
+  <link rel="stylesheet" href="./assets/monitor.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+  <style>
+    html, body {
+      overflow-x: hidden;
+      overscroll-behavior-y: contain;
+    }
+    .monitor-dock {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+      padding-bottom: 2rem;
+    }
+    .monitor-dock-track {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 1rem;
+      padding: 0.5rem 1rem 0.75rem;
+      background-color: rgba(2, 6, 23, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 999px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+    }
+    .monitor-dock-item {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.15), rgba(8, 47, 73, 0.7));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        0 8px 18px rgba(15, 23, 42, 0.45);
+      color: #f8fafc;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .monitor-dock-item span {
+      font-size: 1.35rem;
+    }
+    .monitor-dock-item-label {
+      position: absolute;
+      bottom: calc(100% + 0.35rem);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      color: #f8fafc;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      white-space: nowrap;
+    }
+    .monitor-dock-item:hover .monitor-dock-item-label {
+      opacity: 1;
+      transform: translate(-50%, -4px);
+    }
+    @media (max-width: 640px) {
+      .monitor-dock-track {
+        gap: 0.6rem;
+      }
+      .monitor-dock-item {
+        width: 44px;
+        height: 44px;
+      }
+      .monitor-dock-item span {
+        font-size: 1.1rem;
+      }
+    }
+    .magic-bento-section {
+      margin: 2rem auto;
+      padding: 1.5rem;
+      border-radius: 24px;
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.85), rgba(2, 6, 23, 0.95));
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 30px 70px rgba(2, 6, 23, 0.55);
+    }
+    .magic-bento-headline {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1.2rem;
+    }
+    .magic-bento-headline h3 {
+      font-size: 0.85rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(148, 163, 184, 0.9);
+    }
+    .magic-bento-headline p {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .magic-bento-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .magic-bento-card {
+      position: relative;
+      padding: 1.35rem;
+      min-height: 170px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(6, 0, 16, 0.82);
+      overflow: hidden;
+      transition: transform 0.25s ease, border-color 0.25s ease;
+      --glow-x: 50%;
+      --glow-y: 50%;
+      --glow-strength: 0;
+    }
+    .magic-bento-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at var(--glow-x) var(--glow-y), rgba(255, 255, 255, 0.15), transparent 55%);
+      opacity: calc(0.2 + (var(--glow-strength) * 0.6));
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .magic-bento-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      margin-bottom: 0.85rem;
+    }
+    .magic-bento-card h4 {
+      font-size: 1rem;
+      margin-bottom: 0.35rem;
+    }
+    .magic-bento-card p {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.78);
+    }
+    .magic-bento-ripple {
+      position: absolute;
+      border-radius: 50%;
+      transform: scale(0);
+      opacity: 0.8;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.5), transparent 70%);
+      animation: monitor-bento-ripple 0.8s ease forwards;
+    }
+    @keyframes monitor-bento-ripple {
+      to {
+        transform: scale(1);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <header class="border border-white/10 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 p-6 shadow-lg">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p class="text-[11px] uppercase tracking-[0.2em] text-orange-300">PawTrace HQ</p>
+          <h1 class="text-3xl font-bold leading-tight">Purchase & Activity Monitor</h1>
+          <p class="text-sm text-slate-300 mt-1">Totals, rankings, and daily revenue from the campus store front.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="monitor-status" class="text-[12px] text-slate-200">Initializing…</span>
+        <button id="refresh-btn" class="rounded-full bg-orange-500 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-orange-600">Refresh data</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid md:grid-cols-3 gap-4">
+      <article class="px-4 py-4 rounded-2xl border border-white/10 bg-slate-900 space-y-2">
+        <p class="text-xs tracking-widest text-slate-400">Total revenue</p>
+        <p id="total-sales" class="text-2xl font-bold text-amber-300">¥0.00</p>
+        <p id="total-count" class="text-[11px] text-slate-400">0 purchases captured</p>
+      </article>
+      <article class="px-4 py-4 rounded-2xl border border-white/10 bg-slate-900 space-y-2">
+        <p class="text-xs tracking-widest text-slate-400">Today's revenue</p>
+        <p id="today-sales" class="text-2xl font-bold text-emerald-300">¥0.00</p>
+        <p id="today-count" class="text-[11px] text-slate-400">0 purchases today</p>
+      </article>
+      <article class="px-4 py-4 rounded-2xl border border-white/10 bg-slate-900 space-y-2">
+        <p class="text-xs tracking-widest text-slate-400">Chats captured</p>
+        <p id="chat-count" class="text-2xl font-bold text-sky-300">0 chats</p>
+        <p class="text-[11px] text-slate-400">Contacts tracked: <span id="contact-count">0</span></p>
+      </article>
+    </section>
+
+    <section class="grid lg:grid-cols-[1fr,1.2fr] gap-4">
+      <article class="rounded-2xl border border-white/10 bg-slate-900 overflow-hidden relative">
+        <div class="absolute inset-0">
+          <div id="letter-glitch" class="relative w-full h-full"></div>
+        </div>
+        <div class="relative z-10 p-6 flex flex-col gap-2 text-white/90 backdrop-blur-sm bg-black/40 h-full">
+          <p class="text-[11px] uppercase tracking-[0.3em] text-emerald-300">Realtime Pulse</p>
+          <h2 class="text-2xl font-bold">Backend Monitor Matrix</h2>
+          <p class="text-sm text-slate-300 max-w-sm">
+            Inspired by Letter Glitch from React Bits. Characters flicker behind the stats to visualize backend signals.
+          </p>
+          <div class="text-[11px] text-slate-400 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+            Data feed synced every 30 seconds
+          </div>
+        </div>
+      </article>
+      <article class="rounded-2xl border border-white/10 bg-slate-900/70 p-5 space-y-2">
+        <h2 class="text-lg font-semibold">Latest Snapshot</h2>
+        <p class="text-[11px] text-slate-400">Monitor payload metadata</p>
+        <div class="grid grid-cols-2 gap-3 text-sm text-slate-200">
+          <div class="bg-white/5 rounded-lg p-3">
+            <p class="text-[11px] text-slate-400">Monitor endpoint</p>
+            <p class="font-semibold break-all" id="monitor-endpoint-display"></p>
+          </div>
+          <div class="bg-white/5 rounded-lg p-3">
+            <p class="text-[11px] text-slate-400">Captured at</p>
+            <p class="font-semibold" id="monitor-captured-at"></p>
+          </div>
+          <div class="bg-white/5 rounded-lg p-3 col-span-2">
+            <p class="text-[11px] text-slate-400">Summary totals</p>
+            <div class="flex items-center gap-4 text-[13px]">
+              <span id="summary-users" class="text-emerald-300 font-semibold">0 Users</span>
+              <span id="summary-pets" class="text-sky-300 font-semibold">0 Pets</span>
+              <span id="summary-orders" class="text-amber-300 font-semibold">0 Orders</span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="magic-bento-section">
+      <div class="magic-bento-headline">
+        <h3>Magic Bento</h3>
+        <p>Backend rituals for PawTrace HQ</p>
+      </div>
+      <div class="magic-bento-grid" id="magic-bento-monitor">
+        <article class="magic-bento-card" data-label="Analytics" data-title="API Heatmap" data-desc="Visualize which routes spike over the last hour."></article>
+        <article class="magic-bento-card" data-label="Watchers" data-title="Latency Watch" data-desc="Glow intensifies as proxy delay rises."></article>
+        <article class="magic-bento-card" data-label="Signals" data-title="Contact Radar" data-desc="Track chat personas that triggered AI replies."></article>
+        <article class="magic-bento-card" data-label="Store" data-title="Donation Drift" data-desc="See donation conversion rolling average."></article>
+        <article class="magic-bento-card" data-label="Ops" data-title="Auto Tasks" data-desc="Queue cache flush or data export macros."></article>
+        <article class="magic-bento-card" data-label="Safety" data-title="Integrity Scan" data-desc="Flag anomalies and nudge manual reviews."></article>
+      </div>
+    </section>
+
+    <section class="grid lg:grid-cols-[1fr,1.2fr] gap-4">
+      <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold">Data Snapshot</h2>
+            <p class="text-[11px] text-slate-400">Captured metrics from the backend monitor</p>
+          </div>
+          <span class="text-[11px] text-slate-500">Auto-refresh ×30s</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-200">
+            <thead class="text-[11px] uppercase text-slate-400 border-b border-white/5">
+              <tr>
+                <th class="py-2 pr-4">Metric</th>
+                <th class="py-2 pr-4">Count</th>
+                <th class="py-2">Notes</th>
+              </tr>
+            </thead>
+            <tbody id="summary-table-body" class="text-[13px] divide-y divide-white/5"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold">Daily Revenue Curve</h2>
+            <p class="text-[11px] text-slate-400">Sum of purchases grouped by date</p>
+          </div>
+          <span id="trend-range" class="text-[10px] text-slate-400"></span>
+        </div>
+        <!-- 固定高度，避免 Chart.js responsive + maintainAspectRatio:false 撑破父级导致页面高度失控 -->
+        <div class="relative h-[220px] w-full min-h-0 min-w-0">
+          <canvas id="revenue-chart"></canvas>
+        </div>
+        <p id="trend-empty" class="text-[11px] text-slate-500 text-center mt-4 hidden">No purchase data yet.</p>
+      </div>
+    </section>
+
+    <section class="grid lg:grid-cols-[1.2fr,0.8fr] gap-4">
+      <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Latest purchase table</h2>
+          <p class="text-[11px] text-slate-400">Newest 8 entries</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-200">
+            <thead class="text-[11px] uppercase text-slate-400 border-b border-white/5">
+              <tr>
+                <th class="py-2 pr-4">Time</th>
+                <th class="py-2 pr-4">Item</th>
+                <th class="py-2 pr-4">Quantity</th>
+                <th class="py-2 pr-4">Amount</th>
+                <th class="py-2">Notes</th>
+              </tr>
+            </thead>
+            <tbody id="detail-table-body" class="text-[13px] divide-y divide-white/5"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Timeline</h2>
+          <p class="text-[11px] text-slate-400">Recent capture points</p>
+        </div>
+        <div id="purchase-timeline" class="mt-4 space-y-3 text-[13px] text-slate-200"></div>
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Top Purchases</h2>
+        <p class="text-[11px] text-slate-400">Sorted by revenue</p>
+      </div>
+      <div id="ranking-list" class="grid gap-3 md:grid-cols-2"></div>
+      <p id="ranking-empty" class="text-[11px] text-slate-500">No purchases yet.</p>
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Live Purchase Log</h2>
+        <p class="text-[11px] text-slate-400">Latest entries (UI 最多展示 80 条，滚动查看)</p>
+      </div>
+      <div
+        id="purchase-log"
+        class="space-y-2 max-h-80 overflow-y-auto overflow-x-hidden pr-2"
+        style="max-height: 20rem"
+      ></div>
+      <p id="purchase-empty" class="text-[11px] text-slate-500">Waiting for new orders.</p>
+    </section>
+
+    <section class="pt-8">
+      <p class="text-center text-[11px] uppercase tracking-[0.3em] text-slate-500 mb-3">Quick actions dock</p>
+      <div class="monitor-dock">
+        <div class="monitor-dock-track" id="monitor-dock-track">
+          <button class="monitor-dock-item" data-label="Refresh data" data-action="refresh">
+            <span>🔄</span>
+            <span class="monitor-dock-item-label">Refresh</span>
+          </button>
+          <button class="monitor-dock-item" data-label="Open monitor" data-action="monitor">
+            <span>🛰️</span>
+            <span class="monitor-dock-item-label">Monitor API</span>
+          </button>
+          <button class="monitor-dock-item" data-label="View store" data-action="store">
+            <span>🛒</span>
+            <span class="monitor-dock-item-label">Store</span>
+          </button>
+          <button class="monitor-dock-item" data-label="Download log" data-action="export">
+            <span>📦</span>
+            <span class="monitor-dock-item-label">Export</span>
+          </button>
+          <button class="monitor-dock-item" data-label="System status" data-action="status">
+            <span>📡</span>
+            <span class="monitor-dock-item-label">Status</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const backendHost =
+      params.get('backend') ||
+      (window.location.protocol === 'file:'
+        ? 'http://localhost:3000'
+        : window.location.origin);
+    const overviewUrl = `${backendHost}/api/monitor/overview`;
+    const monitorToken =
+      params.get('token') || params.get('monitor_token') || '';
+    function monitorAuthHeaders() {
+      const h = {};
+      if (monitorToken) h['Authorization'] = `Bearer ${monitorToken}`;
+      return h;
+    }
+    function escapeHtml(s) {
+      if (s == null || s === '') return '';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+    function localDateKey(d) {
+      const x = d instanceof Date ? d : new Date(d);
+      if (Number.isNaN(x.getTime())) return '';
+      const y = x.getFullYear();
+      const m = String(x.getMonth() + 1).padStart(2, '0');
+      const day = String(x.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+    function isSameLocalDay(isoString, localKey) {
+      if (!isoString || !localKey) return false;
+      const d = new Date(isoString);
+      if (Number.isNaN(d.getTime())) return false;
+      return localDateKey(d) === localKey;
+    }
+    const statusEl = document.getElementById('monitor-status');
+    const totalSalesEl = document.getElementById('total-sales');
+    const todaySalesEl = document.getElementById('today-sales');
+    const rankingListEl = document.getElementById('ranking-list');
+    const rankingEmptyEl = document.getElementById('ranking-empty');
+    const purchaseLogEl = document.getElementById('purchase-log');
+    const purchaseEmptyEl = document.getElementById('purchase-empty');
+    const totalCountEl = document.getElementById('total-count');
+    const todayCountEl = document.getElementById('today-count');
+    const chatCountEl = document.getElementById('chat-count');
+    const contactCountEl = document.getElementById('contact-count');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const summaryTableBody = document.getElementById('summary-table-body');
+    const detailTableBody = document.getElementById('detail-table-body');
+    const timelineEl = document.getElementById('purchase-timeline');
+    const trendRangeEl = document.getElementById('trend-range');
+    const trendEmptyEl = document.getElementById('trend-empty');
+    const revenueCanvas = document.getElementById('revenue-chart');
+    const endpointDisplayEl = document.getElementById('monitor-endpoint-display');
+    const capturedAtEl = document.getElementById('monitor-captured-at');
+    const summaryUsersEl = document.getElementById('summary-users');
+    const summaryPetsEl = document.getElementById('summary-pets');
+    const summaryOrdersEl = document.getElementById('summary-orders');
+    const letterGlitchRoot = document.getElementById('letter-glitch');
+    /** 仅控制前端列表渲染量，减轻 DOM；与后端 MONITOR_MAX 无关 */
+    const PURCHASE_LOG_UI_MAX = 80;
+    let revenueChart = null;
+    if (endpointDisplayEl) endpointDisplayEl.textContent = backendHost;
+
+    const glitchConfig = {
+      glitchColors: ['#2b4539', '#61dca3', '#61b3dc'],
+      glitchSpeed: 140,
+      centerVignette: true,
+      outerVignette: false,
+      smooth: true,
+      characters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$&*()-_+=/[]{};:<>.,0123456789'
+    };
+    function getLowPowerMode() {
+      return (
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+        window.innerWidth < 900
+      );
+    }
+    let lowPowerMode = getLowPowerMode();
+    const glitchState = {
+      letters: [],
+      grid: { columns: 0, rows: 0 },
+      fontSize: 16,
+      charWidth: 10,
+      charHeight: 20,
+      ctx: null,
+      canvas: null,
+      animationId: null,
+      lastFrameTime: 0,
+      lastGlitchTime: Date.now(),
+      resizeTimer: null,
+      paused: false,
+      glitchResizeHandler: null,
+      glitchIo: null
+    };
+    /** 与 visibility + 视口交叉共同决定是否跑 glitch 动画 */
+    let glitchInView = true;
+    function syncGlitchPause() {
+      setGlitchPaused(document.hidden || !glitchInView);
+    }
+
+    function destroyLetterGlitch() {
+      if (glitchState.glitchIo) {
+        glitchState.glitchIo.disconnect();
+        glitchState.glitchIo = null;
+      }
+      if (glitchState.resizeTimer) clearTimeout(glitchState.resizeTimer);
+      glitchState.resizeTimer = null;
+      if (glitchState.glitchResizeHandler) {
+        window.removeEventListener('resize', glitchState.glitchResizeHandler);
+        glitchState.glitchResizeHandler = null;
+      }
+      if (glitchState.animationId) {
+        cancelAnimationFrame(glitchState.animationId);
+        glitchState.animationId = null;
+      }
+      glitchState.lastFrameTime = 0;
+      glitchState.canvas = null;
+      glitchState.ctx = null;
+      glitchState.letters = [];
+      if (letterGlitchRoot) {
+        letterGlitchRoot.innerHTML = '';
+      }
+    }
+
+    function setupGlitchIntersectionObserver() {
+      if (glitchState.glitchIo) {
+        glitchState.glitchIo.disconnect();
+        glitchState.glitchIo = null;
+      }
+      if (lowPowerMode || !letterGlitchRoot || !('IntersectionObserver' in window)) return;
+      glitchState.glitchIo = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            glitchInView = e.isIntersecting;
+            syncGlitchPause();
+          }
+        },
+        { root: null, threshold: 0.02, rootMargin: '0px 0px -80px 0px' }
+      );
+      glitchState.glitchIo.observe(letterGlitchRoot);
+    }
+
+    function applyLowPowerModeChange() {
+      const next = getLowPowerMode();
+      if (next === lowPowerMode) return;
+      lowPowerMode = next;
+      initLetterGlitch();
+    }
+
+    function initMagicBentoGrid(selector) {
+      const root = document.querySelector(selector);
+      if (!root) return;
+      const cards = root.querySelectorAll('.magic-bento-card');
+      cards.forEach(card => {
+        const label = card.dataset.label || 'Module';
+        const title = card.dataset.title || 'Untitled';
+        const desc = card.dataset.desc || '';
+        card.innerHTML = `
+          <div class="magic-bento-chip">
+            <span>✦</span>
+            <span>${escapeHtml(label)}</span>
+          </div>
+          <h4>${escapeHtml(title)}</h4>
+          <p>${escapeHtml(desc)}</p>
+        `;
+        if (!lowPowerMode) {
+          card.addEventListener('mousemove', (event) => {
+            const rect = card.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const percentX = (x / rect.width) * 100;
+            const percentY = (y / rect.height) * 100;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateX = ((y - centerY) / centerY) * -8;
+            const rotateY = ((x - centerX) / centerX) * 8;
+            card.style.setProperty('--glow-x', `${percentX}%`);
+            card.style.setProperty('--glow-y', `${percentY}%`);
+            card.style.setProperty('--glow-strength', '1');
+            card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(0)`;
+          });
+          card.addEventListener('mouseleave', () => {
+            card.style.setProperty('--glow-strength', '0');
+            card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg)';
+          });
+        }
+        card.addEventListener('click', (event) => {
+          const rect = card.getBoundingClientRect();
+          const size = Math.max(rect.width, rect.height) * 1.3;
+          const ripple = document.createElement('span');
+          ripple.className = 'magic-bento-ripple';
+          ripple.style.width = ripple.style.height = `${size}px`;
+          ripple.style.left = `${event.clientX - rect.left - size / 2}px`;
+          ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
+          card.appendChild(ripple);
+          ripple.addEventListener('animationend', () => ripple.remove());
+        });
+      });
+    }
+
+    function toCssColor(color) {
+      return `rgb(${color.r}, ${color.g}, ${color.b})`;
+    }
+
+    function hexToRgb(hex) {
+      const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+      hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result
+        ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+          }
+        : { r: 255, g: 255, b: 255 };
+    }
+
+    function cloneColor(color) {
+      return { r: color.r, g: color.g, b: color.b };
+    }
+
+    function getRandomGlitchChar() {
+      const chars = glitchConfig.characters;
+      return chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    function getRandomGlitchColor() {
+      const hex = glitchConfig.glitchColors[Math.floor(Math.random() * glitchConfig.glitchColors.length)];
+      return hexToRgb(hex);
+    }
+
+    function interpolateColor(start, end, factor) {
+      return {
+        r: Math.round(start.r + (end.r - start.r) * factor),
+        g: Math.round(start.g + (end.g - start.g) * factor),
+        b: Math.round(start.b + (end.b - start.b) * factor)
+      };
+    }
+
+    function calculateGlitchGrid(rect) {
+      const columns = Math.ceil(rect.width / glitchState.charWidth);
+      const rows = Math.ceil(rect.height / glitchState.charHeight);
+      return { columns, rows };
+    }
+
+    function initializeGlitchLetters(columns, rows) {
+      glitchState.grid = { columns, rows };
+      const total = columns * rows;
+      glitchState.letters = Array.from({ length: total }, () => {
+        const color = getRandomGlitchColor();
+        return {
+          char: getRandomGlitchChar(),
+          color,
+          startColor: cloneColor(color),
+          targetColor: getRandomGlitchColor(),
+          progress: 1
+        };
+      });
+    }
+
+    function drawGlitchLetters() {
+      if (!glitchState.ctx || !glitchState.canvas) return;
+      const ctx = glitchState.ctx;
+      const canvas = glitchState.canvas;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = `${glitchState.fontSize}px monospace`;
+      ctx.textBaseline = 'top';
+      glitchState.letters.forEach((letter, index) => {
+        const x = (index % glitchState.grid.columns) * glitchState.charWidth;
+        const y = Math.floor(index / glitchState.grid.columns) * glitchState.charHeight;
+        ctx.fillStyle = toCssColor(letter.color);
+        ctx.fillText(letter.char, x, y);
+      });
+    }
+
+    function updateGlitchLetters() {
+      const letters = glitchState.letters;
+      if (!letters.length) return;
+      const updateCount = Math.max(1, Math.floor(letters.length * 0.01));
+      for (let i = 0; i < updateCount; i++) {
+        const index = Math.floor(Math.random() * letters.length);
+        const letter = letters[index];
+        if (!letter) continue;
+        letter.char = getRandomGlitchChar();
+        letter.startColor = cloneColor(letter.color);
+        letter.targetColor = getRandomGlitchColor();
+        if (!glitchConfig.smooth) {
+          letter.color = cloneColor(letter.targetColor);
+          letter.progress = 1;
+        } else {
+          letter.progress = 0;
+        }
+      }
+    }
+
+    function smoothGlitchColors() {
+      if (!glitchConfig.smooth) return;
+      let needsRedraw = false;
+      glitchState.letters.forEach(letter => {
+        if (letter.progress < 1) {
+          letter.progress += 0.05;
+          if (letter.progress > 1) letter.progress = 1;
+          letter.color = interpolateColor(letter.startColor, letter.targetColor, letter.progress);
+          needsRedraw = true;
+        }
+      });
+      if (needsRedraw) drawGlitchLetters();
+    }
+
+    function resizeGlitchCanvas() {
+      if (!letterGlitchRoot || !glitchState.canvas) return;
+      const rect = letterGlitchRoot.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const dpr = window.devicePixelRatio || 1;
+      glitchState.canvas.width = rect.width * dpr;
+      glitchState.canvas.height = rect.height * dpr;
+      glitchState.canvas.style.width = `${rect.width}px`;
+      glitchState.canvas.style.height = `${rect.height}px`;
+      if (glitchState.ctx) {
+        glitchState.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      const { columns, rows } = calculateGlitchGrid(rect);
+      initializeGlitchLetters(columns, rows);
+      drawGlitchLetters();
+    }
+
+    function animateGlitch() {
+      if (glitchState.paused) return;
+      const nowPerf = performance.now();
+      const targetFrameMs = 1000 / 24;
+      if (nowPerf - glitchState.lastFrameTime < targetFrameMs) {
+        glitchState.animationId = requestAnimationFrame(animateGlitch);
+        return;
+      }
+      glitchState.lastFrameTime = nowPerf;
+      const now = Date.now();
+      if (now - glitchState.lastGlitchTime >= glitchConfig.glitchSpeed) {
+        updateGlitchLetters();
+        drawGlitchLetters();
+        glitchState.lastGlitchTime = now;
+      }
+      smoothGlitchColors();
+      glitchState.animationId = requestAnimationFrame(animateGlitch);
+    }
+
+    function initLetterGlitch() {
+      if (!letterGlitchRoot) return;
+      if (lowPowerMode) {
+        destroyLetterGlitch();
+        letterGlitchRoot.style.background =
+          'radial-gradient(circle at center, rgba(15,23,42,0.72), rgba(2,6,23,0.95))';
+        letterGlitchRoot.style.removeProperty('backgroundColor');
+        letterGlitchRoot.style.overflow = 'hidden';
+        return;
+      }
+      destroyLetterGlitch();
+      letterGlitchRoot.style.removeProperty('background');
+      letterGlitchRoot.style.backgroundColor = '#020617';
+      letterGlitchRoot.style.overflow = 'hidden';
+
+      glitchState.canvas = document.createElement('canvas');
+      glitchState.canvas.style.display = 'block';
+      glitchState.canvas.style.width = '100%';
+      glitchState.canvas.style.height = '100%';
+      glitchState.canvas.style.filter = 'blur(0.2px)';
+      glitchState.ctx = glitchState.canvas.getContext('2d');
+      letterGlitchRoot.appendChild(glitchState.canvas);
+
+      if (glitchConfig.outerVignette) {
+        const outer = document.createElement('div');
+        outer.style.position = 'absolute';
+        outer.style.inset = '0';
+        outer.style.background = 'radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.9) 100%)';
+        outer.style.pointerEvents = 'none';
+        letterGlitchRoot.appendChild(outer);
+      }
+      if (glitchConfig.centerVignette) {
+        const center = document.createElement('div');
+        center.style.position = 'absolute';
+        center.style.inset = '0';
+        center.style.background = 'radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0) 60%)';
+        center.style.pointerEvents = 'none';
+        letterGlitchRoot.appendChild(center);
+      }
+
+      resizeGlitchCanvas();
+      if (glitchState.animationId) cancelAnimationFrame(glitchState.animationId);
+      glitchState.animationId = requestAnimationFrame(animateGlitch);
+
+      glitchState.glitchResizeHandler = () => {
+        clearTimeout(glitchState.resizeTimer);
+        glitchState.resizeTimer = setTimeout(() => {
+          cancelAnimationFrame(glitchState.animationId);
+          resizeGlitchCanvas();
+          glitchState.animationId = requestAnimationFrame(animateGlitch);
+        }, 120);
+      };
+      window.addEventListener('resize', glitchState.glitchResizeHandler);
+      setupGlitchIntersectionObserver();
+    }
+
+    function setGlitchPaused(paused) {
+      glitchState.paused = Boolean(paused);
+      if (glitchState.paused) {
+        if (glitchState.animationId) cancelAnimationFrame(glitchState.animationId);
+        glitchState.animationId = null;
+      } else if (glitchState.canvas && !glitchState.animationId) {
+        glitchState.lastFrameTime = 0;
+        glitchState.animationId = requestAnimationFrame(animateGlitch);
+      }
+    }
+
+    function formatYuan(value = 0) {
+      return `¥${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function renderSummaryTable(summary = {}) {
+      if (!summaryTableBody) return;
+      const rows = [
+        { label: 'User Profiles', value: summary.userProfiles || 0, note: 'Account & login records' },
+        { label: 'Pet Profiles', value: summary.petProfiles || 0, note: 'Pet dossiers' },
+        { label: 'Purchases', value: summary.purchases || 0, note: 'Store submissions' },
+        { label: 'Chat Logs', value: summary.chatLogs || 0, note: 'AI or contact replies' },
+        { label: 'Contacts', value: summary.contactsTracked || 0, note: 'Tracked chat contacts' }
+      ];
+      summaryTableBody.innerHTML = rows.map(row => `
+        <tr>
+          <td class="py-2 pr-4">${row.label}</td>
+          <td class="py-2 pr-4 text-amber-200 font-semibold">${row.value}</td>
+          <td class="py-2 text-slate-400">${row.note}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderDetailTable(items = []) {
+      if (!detailTableBody) return;
+      if (!items.length) {
+        detailTableBody.innerHTML = `
+          <tr><td colspan="5" class="py-4 text-center text-slate-500 text-[12px]">No purchase data yet.</td></tr>
+        `;
+        return;
+      }
+      const rows = items.slice(-8).reverse().map(record => {
+        const timestamp = record.capturedAt ? new Date(record.capturedAt).toLocaleString() : 'Unknown';
+        const note = record.note || record.metadata?.note || '';
+        const name = escapeHtml(record.name || 'Unknown');
+        const noteCell = note ? escapeHtml(note) : '--';
+        return `
+          <tr>
+            <td class="py-2 pr-4 whitespace-nowrap text-[11px]">${timestamp}</td>
+            <td class="py-2 pr-4">${name}</td>
+            <td class="py-2 pr-4">${record.quantity || 1}</td>
+            <td class="py-2 pr-4">${formatYuan(record.amount)}</td>
+            <td class="py-2 text-slate-400">${noteCell}</td>
+          </tr>
+        `;
+      });
+      detailTableBody.innerHTML = rows.join('');
+    }
+
+    function renderTimeline(records = []) {
+      if (!timelineEl) return;
+      if (!records.length) {
+        timelineEl.innerHTML = '<p class="text-[12px] text-slate-500">No timeline events captured.</p>';
+        return;
+      }
+      const latest = records.slice(-6).reverse();
+      timelineEl.innerHTML = latest.map(entry => {
+        const timestamp = entry.capturedAt ? new Date(entry.capturedAt).toLocaleString() : 'Unknown time';
+        const name = escapeHtml(entry.purchase?.name || 'Purchase');
+        const quantity = entry.purchase?.quantity || 1;
+        const metaSource = entry.metadata?.source || entry.metadata?.username || '';
+        const metaEsc = metaSource ? escapeHtml(metaSource) : '';
+        return `
+          <div class="border-l-2 border-orange-400/60 pl-3">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>${timestamp}</span>
+              ${metaEsc ? `<span class="text-[10px] text-slate-500">by ${metaEsc}</span>` : ''}
+            </div>
+            <p class="text-sm font-semibold text-white">${name}</p>
+            <p class="text-[11px] text-slate-400">${quantity} × ¥${Number(entry.purchase?.price || 0).toFixed(2)}</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function buildTrendSeries(items = []) {
+      const trendMap = {};
+      items.forEach(record => {
+        if (!record.capturedAt) return;
+        const d = new Date(record.capturedAt);
+        if (Number.isNaN(d.getTime())) return;
+        const dateKey = localDateKey(d);
+        trendMap[dateKey] = (trendMap[dateKey] || 0) + (record.amount || 0);
+      });
+      return Object.keys(trendMap)
+        .sort()
+        .map(date => ({ date, amount: Number(trendMap[date].toFixed(2)) }));
+    }
+
+    function renderRevenueChart(series = []) {
+      if (!revenueCanvas) return;
+      const ctx = revenueCanvas.getContext('2d');
+      if (!series.length) {
+        trendEmptyEl?.classList.remove('hidden');
+        if (trendRangeEl) trendRangeEl.textContent = '';
+        if (revenueChart) {
+          revenueChart.destroy();
+          revenueChart = null;
+        }
+        return;
+      }
+      trendEmptyEl?.classList.add('hidden');
+      const labels = series.map(point => point.date);
+      const dataPoints = series.map(point => point.amount);
+      if (trendRangeEl) trendRangeEl.textContent = `${labels[0]} → ${labels[labels.length - 1]}`;
+      if (revenueChart) {
+        revenueChart.data.labels = labels;
+        revenueChart.data.datasets[0].data = dataPoints;
+        revenueChart.update('none');
+        return;
+      }
+      revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Revenue',
+              data: dataPoints,
+              fill: true,
+              backgroundColor: 'rgba(251, 191, 36, 0.15)',
+              borderColor: '#fbbf24',
+              tension: 0.3,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointBackgroundColor: '#f59e0b'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          layout: { padding: { top: 4, right: 4, bottom: 4, left: 4 } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => `¥${ctx.parsed.y.toFixed(2)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#94a3b8', font: { size: 11 } },
+              grid: { color: 'rgba(148,163,184,0.1)' }
+            },
+            y: {
+              ticks: {
+                color: '#94a3b8',
+                font: { size: 11 },
+                callback: value => `¥${value}`
+              },
+              grid: { color: 'rgba(148,163,184,0.1)' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderRanking(ranking) {
+      if (!rankingListEl || !rankingEmptyEl) return;
+      if (!ranking.length) {
+        rankingEmptyEl.classList.remove('hidden');
+        rankingListEl.innerHTML = '';
+        return;
+      }
+      rankingEmptyEl.classList.add('hidden');
+      rankingListEl.innerHTML = ranking.map((entry, idx) => `
+        <article class="rounded-2xl border border-white/10 bg-slate-900 p-4 space-y-1">
+          <p class="text-[11px] text-slate-400">#${idx + 1}</p>
+          <p class="text-sm font-semibold">${escapeHtml(entry.name)}</p>
+          <p class="text-[11px] text-slate-500">Qty: ${entry.quantity}</p>
+          <p class="text-[11px] text-slate-500">Revenue: ${formatYuan(entry.revenue)}</p>
+        </article>
+      `).join('');
+    }
+
+    function renderPurchaseHistory(records) {
+      if (!purchaseLogEl || !purchaseEmptyEl) return;
+      if (!records.length) {
+        purchaseEmptyEl.classList.remove('hidden');
+        purchaseLogEl.innerHTML = '';
+        return;
+      }
+      purchaseEmptyEl.classList.add('hidden');
+      const capped = records.slice(0, PURCHASE_LOG_UI_MAX);
+      purchaseLogEl.innerHTML = capped.map(record => {
+        const purchase = record.purchase || record;
+        const quantity = Number(purchase.quantity) || 1;
+        const price = Number(purchase.price) || 0;
+        const amount = price * quantity;
+        const captured = record.capturedAt || purchase.capturedAt || '';
+        const timestamp = captured ? new Date(captured).toLocaleString() : 'Unknown';
+        const nameEsc = escapeHtml(purchase.name || '');
+        const noteEsc = purchase.note ? escapeHtml(purchase.note) : '';
+        return `
+          <div class="rounded-2xl border border-white/5 bg-slate-900/80 p-3">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>${nameEsc}</span>
+              <span>${formatYuan(amount)}</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+              <span>${quantity} × ¥${price.toFixed(2)}</span>
+              <span>${timestamp}</span>
+            </div>
+            ${noteEsc ? `<p class="text-[10px] text-slate-500 mt-1">Note: ${noteEsc}</p>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function buildSummary(data) {
+      const preservePurchaseLogScroll = purchaseLogEl ? purchaseLogEl.scrollTop : 0;
+      const records = Array.isArray(data.monitoring?.purchases) ? data.monitoring.purchases : [];
+      const items = records.map(entry => ({
+        ...entry.purchase,
+        amount: (Number(entry.purchase?.price) || 0) * (Number(entry.purchase?.quantity) || 1),
+        capturedAt: entry.capturedAt || entry.purchase?.capturedAt,
+        metadata: entry.metadata || {}
+      }));
+      const totalRevenue = items.reduce((sum, record) => sum + record.amount, 0);
+      const todayKey = localDateKey();
+      const todayRevenue = items
+        .filter(record => isSameLocalDay(record.capturedAt, todayKey))
+        .reduce((sum, record) => sum + record.amount, 0);
+      const todayCount = items.filter(record => isSameLocalDay(record.capturedAt, todayKey)).length;
+      const rankMap = {};
+      items.forEach(record => {
+        const key = record.name || 'Unknown';
+        if (!rankMap[key]) {
+          rankMap[key] = { name: key, quantity: 0, revenue: 0 };
+        }
+        rankMap[key].quantity += Number(record.quantity) || 1;
+        rankMap[key].revenue += record.amount;
+      });
+      const ranking = Object.values(rankMap)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 6);
+      if (totalSalesEl) totalSalesEl.textContent = formatYuan(totalRevenue);
+      if (todaySalesEl) todaySalesEl.textContent = formatYuan(todayRevenue);
+      if (totalCountEl) totalCountEl.textContent = `${items.length} purchases captured`;
+      if (todayCountEl) todayCountEl.textContent = `${todayCount} purchases today`;
+      if (chatCountEl) chatCountEl.textContent = `${data.summary?.chatLogs || 0} replies`;
+      if (contactCountEl) contactCountEl.textContent = `${data.summary?.contactsTracked || 0}`;
+      if (capturedAtEl) {
+        const stamp = data.capturedAt ? new Date(data.capturedAt).toLocaleString() : 'N/A';
+        capturedAtEl.textContent = stamp;
+      }
+      if (summaryUsersEl) summaryUsersEl.textContent = `${data.summary?.userProfiles || 0} Users`;
+      if (summaryPetsEl) summaryPetsEl.textContent = `${data.summary?.petProfiles || 0} Pets`;
+      if (summaryOrdersEl) summaryOrdersEl.textContent = `${items.length} Orders`;
+      renderRanking(ranking);
+      renderPurchaseHistory(records.slice().reverse());
+      if (purchaseLogEl) purchaseLogEl.scrollTop = preservePurchaseLogScroll;
+      renderSummaryTable(data.summary || {});
+      renderRevenueChart(buildTrendSeries(items));
+      renderDetailTable(items);
+      renderTimeline(records);
+    }
+
+    async function refreshData() {
+      if (statusEl) statusEl.textContent = 'Loading...';
+      try {
+        const response = await fetch(overviewUrl, {
+          cache: 'no-store',
+          headers: monitorAuthHeaders()
+        });
+        if (response.status === 401) {
+          if (statusEl) {
+            statusEl.textContent =
+              '未授权 · 请在 URL 加 ?token= 密钥，或与后端 MONITOR_API_TOKEN 一致';
+          }
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`Status ${response.status}`);
+        }
+        const data = await response.json();
+        buildSummary(data);
+        if (statusEl) statusEl.textContent = `Synced ${new Date().toLocaleTimeString()}`;
+      } catch (err) {
+        if (statusEl) statusEl.textContent = `Offline · ${err.message}`;
+      }
+    }
+
+    initLetterGlitch();
+    let lowPowerResizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(lowPowerResizeTimer);
+      lowPowerResizeTimer = setTimeout(() => applyLowPowerModeChange(), 150);
+    });
+    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => {
+      applyLowPowerModeChange();
+    });
+    initMagicBentoGrid('#magic-bento-monitor');
+    const dockTrack = document.getElementById('monitor-dock-track');
+    if (dockTrack) {
+      const dockItems = Array.from(dockTrack.querySelectorAll('.monitor-dock-item'));
+      let dockMoveRaf = 0;
+      let lastDockEvent = null;
+      const handleDockMove = (event) => {
+        if (lowPowerMode) return;
+        lastDockEvent = event;
+        if (dockMoveRaf) return;
+        dockMoveRaf = requestAnimationFrame(() => {
+          dockMoveRaf = 0;
+          const ev = lastDockEvent;
+          if (!ev) return;
+          const pointerX = ev.clientX;
+          dockItems.forEach(item => {
+            const rect = item.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const distance = Math.abs(pointerX - centerX);
+            const influence = Math.max(0, 1 - distance / 180);
+            const scale = 1 + influence * 0.85;
+            const translateY = -influence * 18;
+            item.style.transform = `translateY(${translateY}px) scale(${scale})`;
+            item.style.borderColor = `rgba(255,255,255,${0.15 + influence * 0.6})`;
+          });
+        });
+      };
+      const resetDock = () => {
+        dockItems.forEach(item => {
+          item.style.transform = 'translateY(0px) scale(1)';
+          item.style.borderColor = 'rgba(255,255,255,0.1)';
+        });
+      };
+      dockTrack.addEventListener('mousemove', handleDockMove);
+      dockTrack.addEventListener('mouseleave', resetDock);
+      dockItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const action = item.dataset.action;
+          const label = item.dataset.label || action;
+          if (action === 'refresh') {
+            refreshData();
+          } else if (action === 'monitor') {
+            window.open(overviewUrl, '_blank', 'noreferrer');
+          } else if (action === 'store') {
+            window.open(backendHost, '_blank', 'noreferrer');
+          } else if (action === 'export') {
+            const payload = `PawTrace Monitor Snapshot\nEndpoint: ${backendHost}\nTimestamp: ${new Date().toLocaleString()}`;
+            const blob = new Blob([payload], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'pawtrace-monitor.txt';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(link.href), 500);
+          } else if (action === 'status' && statusEl) {
+            statusEl.textContent = `Status ping · ${new Date().toLocaleTimeString()}`;
+          }
+          if (statusEl && action !== 'status') {
+            statusEl.textContent = `${label} · ${new Date().toLocaleTimeString()}`;
+          }
+        });
+      });
+    }
+    refreshBtn?.addEventListener('click', () => refreshData());
+    refreshData();
+    let refreshTimer = window.setInterval(refreshData, 30000);
+    document.addEventListener('visibilitychange', () => {
+      syncGlitchPause();
+      if (document.hidden) {
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = null;
+      } else {
+        refreshData();
+        if (!refreshTimer) refreshTimer = window.setInterval(refreshData, 30000);
+      }
+    });
+  </script>
+</body>
+</html>

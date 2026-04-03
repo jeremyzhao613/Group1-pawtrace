@@ -14,6 +14,8 @@
     {
       id: 'canal-paw-cafe',
       name: 'Canal Paw Cafe',
+      markerLabel: 'Cafe',
+      markerIcon: 'fa-mug-hot',
       type: 'Coffee + pet break',
       description: 'A compact coffee stop beside the north canal bridge, with shaded seats and water bowls for quick campus walks.',
       rating: '4.8 · 240 reviews',
@@ -23,12 +25,14 @@
       phone: '+86 512 8888 3201',
       address: 'North Canal Bridge, Taicang Campus',
       status: 'Open now',
-      coords: { x: 49, y: 33 },
+      coords: { x: 44, y: 31.8 },
       link: 'https://pawtrace.demo/spot/canal-paw-cafe'
     },
     {
       id: 'ring-lawn-garden',
       name: 'Ring Lawn Garden',
+      markerLabel: 'Lawn',
+      markerIcon: 'fa-seedling',
       type: 'Open lawn + shade',
       description: 'The central green beside the ring is the easiest place to pause, meet other owners, and let pets settle before class.',
       rating: '4.9 · 410 reviews',
@@ -38,12 +42,14 @@
       phone: '+86 512 8802 5521',
       address: 'Central Ring Promenade',
       status: 'Busy after 5pm',
-      coords: { x: 68, y: 48 },
+      coords: { x: 63.5, y: 46.5 },
       link: 'https://pawtrace.demo/spot/ring-lawn-garden'
     },
     {
       id: 'learning-hub-supplies',
       name: 'Learning Hub Pet Supplies',
+      markerLabel: 'Supply',
+      markerIcon: 'fa-store',
       type: 'Pet essentials kiosk',
       description: 'A grab-and-go kiosk near the upper learning hub for wipes, waste bags, small snacks, and replacement tags.',
       rating: '4.7 · 186 reviews',
@@ -53,12 +59,14 @@
       phone: '+86 512 8811 6128',
       address: 'Learning Hub Entrance',
       status: 'Stocked today',
-      coords: { x: 59, y: 22 },
+      coords: { x: 57.8, y: 20.5 },
       link: 'https://pawtrace.demo/spot/learning-hub-supplies'
     },
     {
       id: 'trackside-play-zone',
       name: 'Trackside Play Zone',
+      markerLabel: 'Track',
+      markerIcon: 'fa-person-walking',
       type: 'Walk loop + open field',
       description: 'A calmer stretch near the stadium where owners usually do short walks, cooldowns, and basic obedience practice.',
       rating: '4.8 · 352 reviews',
@@ -68,12 +76,14 @@
       phone: '+86 512 8844 5090',
       address: 'Stadium Track Edge',
       status: 'Best at sunset',
-      coords: { x: 50, y: 69 },
+      coords: { x: 46.5, y: 68.5 },
       link: 'https://pawtrace.demo/spot/trackside-play-zone'
     },
     {
       id: 'west-courtyard-care',
       name: 'West Courtyard Care Point',
+      markerLabel: 'Care',
+      markerIcon: 'fa-kit-medical',
       type: 'Pet wellness kiosk',
       description: 'A small service point near the west residence blocks for first-aid wipes, water refill, and temporary NFC card help.',
       rating: '4.6 · 129 reviews',
@@ -83,7 +93,7 @@
       phone: '+86 512 8866 1408',
       address: 'West Residence Quad',
       status: 'Open this afternoon',
-      coords: { x: 24, y: 20 },
+      coords: { x: 18.5, y: 23.5 },
       link: 'https://pawtrace.demo/spot/west-courtyard-care'
     }
   ];
@@ -93,19 +103,19 @@
       name: 'Bao',
       emoji: '🐶',
       status: 'Central Ring',
-      coords: { x: 67, y: 46 }
+      coords: { x: 62.8, y: 47.3 }
     },
     {
       name: 'Mochi',
       emoji: '🐱',
       status: 'North Canal',
-      coords: { x: 48, y: 33 }
+      coords: { x: 44.5, y: 31.6 }
     },
     {
       name: 'Nimbus',
       emoji: '🐶',
       status: 'Track Edge',
-      coords: { x: 51, y: 68 }
+      coords: { x: 46.8, y: 68.8 }
     }
   ];
 
@@ -168,6 +178,7 @@
       this.locations = DEMO_LOCATIONS;
       this.trackedPets = [];
       this.handleResize = null;
+      this.resizeObserver = null;
     }
 
     init() {
@@ -178,8 +189,10 @@
       this.renderTrackedPets();
       this.attachCardHandlers();
       this.updateLocationCount();
-      if (this.locations.length) {
+      if (this.locations.length && window.innerWidth > 768) {
         this.showLocationCard(this.locations[0]);
+      } else {
+        this.hideLocationCard();
       }
       document.addEventListener('pawtrace:pets-updated', () => this.refreshTrackedPets());
     }
@@ -189,6 +202,10 @@
       if (!this.handleResize) {
         this.handleResize = () => this.updateMapFrame();
         window.addEventListener('resize', this.handleResize);
+      }
+      if (!this.resizeObserver && this.container && typeof ResizeObserver === 'function') {
+        this.resizeObserver = new ResizeObserver(() => this.updateMapFrame());
+        this.resizeObserver.observe(this.container);
       }
       if (this.background.tagName === 'IMG') {
         const preferred = this.background.getAttribute('src') || MAP_BACKGROUND_SOURCES[0];
@@ -258,7 +275,11 @@
         marker.className = 'map-marker';
         marker.style.left = `${location.coords?.x ?? 50}%`;
         marker.style.top = `${location.coords?.y ?? 50}%`;
-        marker.innerHTML = '<span aria-hidden="true">🐾</span>';
+        marker.setAttribute('aria-label', `${location.name} marker`);
+        marker.innerHTML = `
+          <span class="map-marker__icon" aria-hidden="true"><i class="fas ${location.markerIcon || 'fa-store'}"></i></span>
+          <span class="map-marker__label">${location.markerLabel || location.name}</span>
+        `;
         marker.addEventListener('click', () => this.showLocationCard(location, marker));
         this.markersLayer.appendChild(marker);
         this.locationMarkerMap.set(location.id, marker);
@@ -316,6 +337,7 @@
         node.style.left = `${record.coords?.x ?? 50}%`;
         node.style.top = `${record.coords?.y ?? 50}%`;
         node.title = `${record.name} · ${record.location}`;
+        node.setAttribute('aria-label', `${record.name} live location`);
         node.innerHTML = `
           <span class="map-pet-circle">${record.avatar ? `<img src="${record.avatar}" alt="${record.name}" />` : record.emoji}</span>
           <span class="map-pet-name">${record.name}</span>
@@ -333,6 +355,17 @@
       if (this.cardElements.closeButton) {
         this.cardElements.closeButton.addEventListener('click', () => this.hideLocationCard());
       }
+    }
+
+    revealDetailCard() {
+      if (!this.locationCard || this.locationCard.classList.contains('hidden')) return;
+      if (window.innerWidth > 768) return;
+      window.requestAnimationFrame(() => {
+        this.locationCard.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest'
+        });
+      });
     }
 
     focusTrackedPet(petId) {
@@ -375,6 +408,7 @@
         linkButton.innerHTML = '<i class="fas fa-paw mr-1"></i>Open pet card';
         linkButton.onclick = () => global.document.querySelector('[data-tab="pets"]')?.click();
       }
+      this.revealDetailCard();
     }
 
     renderTrackedPetList() {
@@ -452,6 +486,7 @@
         this.cardElements.linkButton.innerHTML = '<i class="fas fa-directions mr-1"></i>Visit this spot';
       }
       this.setLink(location.link);
+      this.revealDetailCard();
     }
 
     hideLocationCard() {
@@ -496,6 +531,22 @@
     updateLocationCount() {
       if (!this.locationCountEl) return;
       this.locationCountEl.textContent = `${this.locations.length} spots`;
+    }
+
+    syncMapView() {
+      window.requestAnimationFrame(() => {
+        this.updateMapFrame();
+        this.renderMarkers();
+        this.renderTrackedPets();
+        if (this.activeTrackedPetId) {
+          this.focusTrackedPet(this.activeTrackedPetId);
+          return;
+        }
+        if (this.activeLocationId) {
+          const location = this.locations.find((entry) => entry.id === this.activeLocationId);
+          if (location) this.showLocationCard(location);
+        }
+      });
     }
   }
 

@@ -1119,6 +1119,11 @@
         if (tabPages[name]) {
           tabPages[name].classList.add('visible');
         }
+        if (name === 'map') {
+          window.requestAnimationFrame(() => {
+            mapController?.syncMapView?.();
+          });
+        }
         if (name === 'chat' && window.innerWidth <= 1024) {
           chatPane?.classList.add('open');
           if (chatToggle) chatToggle.textContent = 'Hide friends';

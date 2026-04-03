@@ -1,4 +1,9 @@
-PawTrace Web App（完整前后端）
+PawTrace 是一个全栈宠物社区与健康管理原型：以「地图 + 社交 + AI」为核心，帮助用户在校园环境中发现宠物友好地点、管理多只宠物信息，并通过大模型完成对话式互动与基于图片的健康/行为类辅助分析（服务端集成阿里云通义千问文本与 Qwen-VL 视觉能力，密钥仅在后端配置）。
+
+技术上前端采用 Vite + React + TypeScript + Tailwind，当前主界面以 legacy 单页 HTML/JS 为主并与 React 共存；后端为 Node.js + Express + TypeScript，数据层 Prisma + PostgreSQL，认证使用 JWT。仓库为 monorepo，包含本地数据库脚本、监控静态页与一键启动流程，适合小团队迭代与课程/演示环境部署。
+
+
+PawTrace Web App
 
 快速开始（最简）
 - 首次只做一次：`npm install && npm run init`

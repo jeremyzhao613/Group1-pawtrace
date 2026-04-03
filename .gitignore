@@ -43,4 +43,11 @@ coverage/
 
 # Local postgres cluster
 .local-pg/
+
+# Capacitor / Android (not needed for web)
 frontend/android/
+frontend/capacitor.config.ts
+
+# Vite cache
+.vite/
+**/.vite/

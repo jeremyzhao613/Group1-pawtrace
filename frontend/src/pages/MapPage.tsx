@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { LiquidPageHeader } from '@/components/LiquidPageHeader';
 
 const DEMO_LOCATIONS = [
   {
@@ -40,8 +41,16 @@ export function MapPage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-dark">校园地图</h2>
-      <div className="relative rounded-3xl overflow-hidden border border-white/60 bg-white/50 aspect-[4/3] max-h-[420px]">
+      <LiquidPageHeader
+        eyebrow="Map Pulse"
+        title="校园地图"
+        description="像液态玻璃一样把实时位置、常去地点和地图动态叠在一起，信息更轻，但层次更深。"
+        stats={[
+          { label: '热点地点', value: '3' },
+          { label: '在线宠物', value: '3' },
+        ]}
+      />
+      <div className="liquid-map-stage relative aspect-[4/3] max-h-[420px] overflow-hidden rounded-3xl">
         <img
           src="/assets/m2.png"
           alt="campus map"

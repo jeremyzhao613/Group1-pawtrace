@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiFetch } from '@/api/client';
+import { LiquidPageHeader } from '@/components/LiquidPageHeader';
 
 type Pet = {
   id: string;
@@ -39,7 +40,15 @@ export function PetsPage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-dark">宠物</h2>
+      <LiquidPageHeader
+        eyebrow="Pet Library"
+        title="宠物档案"
+        description="用更通透的玻璃层展示宠物卡片，让头像、状态和日常备注像漂浮在同一个信息平面里。"
+        stats={[
+          { label: '当前宠物', value: String(data?.pets.length ?? 0) },
+          { label: '新增入口', value: '1 tap' },
+        ]}
+      />
       <form
         className="flex gap-2"
         onSubmit={(e) => {

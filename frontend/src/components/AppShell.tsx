@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { LiquidGlassBackdrop } from '@/components/LiquidGlassBackdrop';
 
 const nav = [
   { to: '/map', label: '地图', icon: '🗺️' },
@@ -12,31 +13,43 @@ export function AppShell() {
   const { logout, user } = useAuth();
 
   return (
-    <div className="min-h-screen flex flex-col pb-20">
-      <header className="sticky top-0 z-20 backdrop-blur-md bg-white/70 border-b border-white/60 px-4 py-3 flex items-center justify-between">
-        <span className="font-semibold text-dark">PawTrace</span>
-        <span className="text-xs text-gray-600">{user?.displayName}</span>
-        <button type="button" className="text-xs text-primary underline" onClick={logout}>
-          退出
-        </button>
-      </header>
-      <main className="flex-1 px-4 py-4 max-w-3xl mx-auto w-full">
-        <Outlet />
-      </main>
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white/85 backdrop-blur border-t border-white/60 flex justify-around py-2 safe-area-pb">
-        {nav.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            className={({ isActive }) =>
-              `flex flex-col items-center text-[10px] ${isActive ? 'text-dark font-semibold' : 'text-gray-500'}`
-            }
-          >
-            <span className="text-lg">{n.icon}</span>
-            {n.label}
-          </NavLink>
-        ))}
-      </nav>
+    <div className="relative min-h-screen overflow-hidden pb-28">
+      <LiquidGlassBackdrop variant="app" />
+      <div className="relative z-10 flex min-h-screen flex-col px-3 pt-3 sm:px-4 sm:pt-4">
+        <header className="liquid-shell-bar sticky top-3 z-30 mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="liquid-brand-badge">PT</div>
+            <div className="min-w-0">
+              <p className="liquid-kicker !mb-1 !tracking-[0.3em]">Liquid Glass</p>
+              <p className="truncate text-sm font-semibold text-dark">PawTrace Companion</p>
+            </div>
+          </div>
+          <div className="hidden items-center gap-2 sm:flex">
+            <span className="liquid-status-pill">Campus live</span>
+            <span className="text-xs text-gray-600">{user?.displayName}</span>
+          </div>
+          <button type="button" className="liquid-ghost-button text-xs" onClick={logout}>
+            退出
+          </button>
+        </header>
+        <main className="relative z-10 mx-auto flex-1 w-full max-w-5xl px-1 pb-28 pt-4 sm:px-2">
+          <Outlet />
+        </main>
+        <nav className="fixed bottom-4 left-1/2 z-40 w-[min(calc(100%-1.5rem),32rem)] -translate-x-1/2">
+          <div className="liquid-nav-dock flex items-center justify-around gap-1 px-2 py-2 safe-area-pb">
+            {nav.map((n) => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                className={({ isActive }) => `liquid-nav-link ${isActive ? 'active' : ''}`}
+              >
+                <span className="liquid-nav-link__icon">{n.icon}</span>
+                <span className="liquid-nav-link__label">{n.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+      </div>
     </div>
   );
 }

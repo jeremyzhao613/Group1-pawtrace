@@ -28,6 +28,46 @@
     let textServiceRunBtn = null;
     let textServiceClearBtn = null;
     let selectedAIService = 'diagnosis';
+    let petsInitialized = false;
+    let rerenderPets = null;
+    let chatInitialized = false;
+    let rerenderChat = null;
+    let chatHoverCard = null;
+    let petCheckInInitialized = false;
+    let activeTabName = 'map';
+    let activateAppTab = null;
+    const TAB_HEADER_META = {
+      map: {
+        eyebrow: 'PawTrace',
+        title: 'Campus Map',
+        subtitle: 'Watch pet locations, nearby spots, and live campus movement without losing the overall layout.'
+      },
+      pets: {
+        eyebrow: 'PawTrace',
+        title: 'Pet Cards',
+        subtitle: 'Manage your pets, NFC cards, and community activity in a tighter card stack.'
+      },
+      chat: {
+        eyebrow: 'PawTrace',
+        title: 'Friends Chat',
+        subtitle: 'Keep conversations, contact details, and pet info in a single responsive chat shell.'
+      },
+      health: {
+        eyebrow: 'PawTrace',
+        title: 'Health Monitoring',
+        subtitle: 'Temperature, heart rate, and recent trends stay visible without stretching the whole page.'
+      },
+      ai: {
+        eyebrow: 'PawTrace',
+        title: 'AI Assist',
+        subtitle: 'Run diagnosis and text reports in a cleaner panel with better scrolling and less visual noise.'
+      },
+      profile: {
+        eyebrow: 'PawTrace',
+        title: 'Profile Center',
+        subtitle: 'Owner info, pet summary, and account settings now share the same page shell.'
+      }
+    };
     // --- Modal Functions ---
     function openProfileEditModal() {
       const currentUser = getCurrentUser();
@@ -47,97 +87,6 @@
       document.getElementById('edit-main-pet-birth').value = currentUser.mainPetBirth || '';
       document.getElementById('edit-main-pet-notes').value = currentUser.mainPetNotes || '';
       document.getElementById('profile-edit-modal').classList.remove('hidden');
-    }
-
-    function initStickyNotes() {
-      const form = document.getElementById('sticky-note-form');
-      const input = document.getElementById('sticky-note-input');
-      const listEl = document.getElementById('sticky-note-list');
-      const clearBtn = document.getElementById('clear-sticky-notes');
-      const emptyEl = document.getElementById('sticky-note-empty');
-      const container = document.getElementById('sticky-note-container');
-      if (!form || !input || !listEl) return;
-      let notes = [];
-
-      async function fetchNotes() {
-        try {
-          const res = await fetch(STICKY_NOTES_API);
-          const data = await res.json();
-          notes = Array.isArray(data.notes) ? data.notes : [];
-        } catch (err) {
-          console.error('Failed to load sticky notes', err);
-          notes = notes || [];
-        }
-        render();
-      }
-
-      function render() {
-        listEl.innerHTML = '';
-        if (!notes.length) {
-          emptyEl?.classList.remove('hidden');
-          return;
-        }
-        emptyEl?.classList.add('hidden');
-        notes
-          .slice()
-          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-          .forEach(note => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'flex items-start justify-between gap-2 bg-secondary/40 px-2 py-2 rounded-sm';
-            wrapper.innerHTML = `
-              <p class="flex-1 text-[11px] text-gray-700 break-words">${note.text}</p>
-              <button class="text-[10px] text-red-500 hover:underline" data-note-id="${note.id}" type="button">Delete</button>
-            `;
-            listEl.appendChild(wrapper);
-          });
-      }
-
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const text = input.value.trim();
-        if (!text) return;
-        try {
-          const res = await fetch(STICKY_NOTES_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-          });
-          if (!res.ok) throw new Error('Failed to save note');
-          input.value = '';
-          await fetchNotes();
-        } catch (err) {
-          console.error('Sticky note save error', err);
-          alert('Unable to save note right now.');
-        }
-      });
-
-      listEl.addEventListener('click', async (event) => {
-        const btn = event.target.closest('[data-note-id]');
-        if (!btn) return;
-        const id = btn.getAttribute('data-note-id');
-        if (!id) return;
-        try {
-          const res = await fetch(`${STICKY_NOTES_API}/${id}`, { method: 'DELETE' });
-          if (!res.ok) throw new Error('Failed to delete note');
-          await fetchNotes();
-        } catch (err) {
-          console.error('Sticky note delete error', err);
-        }
-      });
-
-      clearBtn?.addEventListener('click', async () => {
-        if (!notes.length) return;
-        if (!confirm('Clear all sticky notes?')) return;
-        try {
-          const res = await fetch(STICKY_NOTES_API, { method: 'DELETE' });
-          if (!res.ok) throw new Error('Failed to clear notes');
-          await fetchNotes();
-        } catch (err) {
-          console.error('Sticky note clear error', err);
-        }
-      });
-
-      fetchNotes();
     }
 
     function closeProfileEditModal() {
@@ -336,6 +285,8 @@
         background: document.getElementById('map-background'),
         markersLayer: document.getElementById('map-markers-layer'),
         petsLayer: document.getElementById('map-pets-layer'),
+        petLocationListEl: document.getElementById('pet-location-feed'),
+        trackedCountEl: document.getElementById('tracked-pet-count'),
         locationListEl: document.getElementById('location-list'),
         locationCountEl: document.getElementById('location-count'),
         cardElements: {
@@ -361,6 +312,12 @@
         mapController = new window.PawMapController(mapOptions);
         mapController.init();
       }
+      window.focusPetOnMap = (petId) => {
+        document.querySelector('[data-tab="map"]')?.click();
+        window.setTimeout(() => {
+          mapController?.focusTrackedPet?.(petId);
+        }, 80);
+      };
 
       const appShellEl = document.querySelector('.app-shell');
       function setSidebarState(collapsed) {
@@ -461,6 +418,7 @@
 
       const currentUserNameEl = document.getElementById('current-user-name');
       const currentUserAvatarEl = document.getElementById('current-user-avatar');
+      const headerConnectionStatusEl = document.getElementById('header-connection-status');
       const sidebarUserNameEl = document.getElementById('sidebar-user-name');
       const profileAvatarEl = document.getElementById('profile-avatar');
       const profileNameEl = document.getElementById('profile-name');
@@ -884,6 +842,7 @@
         currentUserNameEl.textContent = displayName;
         currentUserAvatarEl.src = avatar;
         if (sidebarUserNameEl) sidebarUserNameEl.textContent = displayName;
+        if (headerConnectionStatusEl) headerConnectionStatusEl.textContent = `${user.campus || 'Taicang'} · Connected`;
         profileAvatarEl.src = avatar;
         profileNameEl.textContent = displayName;
         profileUsernameEl.textContent = '@' + user.username;
@@ -892,8 +851,9 @@
         profileContactEl.textContent = user.contact || 'Contact: N/A';
         updateProfileDetails(user);
         initTabs();
-        initStickyNotes();
         initPets();
+        initHealthMonitor();
+        mapController?.refreshTrackedPets?.();
         initChat();
         handleScrollReveal();
         fetchPetInsight();
@@ -1036,26 +996,39 @@
     // --- Tabs & navigation ---
     let tabsInitialized = false;
     function initTabs() {
-      if (tabsInitialized) return;
-      tabsInitialized = true;
       const tabPages = {
         map: document.getElementById('tab-map'),
         pets: document.getElementById('tab-pets'),
         chat: document.getElementById('tab-chat'),
+        health: document.getElementById('tab-health'),
         profile: document.getElementById('tab-profile'),
         ai: document.getElementById('tab-ai'),
       };
       const topTabs = document.querySelectorAll('.app-tab');
+      const headerEyebrow = document.getElementById('header-tab-eyebrow');
+      const headerTitle = document.getElementById('header-tab-title');
+      const headerSubtitle = document.getElementById('header-tab-subtitle');
+      if (tabsInitialized) {
+        activateAppTab?.(activeTabName);
+        return;
+      }
+      tabsInitialized = true;
 
       function activateTab(name) {
+        if (!tabPages[name]) name = 'map';
         const chatPane = document.getElementById('chat-left-pane');
         const chatToggle = document.getElementById('chat-toggle-contacts');
+        const meta = TAB_HEADER_META[name] || TAB_HEADER_META.map;
+        activeTabName = name;
         Object.keys(tabPages).forEach(key => {
           tabPages[key].classList.toggle('hidden', key !== name);
         });
         topTabs.forEach(btn => {
           btn.classList.toggle('active', btn.getAttribute('data-tab') === name);
         });
+        if (headerEyebrow) headerEyebrow.textContent = meta.eyebrow;
+        if (headerTitle) headerTitle.textContent = meta.title;
+        if (headerSubtitle) headerSubtitle.textContent = meta.subtitle;
         if (tabPages[name]) {
           tabPages[name].classList.add('visible');
         }
@@ -1067,6 +1040,7 @@
           if (chatToggle) chatToggle.textContent = 'Show friends';
         }
       }
+      activateAppTab = activateTab;
 
       topTabs.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1079,7 +1053,6 @@
 
     // --- Pet data & UI ---
     const PETS_DATA_KEY = 'pawtrace_pets';
-    const STICKY_NOTES_API = '/api/sticky-notes';
     const MONITORING_API = '/api/monitor/collect';
     const DEFAULT_PET_AVATAR = '/assets/1.png';
     const MY_PETS_KEY = 'pawtrace_my_pets';
@@ -1128,6 +1101,241 @@
         subtitle: 'Meals, snacks, hydration'
       }
     };
+    const PETS_CHANGED_EVENT = 'pawtrace:pets-updated';
+    const DEFAULT_TRACKED_ZONES = [
+      { label: 'West Residence Quad', coords: { x: 24, y: 20 } },
+      { label: 'North Canal Bridge', coords: { x: 49, y: 33 } },
+      { label: 'Central Ring Promenade', coords: { x: 68, y: 48 } },
+      { label: 'Learning Hub Entrance', coords: { x: 59, y: 22 } },
+      { label: 'Stadium Track Edge', coords: { x: 50, y: 69 } },
+      { label: 'South Ring Gate', coords: { x: 72, y: 79 } },
+    ];
+
+    function clampNumber(value, min, max, fallback) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return fallback;
+      return Math.min(max, Math.max(min, numeric));
+    }
+
+    function getDefaultTrackedZone(index = 0) {
+      return DEFAULT_TRACKED_ZONES[index % DEFAULT_TRACKED_ZONES.length];
+    }
+
+    function buildPetNfcId(pet = {}, index = 0) {
+      const raw = String(pet.id || `pet-${index}`)
+        .replace(/[^a-z0-9]/gi, '')
+        .slice(-6)
+        .toUpperCase();
+      return `PT-${raw || `0${index + 1}`}`;
+    }
+
+    function formatReadingTimestamp(timestamp) {
+      if (!timestamp) return 'Just now';
+      const date = new Date(timestamp);
+      if (Number.isNaN(date.getTime())) return 'Just now';
+      return date.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    function normalizeVitalsHistory(history = []) {
+      if (!Array.isArray(history)) return [];
+      return history
+        .map((entry) => ({
+          timestamp: entry?.timestamp || new Date().toISOString(),
+          temperature: Number(entry?.temperature),
+          heartRate: Number(entry?.heartRate),
+        }))
+        .filter((entry) => Number.isFinite(entry.temperature) || Number.isFinite(entry.heartRate))
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
+
+    function getLatestVitals(pet = {}) {
+      const history = normalizeVitalsHistory(pet.vitalsHistory);
+      return history[0] || null;
+    }
+
+    function getVitalsAssessment(entry) {
+      if (!entry) {
+        return {
+          state: 'Waiting',
+          summary: 'No recent temperature or heart-rate data.',
+          tempLabel: 'No reading yet',
+          heartLabel: 'No reading yet',
+        };
+      }
+      const temperature = Number(entry.temperature);
+      const heartRate = Number(entry.heartRate);
+      const tempBand = Number.isFinite(temperature)
+        ? (temperature < 37.3 || temperature > 39.6 ? 'alert' : temperature < 37.8 || temperature > 39.2 ? 'watch' : 'stable')
+        : 'unknown';
+      const heartBand = Number.isFinite(heartRate)
+        ? (heartRate < 60 || heartRate > 165 ? 'alert' : heartRate < 75 || heartRate > 145 ? 'watch' : 'stable')
+        : 'unknown';
+      const state = tempBand === 'alert' || heartBand === 'alert'
+        ? 'Needs attention'
+        : tempBand === 'watch' || heartBand === 'watch'
+          ? 'Watch closely'
+          : 'Stable';
+      const summary = state === 'Needs attention'
+        ? 'One or more vitals are outside the usual pet-safe demo range.'
+        : state === 'Watch closely'
+          ? 'Vitals are slightly off the comfortable demo range. Recheck soon.'
+          : 'Latest vitals are within the expected demo monitoring range.';
+      return {
+        state,
+        summary,
+        tempLabel: Number.isFinite(temperature) ? `${temperature.toFixed(1)} °C` : 'No reading yet',
+        heartLabel: Number.isFinite(heartRate) ? `${Math.round(heartRate)} bpm` : 'No reading yet',
+      };
+    }
+
+    function formatMetricValue(metric, value) {
+      if (!Number.isFinite(value)) return '--';
+      return metric === 'temperature'
+        ? `${value.toFixed(1)}°C`
+        : `${Math.round(value)} bpm`;
+    }
+
+    function getTrendSeries(history = [], metric = 'temperature', limit = 7) {
+      return normalizeVitalsHistory(history)
+        .slice(0, limit)
+        .reverse()
+        .map((entry) => ({
+          timestamp: entry.timestamp,
+          value: Number(entry[metric]),
+        }))
+        .filter((entry) => Number.isFinite(entry.value));
+    }
+
+    function getTrendSummary(series = [], metric = 'temperature') {
+      if (!series.length) {
+        return {
+          badge: 'No data',
+          caption: 'Waiting for recent readings',
+          min: '--',
+          avg: '--',
+          max: '--',
+        };
+      }
+      const values = series.map((point) => point.value);
+      const delta = values[values.length - 1] - values[0];
+      const threshold = metric === 'temperature' ? 0.25 : 8;
+      const badge = delta > threshold ? 'Rising' : delta < -threshold ? 'Falling' : 'Stable';
+      const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+      return {
+        badge,
+        caption: `${series.length} recent readings · last ${formatReadingTimestamp(series[series.length - 1].timestamp)}`,
+        min: formatMetricValue(metric, Math.min(...values)),
+        avg: formatMetricValue(metric, average),
+        max: formatMetricValue(metric, Math.max(...values)),
+      };
+    }
+
+    function buildTrendChartMarkup(series = [], metric = 'temperature') {
+      if (!series.length) {
+        return '<div class="health-trend-empty">No recent readings to graph yet.</div>';
+      }
+      const width = 320;
+      const height = 148;
+      const paddingX = 20;
+      const paddingY = 16;
+      const values = series.map((point) => point.value);
+      const rawMin = Math.min(...values);
+      const rawMax = Math.max(...values);
+      const rangePadding = metric === 'temperature' ? 0.25 : 8;
+      const min = rawMin === rawMax ? rawMin - rangePadding : rawMin - rangePadding;
+      const max = rawMin === rawMax ? rawMax + rangePadding : rawMax + rangePadding;
+      const chartWidth = width - (paddingX * 2);
+      const chartHeight = height - (paddingY * 2);
+      const points = series.map((point, index) => {
+        const x = paddingX + ((chartWidth / Math.max(series.length - 1, 1)) * index);
+        const y = paddingY + ((max - point.value) / Math.max(max - min, 0.0001)) * chartHeight;
+        return { ...point, x, y };
+      });
+      const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+      const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${(height - paddingY).toFixed(2)} L ${points[0].x.toFixed(2)} ${(height - paddingY).toFixed(2)} Z`;
+      const gridLines = [0.25, 0.5, 0.75]
+        .map((ratio) => {
+          const y = paddingY + (chartHeight * ratio);
+          return `<line class="health-trend-grid" x1="${paddingX}" y1="${y.toFixed(2)}" x2="${(width - paddingX).toFixed(2)}" y2="${y.toFixed(2)}"></line>`;
+        })
+        .join('');
+      const dots = points
+        .map((point) => `<circle class="health-trend-dot" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4" fill="${metric === 'temperature' ? '#f59e0b' : '#38bdf8'}"></circle>`)
+        .join('');
+      const firstLabel = new Date(points[0].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const lastLabel = new Date(points[points.length - 1].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      return `
+        <svg class="health-trend-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${metric} trend">
+          ${gridLines}
+          <path class="health-trend-area" d="${areaPath}" fill="${metric === 'temperature' ? 'rgba(245,158,11,0.22)' : 'rgba(56,189,248,0.22)'}"></path>
+          <path class="health-trend-line" d="${linePath}" stroke="${metric === 'temperature' ? '#f59e0b' : '#38bdf8'}"></path>
+          ${dots}
+          <text class="health-trend-label" x="${paddingX}" y="${height - 4}">${firstLabel}</text>
+          <text class="health-trend-label" x="${width - paddingX}" y="${height - 4}" text-anchor="end">${lastLabel}</text>
+        </svg>
+      `;
+    }
+
+    function updateTrendCard(options = {}) {
+      const {
+        metric = 'temperature',
+        history = [],
+        chartEl,
+        badgeEl,
+        captionEl,
+        minEl,
+        avgEl,
+        maxEl,
+      } = options;
+      const series = getTrendSeries(history, metric);
+      const summary = getTrendSummary(series, metric);
+      if (chartEl) chartEl.innerHTML = buildTrendChartMarkup(series, metric);
+      if (badgeEl) badgeEl.textContent = summary.badge;
+      if (captionEl) captionEl.textContent = summary.caption;
+      if (minEl) minEl.textContent = summary.min;
+      if (avgEl) avgEl.textContent = summary.avg;
+      if (maxEl) maxEl.textContent = summary.max;
+    }
+
+    function createStarterVitals(pet = {}, index = 0) {
+      const baseTemp = 38 + ((index % 3) * 0.2);
+      const baseHeart = pet.type && /cat/i.test(pet.type) ? 138 - (index * 3) : 108 + (index * 4);
+      return [
+        {
+          timestamp: new Date(Date.now() - ((index + 1) * 3600 * 1000)).toISOString(),
+          temperature: Number(baseTemp.toFixed(1)),
+          heartRate: baseHeart,
+        }
+      ];
+    }
+
+    function normalizePetRecord(pet = {}, index = 0) {
+      const zone = getDefaultTrackedZone(index);
+      const currentUser = getCurrentUser();
+      const history = normalizeVitalsHistory(pet.vitalsHistory);
+      return {
+        ...pet,
+        location: String(pet.location || pet.locationLabel || zone.label || 'Campus Lawn').trim(),
+        mapCoords: {
+          x: clampNumber(pet?.mapCoords?.x, 8, 92, zone.coords.x),
+          y: clampNumber(pet?.mapCoords?.y, 8, 92, zone.coords.y),
+        },
+        nfcId: String(pet.nfcId || buildPetNfcId(pet, index)),
+        nfcContact: String(pet.nfcContact || currentUser?.contact || '').trim(),
+        nfcNote: String(pet.nfcNote || `${pet.name || 'This pet'} is friendly. Please contact the owner if found.`).trim(),
+        vitalsHistory: history.length ? history : createStarterVitals(pet, index),
+      };
+    }
+
+    function emitPetsChanged(pets = []) {
+      document.dispatchEvent(new CustomEvent(PETS_CHANGED_EVENT, { detail: { pets } }));
+    }
 
     function fileToDataURL(file) {
       return new Promise((resolve, reject) => {
@@ -1157,14 +1365,17 @@
 
     function getStoredPets() {
       try {
-        return JSON.parse(localStorage.getItem(PETS_DATA_KEY)) || [];
+        const parsed = JSON.parse(localStorage.getItem(PETS_DATA_KEY)) || [];
+        return Array.isArray(parsed) ? parsed.map((pet, index) => normalizePetRecord(pet, index)) : [];
       } catch {
         return [];
       }
     }
 
     function setStoredPets(pets) {
-      localStorage.setItem(PETS_DATA_KEY, JSON.stringify(pets));
+      const normalized = Array.isArray(pets) ? pets.map((pet, index) => normalizePetRecord(pet, index)) : [];
+      localStorage.setItem(PETS_DATA_KEY, JSON.stringify(normalized));
+      emitPetsChanged(normalized);
     }
 
 
@@ -1185,6 +1396,7 @@
     }
 
     function sanitizePetForPayload(pet = {}) {
+      const latestVitals = getLatestVitals(pet);
       return {
         id: pet.id,
         name: pet.name,
@@ -1193,7 +1405,10 @@
         age: pet.age,
         gender: pet.gender,
         status: pet.status,
-        health: pet.health
+        health: pet.health,
+        location: pet.location,
+        temperature: latestVitals?.temperature ?? null,
+        heartRate: latestVitals?.heartRate ?? null,
       };
     }
 
@@ -1226,6 +1441,15 @@
           traits: ['Friendly', 'Active', 'Affectionate'],
           status: 'Needs at least two walks daily and prefers chicken dog food.',
           health: 'Vaccinations up to date: Rabies, Distemper, Parvovirus. Next vaccination: 2023/12/15.',
+          location: 'North Lawn',
+          mapCoords: { x: 24, y: 61 },
+          nfcId: 'PT-XH01',
+          nfcContact: '+86 138 0000 0001',
+          nfcNote: 'Friendly with students. Offer water first if found.',
+          vitalsHistory: [
+            { timestamp: new Date(Date.now() - 2 * 3600 * 1000).toISOString(), temperature: 38.4, heartRate: 104 },
+            { timestamp: new Date(Date.now() - 26 * 3600 * 1000).toISOString(), temperature: 38.2, heartRate: 108 },
+          ],
         },
         {
           id: 'pet-2',
@@ -1238,6 +1462,15 @@
           traits: ['Quiet', 'Independent', 'Cuddly'],
           status: 'Enjoys quiet rooms and feather toys, eats tuna-flavor food.',
           health: 'Vaccinations up to date: FVRCP, Rabies. Next vaccination: 2024/01/20.',
+          location: 'Library Plaza',
+          mapCoords: { x: 52, y: 37 },
+          nfcId: 'PT-XB02',
+          nfcContact: '+86 138 0000 0002',
+          nfcNote: 'Indoor cat. Please keep in a quiet room and avoid loud dogs.',
+          vitalsHistory: [
+            { timestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString(), temperature: 38.1, heartRate: 142 },
+            { timestamp: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), temperature: 38.0, heartRate: 146 },
+          ],
         },
         {
           id: 'pet-3',
@@ -1250,8 +1483,17 @@
           traits: ['Active', 'Curious', 'Nocturnal'],
           status: 'Sleeps during the day, loves sunflower seeds and late-night runs.',
           health: 'Healthy; housed in 40x30cm cage with wheel and fresh wood shavings.',
+          location: 'Dorm Garden',
+          mapCoords: { x: 66, y: 47 },
+          nfcId: 'PT-XH03',
+          nfcContact: '+86 138 0000 0003',
+          nfcNote: 'Small pet. Keep the carrier level and avoid direct sun.',
+          vitalsHistory: [
+            { timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString(), temperature: 37.8, heartRate: 132 },
+            { timestamp: new Date(Date.now() - 27 * 3600 * 1000).toISOString(), temperature: 37.7, heartRate: 128 },
+          ],
         }
-      ];
+      ].map((pet, index) => normalizePetRecord(pet, index));
     }
 
     function loadMyPetsFromStorage() {
@@ -1373,7 +1615,168 @@
       }
     ];
 
+    let healthMonitorInitialized = false;
+    let rerenderHealthMonitor = null;
+
+    function initHealthMonitor() {
+      const petSelect = document.getElementById('health-pet-select');
+      const latestTempEl = document.getElementById('health-latest-temp');
+      const latestHeartEl = document.getElementById('health-latest-heart');
+      const tempStatusEl = document.getElementById('health-temp-status');
+      const heartStatusEl = document.getElementById('health-heart-status');
+      const vitalsStateEl = document.getElementById('health-vitals-state');
+      const vitalsSummaryEl = document.getElementById('health-vitals-summary');
+      const historyCountEl = document.getElementById('health-history-count');
+      const historyListEl = document.getElementById('health-history-list');
+      const historyEmptyEl = document.getElementById('health-history-empty');
+      const tempChartEl = document.getElementById('health-temp-chart');
+      const tempBadgeEl = document.getElementById('health-temp-badge');
+      const tempCaptionEl = document.getElementById('health-temp-caption');
+      const tempMinEl = document.getElementById('health-temp-min');
+      const tempAvgEl = document.getElementById('health-temp-avg');
+      const tempMaxEl = document.getElementById('health-temp-max');
+      const heartChartEl = document.getElementById('health-heart-chart');
+      const heartBadgeEl = document.getElementById('health-heart-badge');
+      const heartCaptionEl = document.getElementById('health-heart-caption');
+      const heartMinEl = document.getElementById('health-heart-min');
+      const heartAvgEl = document.getElementById('health-heart-avg');
+      const heartMaxEl = document.getElementById('health-heart-max');
+      const tempInput = document.getElementById('health-input-temp');
+      const heartInput = document.getElementById('health-input-heart');
+      const saveBtn = document.getElementById('health-save-reading');
+      const demoBtn = document.getElementById('health-fill-demo');
+      const formStatus = document.getElementById('health-form-status');
+      if (!petSelect) return;
+
+      function setFormStatus(message = '', isError = false) {
+        if (!formStatus) return;
+        formStatus.textContent = message;
+        formStatus.classList.toggle('hidden', !message);
+        formStatus.classList.toggle('text-red-500', Boolean(message) && isError);
+        formStatus.classList.toggle('text-primary', Boolean(message) && !isError);
+      }
+
+      function render() {
+        const pets = getStoredPets();
+        const previousSelection = petSelect.value;
+        petSelect.innerHTML = '';
+        if (!pets.length) {
+          petSelect.innerHTML = '<option value="">No pets available</option>';
+          if (latestTempEl) latestTempEl.textContent = '--';
+          if (latestHeartEl) latestHeartEl.textContent = '--';
+          if (tempStatusEl) tempStatusEl.textContent = 'Add a pet first';
+          if (heartStatusEl) heartStatusEl.textContent = 'Add a pet first';
+          if (vitalsStateEl) vitalsStateEl.textContent = 'Waiting';
+          if (vitalsSummaryEl) vitalsSummaryEl.textContent = 'Create a pet in the Pets page to start health monitoring.';
+          if (historyCountEl) historyCountEl.textContent = '0 records';
+          if (historyListEl) historyListEl.innerHTML = '';
+          updateTrendCard({ metric: 'temperature', history: [], chartEl: tempChartEl, badgeEl: tempBadgeEl, captionEl: tempCaptionEl, minEl: tempMinEl, avgEl: tempAvgEl, maxEl: tempMaxEl });
+          updateTrendCard({ metric: 'heartRate', history: [], chartEl: heartChartEl, badgeEl: heartBadgeEl, captionEl: heartCaptionEl, minEl: heartMinEl, avgEl: heartAvgEl, maxEl: heartMaxEl });
+          historyEmptyEl?.classList.remove('hidden');
+          return;
+        }
+        pets.forEach((pet) => {
+          const option = document.createElement('option');
+          option.value = pet.id;
+          option.textContent = `${pet.name} · ${pet.type}`;
+          petSelect.appendChild(option);
+        });
+        petSelect.value = pets.some((pet) => pet.id === previousSelection) ? previousSelection : pets[0].id;
+        const activePet = pets.find((pet) => pet.id === petSelect.value) || pets[0];
+        const latestVitals = getLatestVitals(activePet);
+        const assessment = getVitalsAssessment(latestVitals);
+        if (latestTempEl) latestTempEl.textContent = assessment.tempLabel;
+        if (latestHeartEl) latestHeartEl.textContent = assessment.heartLabel;
+        if (tempStatusEl) tempStatusEl.textContent = latestVitals ? `Last update · ${formatReadingTimestamp(latestVitals.timestamp)}` : 'No reading yet';
+        if (heartStatusEl) heartStatusEl.textContent = activePet.location ? `Tracking near ${activePet.location}` : 'Location not set';
+        if (vitalsStateEl) vitalsStateEl.textContent = assessment.state;
+        if (vitalsSummaryEl) vitalsSummaryEl.textContent = assessment.summary;
+        const history = normalizeVitalsHistory(activePet.vitalsHistory);
+        updateTrendCard({ metric: 'temperature', history, chartEl: tempChartEl, badgeEl: tempBadgeEl, captionEl: tempCaptionEl, minEl: tempMinEl, avgEl: tempAvgEl, maxEl: tempMaxEl });
+        updateTrendCard({ metric: 'heartRate', history, chartEl: heartChartEl, badgeEl: heartBadgeEl, captionEl: heartCaptionEl, minEl: heartMinEl, avgEl: heartAvgEl, maxEl: heartMaxEl });
+        if (historyCountEl) historyCountEl.textContent = `${history.length} records`;
+        if (historyListEl) historyListEl.innerHTML = '';
+        if (!history.length) {
+          historyEmptyEl?.classList.remove('hidden');
+          return;
+        }
+        historyEmptyEl?.classList.add('hidden');
+        history.slice(0, 6).forEach((entry) => {
+          const row = document.createElement('div');
+          row.className = 'health-history-row';
+          row.innerHTML = `
+            <div class="health-history-row__meta">
+              <p class="font-semibold text-dark">${formatReadingTimestamp(entry.timestamp)}</p>
+              <p class="text-[10px] text-gray-500">${activePet.name} · ${activePet.location || 'Campus'}</p>
+            </div>
+            <div class="health-history-row__stats">
+              <span class="health-status-pill">Temp ${Number.isFinite(entry.temperature) ? `${entry.temperature.toFixed(1)}°C` : '--'}</span>
+              <span class="health-status-pill">HR ${Number.isFinite(entry.heartRate) ? `${Math.round(entry.heartRate)} bpm` : '--'}</span>
+            </div>
+          `;
+          historyListEl.appendChild(row);
+        });
+      }
+
+      function saveReading(useDemo = false) {
+        const pets = getStoredPets();
+        const petId = petSelect.value;
+        const selectedPet = pets.find((pet) => pet.id === petId);
+        if (!selectedPet) {
+          setFormStatus('Select a pet first.', true);
+          return;
+        }
+        const nextTemperature = useDemo
+          ? Number((38 + Math.random() * 1).toFixed(1))
+          : (tempInput && tempInput.value.trim() !== '' ? Number(tempInput.value) : NaN);
+        const nextHeartRate = useDemo
+          ? Math.round(90 + Math.random() * 55)
+          : (heartInput && heartInput.value.trim() !== '' ? Number(heartInput.value) : NaN);
+        if (!Number.isFinite(nextTemperature) || !Number.isFinite(nextHeartRate)) {
+          setFormStatus('Please enter both temperature and heart rate.', true);
+          return;
+        }
+        const nextPets = pets.map((pet, index) => {
+          if (pet.id !== petId) return normalizePetRecord(pet, index);
+          return normalizePetRecord({
+            ...pet,
+            vitalsHistory: [
+              {
+                timestamp: new Date().toISOString(),
+                temperature: nextTemperature,
+                heartRate: nextHeartRate,
+              },
+              ...normalizeVitalsHistory(pet.vitalsHistory),
+            ].slice(0, 12),
+          }, index);
+        });
+        setStoredPets(nextPets);
+        if (tempInput) tempInput.value = '';
+        if (heartInput) heartInput.value = '';
+        setFormStatus(`Saved a new reading for ${selectedPet.name}.`);
+        render();
+      }
+
+      if (!healthMonitorInitialized) {
+        healthMonitorInitialized = true;
+        petSelect.addEventListener('change', () => {
+          setFormStatus('');
+          render();
+        });
+        saveBtn?.addEventListener('click', () => saveReading(false));
+        demoBtn?.addEventListener('click', () => saveReading(true));
+        document.addEventListener(PETS_CHANGED_EVENT, () => render());
+      }
+      rerenderHealthMonitor = render;
+      render();
+    }
+
     function initPets() {
+      if (petsInitialized && rerenderPets) {
+        rerenderPets();
+        return;
+      }
+      petsInitialized = true;
       let pets = [];
       const petList = document.getElementById('pet-list');
       const petEmpty = document.getElementById('pet-empty');
@@ -1396,6 +1799,9 @@
         gender: document.getElementById('new-pet-gender'),
         status: document.getElementById('new-pet-status'),
         health: document.getElementById('new-pet-health'),
+        location: document.getElementById('new-pet-location'),
+        nfcContact: document.getElementById('new-pet-nfc-contact'),
+        nfcNote: document.getElementById('new-pet-nfc-note'),
         traits: document.getElementById('new-pet-traits'),
         image: document.getElementById('new-pet-image'),
       };
@@ -1455,6 +1861,9 @@
         newPetInputs.gender.value = pet.gender || '';
         newPetInputs.status.value = pet.status || '';
         newPetInputs.health.value = pet.health || '';
+        newPetInputs.location.value = pet.location || '';
+        newPetInputs.nfcContact.value = pet.nfcContact || '';
+        newPetInputs.nfcNote.value = pet.nfcNote || '';
         newPetInputs.traits.value = (pet.traits || []).join(', ');
         if (pet.avatar) setPetImagePreview(pet.avatar); else resetPetImagePreview();
         showPetForm();
@@ -1463,12 +1872,16 @@
       function render() {
         if (!petList) return;
         petList.innerHTML = '';
+        if (profilePetCount) profilePetCount.textContent = pets.length.toString();
         if (pets.length === 0) {
           petEmpty?.classList.remove('hidden');
+          renderProfilePetList();
           return;
         }
         petEmpty?.classList.add('hidden');
         pets.forEach((p, idx) => {
+          const latestVitals = getLatestVitals(p);
+          const vitalsAssessment = getVitalsAssessment(latestVitals);
           const birthdayDisplay = p.birthday
             ? (() => {
                 try {
@@ -1510,6 +1923,20 @@
                 <p class="font-semibold text-[11px]">Status</p>
                 <p class="text-[11px] text-gray-600">${p.status || 'No recent notes'}</p>
               </div>
+              <div class="grid md:grid-cols-2 gap-3">
+                <div>
+                  <p class="font-semibold text-[11px]">Location</p>
+                  <p class="text-[11px] text-gray-600">${p.location || 'Campus map not set'}</p>
+                </div>
+                <div>
+                  <p class="font-semibold text-[11px]">Latest vitals</p>
+                  <div class="pet-vitals-mini">
+                    <span class="health-status-pill">${vitalsAssessment.tempLabel}</span>
+                    <span class="health-status-pill">${vitalsAssessment.heartLabel}</span>
+                  </div>
+                  <p class="text-[10px] text-gray-500 mt-1">${vitalsAssessment.state}</p>
+                </div>
+              </div>
               <div>
                 <p class="font-semibold text-[11px]">Personality</p>
                 <div class="flex flex-wrap gap-1">
@@ -1523,12 +1950,31 @@
                 </div>
                 <button data-id="${p.id}" class="pet-edit text-primary text-[12px] hover:underline flex items-center gap-1"><i class="fas fa-edit"></i>Edit</button>
               </div>
+              <div class="pet-nfc-card">
+                <div class="flex items-center justify-between gap-2">
+                  <div>
+                    <p class="text-[10px] uppercase tracking-[0.28em] text-gray-500">NFC Pet Card</p>
+                    <p class="font-semibold text-sm text-dark">${p.name}</p>
+                  </div>
+                  <span class="pet-nfc-card__code">${p.nfcId}</span>
+                </div>
+                <div class="space-y-1 text-[11px] text-gray-700">
+                  <p><span class="font-semibold">Emergency:</span> ${p.nfcContact || 'Add an emergency contact'}</p>
+                  <p><span class="font-semibold">Care note:</span> ${p.nfcNote || 'No care note added yet.'}</p>
+                </div>
+                <div class="flex flex-wrap gap-2 pt-1">
+                  <button type="button" class="pet-action-link" data-copy-nfc="${p.id}">
+                    <i class="fas fa-id-card"></i><span>Copy NFC Card</span>
+                  </button>
+                  <button type="button" class="pet-action-link" data-open-map="${p.id}">
+                    <i class="fas fa-location-arrow"></i><span>Locate on Map</span>
+                  </button>
+                </div>
+              </div>
             </div>
           `;
         petList.appendChild(card);
       });
-      if (profilePetCount) profilePetCount.textContent = pets.length.toString();
-
         petList.querySelectorAll('.pet-edit').forEach(btn => {
           btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-id');
@@ -1545,6 +1991,35 @@
             if (!id) return;
             openPetId = id;
             render();
+          });
+        });
+        petList.querySelectorAll('[data-copy-nfc]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-copy-nfc');
+            const pet = pets.find((entry) => entry.id === id);
+            if (!pet) return;
+            const cardText = [
+              `PawTrace NFC Card · ${pet.name}`,
+              `NFC ID: ${pet.nfcId}`,
+              `Type: ${pet.type} · ${pet.breed}`,
+              `Location: ${pet.location || 'Campus'}`,
+              `Emergency: ${pet.nfcContact || 'Not set'}`,
+              `Care note: ${pet.nfcNote || 'None'}`,
+            ].join('\n');
+            try {
+              await navigator.clipboard.writeText(cardText);
+              alert(`Copied ${pet.name}'s NFC card.`);
+            } catch (err) {
+              console.warn('Clipboard copy failed', err);
+              alert(cardText);
+            }
+          });
+        });
+        petList.querySelectorAll('[data-open-map]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-open-map');
+            if (!id) return;
+            window.focusPetOnMap?.(id);
           });
         });
         renderProfilePetList();
@@ -1628,6 +2103,14 @@
       hydratePets();
       render();
       renderCommunityPets();
+      rerenderPets = () => {
+        hydratePets();
+        if (!pets.some((pet) => pet.id === openPetId)) {
+          openPetId = pets[0]?.id || null;
+        }
+        render();
+        renderCommunityPets();
+      };
 
       newPetInputs.image?.addEventListener('change', () => {
         const file = newPetInputs.image.files && newPetInputs.image.files[0];
@@ -1705,7 +2188,12 @@
             avatar,
             traits: traits.length ? traits : ['Playful'],
             status: newPetInputs.status.value.trim() || 'Just joined the crew.',
-            health: newPetInputs.health.value.trim() || 'No health notes yet.'
+            health: newPetInputs.health.value.trim() || 'No health notes yet.',
+            location: newPetInputs.location.value.trim() || existingPet?.location || getDefaultTrackedZone(pets.length).label,
+            nfcContact: newPetInputs.nfcContact.value.trim() || existingPet?.nfcContact || getCurrentUser()?.contact || '',
+            nfcNote: newPetInputs.nfcNote.value.trim() || existingPet?.nfcNote || `${name} is friendly. Please contact the owner if found.`,
+            mapCoords: existingPet?.mapCoords || getDefaultTrackedZone(pets.length).coords,
+            vitalsHistory: existingPet?.vitalsHistory || createStarterVitals(existingPet || { name, type: newPetInputs.type.value.trim() || 'Pet' }, pets.length),
           };
 
           if (isEdit && existingPet) {
@@ -1929,6 +2417,11 @@
     }
 
     function initChat() {
+      if (chatInitialized && rerenderChat) {
+        rerenderChat();
+        return;
+      }
+      chatInitialized = true;
       const listEl = document.getElementById('contact-list');
       const searchEl = document.getElementById('chat-search');
       const chatAvatar = document.getElementById('chat-avatar');
@@ -1957,21 +2450,24 @@
       const profileFriendsCount = document.getElementById('profile-friends-count');
       const chatScrollUp = document.getElementById('chat-scroll-up');
       const chatScrollDown = document.getElementById('chat-scroll-down');
-      const hoverCard = document.createElement('div');
-      hoverCard.className = 'contact-hover-card';
-      hoverCard.innerHTML = `
-        <div class="flex items-center gap-2 mb-2">
-          <img id="hover-avatar" class="w-9 h-9 rounded-full object-cover pixel-border bg-secondary" alt="Avatar preview" />
-          <div>
-            <h4 id="hover-name">Friend</h4>
-            <p id="hover-pet-tag" class="text-[11px] text-gray-500">Pet info</p>
+      if (!chatHoverCard) {
+        chatHoverCard = document.createElement('div');
+        chatHoverCard.className = 'contact-hover-card';
+        chatHoverCard.innerHTML = `
+          <div class="flex items-center gap-2 mb-2">
+            <img id="hover-avatar" class="w-9 h-9 rounded-full object-cover pixel-border bg-secondary" alt="Avatar preview" />
+            <div>
+              <h4 id="hover-name">Friend</h4>
+              <p id="hover-pet-tag" class="text-[11px] text-gray-500">Pet info</p>
+            </div>
           </div>
-        </div>
-        <p id="hover-summary" class="mb-1 text-[12px] text-gray-600"></p>
-        <p id="hover-health" class="text-[11px] text-gray-500"></p>
-        <div id="hover-tags" class="contact-hover-tags"></div>
-      `;
-      document.body.appendChild(hoverCard);
+          <p id="hover-summary" class="mb-1 text-[12px] text-gray-600"></p>
+          <p id="hover-health" class="text-[11px] text-gray-500"></p>
+          <div id="hover-tags" class="contact-hover-tags"></div>
+        `;
+        document.body.appendChild(chatHoverCard);
+      }
+      const hoverCard = chatHoverCard;
 
       if (profileFriendsCount) profileFriendsCount.textContent = CHAT_STATE.contacts.length;
 
@@ -1994,11 +2490,15 @@
       function renderContacts(filter = '') {
         if (!listEl) return;
         listEl.innerHTML = '';
-        CHAT_STATE.contacts
+        const filteredContacts = CHAT_STATE.contacts
           .filter(c => c.name.toLowerCase().includes(filter.toLowerCase()))
-          .forEach((c, idx) => {
-            const item = document.createElement('button');
-          item.className = 'w-full flex items-center gap-2 px-2 py-2 rounded hover:bg-secondary text-left transition-colors animate-slideInLeft';
+        if (!filteredContacts.length) {
+          listEl.innerHTML = '<div class="chat-empty-state">No friends matched that search yet.</div>';
+          return;
+        }
+        filteredContacts.forEach((c, idx) => {
+          const item = document.createElement('button');
+          item.className = `chat-contact-item w-full flex items-center gap-2 px-2 py-2 rounded text-left transition-colors animate-slideInLeft ${c.id === CHAT_STATE.activeId ? 'active' : ''}`;
           item.style.animationDelay = (idx * 0.05) + 's';
           item.dataset.id = c.id;
           item.dataset.contactId = c.id;
@@ -2145,6 +2645,7 @@
         }
         if (chatStatus) chatStatus.textContent = 'Online · ' + c.petType + ' owner';
         updateOwnerPetPanel(c);
+        renderContacts(searchEl?.value || '');
         if (!CHAT_STATE.history[id]) {
           CHAT_STATE.history[id] = [
             { role: 'assistant', content: `Hi! I'm ${c.name} and this is ${c.petName}.` }
@@ -2210,6 +2711,15 @@
 
       searchEl?.addEventListener('input', () => {
         renderContacts(searchEl.value);
+      });
+      document.addEventListener('click', (event) => {
+        if (window.innerWidth > 1024) return;
+        if (!chatPane?.classList.contains('open')) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (chatPane.contains(target) || target.closest('#chat-toggle-contacts') || target.closest('#chat-back-btn')) return;
+        chatPane.classList.remove('open');
+        if (chatToggle) chatToggle.textContent = 'Show friends';
       });
       const chatAttachImage = document.getElementById('chat-attach-image');
       chatAttachImage?.addEventListener('click', () => {
@@ -2281,11 +2791,23 @@
       if (CHAT_STATE.contacts[0]) {
         activateContact(CHAT_STATE.contacts[0].id);
       }
+      rerenderChat = () => {
+        if (profileFriendsCount) profileFriendsCount.textContent = CHAT_STATE.contacts.length;
+        renderContacts(searchEl?.value || '');
+        const nextId = CHAT_STATE.contacts.some((contact) => contact.id === CHAT_STATE.activeId)
+          ? CHAT_STATE.activeId
+          : CHAT_STATE.contacts[0]?.id;
+        if (nextId) {
+          activateContact(nextId);
+        }
+      };
 
       window.openFriendInChat = (friendId) => {
         switchToChatTab();
         setTimeout(() => {
-          document.querySelector(`[data-contact-id="${friendId}"]`)?.click();
+          if (searchEl) searchEl.value = '';
+          renderContacts();
+          activateContact(friendId);
           focusChatInput();
         }, 80);
       };
@@ -2301,6 +2823,8 @@
 
       // ========== PET CHECK-IN SYSTEM ==========
       function initPetCheckIn() {
+        if (petCheckInInitialized) return;
+        petCheckInInitialized = true;
         const checkInBtn = document.getElementById('btn-pet-checkin');
         if (!checkInBtn) return;
 
@@ -2314,7 +2838,7 @@
         }
 
         checkInBtn.addEventListener('click', () => {
-          const pets = JSON.parse(localStorage.getItem('pawtrace_pets') || '[]');
+          const pets = getStoredPets();
           if (pets.length === 0) {
             alert('No pets to check in!');
             return;

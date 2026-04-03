@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiFetch } from '@/api/client';
+import { LiquidPageHeader } from '@/components/LiquidPageHeader';
 
 const CONTACTS = [
   { id: 'c1', name: 'Lily', pet: 'Mocha' },
@@ -44,24 +45,32 @@ export function ChatPage() {
 
   return (
     <div className="flex flex-col gap-3 h-[calc(100vh-8rem)]">
-      <h2 className="text-lg font-semibold text-dark">AI 聊天</h2>
+      <LiquidPageHeader
+        eyebrow="Glass Chat"
+        title="AI 聊天"
+        description="对话区保持安静的玻璃深度感，焦点落在消息本身，高光和背景只做轻微呼吸。"
+        stats={[
+          { label: '联系人', value: String(CONTACTS.length) },
+          { label: '模式', value: 'AI' },
+        ]}
+      />
       <div className="flex gap-1 flex-wrap">
         {CONTACTS.map((c) => (
           <button
             key={c.id}
             type="button"
             onClick={() => setContactId(c.id)}
-            className={`text-xs px-2 py-1 rounded-lg border ${contactId === c.id ? 'border-dark bg-primary/30' : 'border-white/60'}`}
+            className={`liquid-contact-chip ${contactId === c.id ? 'active' : ''}`}
           >
             {c.name}
           </button>
         ))}
       </div>
-      <div className="flex-1 overflow-y-auto pixel-card space-y-2 min-h-[200px]">
+      <div className="liquid-chat-thread flex-1 overflow-y-auto pixel-card space-y-3 min-h-[200px]">
         {history?.history.map((m, i) => (
           <div
             key={i}
-            className={`text-sm ${m.role === 'assistant' ? 'text-dark' : 'text-blue-900'}`}
+            className={`liquid-chat-bubble text-sm ${m.role === 'assistant' ? 'liquid-chat-bubble--assistant text-dark' : 'liquid-chat-bubble--user text-blue-900'}`}
           >
             <span className="text-[10px] text-gray-400">{m.role}</span>
             <p>{m.content}</p>

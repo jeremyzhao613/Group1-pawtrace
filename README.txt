@@ -13,7 +13,7 @@ PawTrace Web App
 技术栈
 - 前端：Vite + Tailwind（当前 UI 为 legacy 大页面方案）
 - 后端：Node.js + Express + TypeScript + Prisma + PostgreSQL
-- AI：通义千问（DashScope）/ Google Gemini（仅服务端密钥）
+- AI：通义千问 DashScope（Qwen 文本 + Qwen-VL 视觉，仅服务端密钥）
 
 目录
 - frontend/             前端入口（当前为 legacy UI）
@@ -27,9 +27,8 @@ PawTrace Web App
 - 复制 backend/.env.example 为 backend/.env
 - 推荐本地：DATABASE_URL="postgresql://pawtrace@localhost:55432/pawtrace"
 - JWT_SECRET=（本地可简化，生产务必强随机）
-- DASHSCOPE_API_KEY / GEMINI_API_KEY（AI 功能）
+- DASHSCOPE_API_KEY（AI 功能，通义千问密钥）
 - MONITOR_API_TOKEN（可选，保护 /api/monitor/*）
-- DEVICE_TOKENS=m5-001=tokenA（可选）
 
 小团队本地推荐流程（无需 Docker）
 1) 安装依赖
@@ -63,11 +62,10 @@ PawTrace Web App
 - 用户名：demo
 - 密码：demo123
 
-当前仍不合理但可接受（小团队本地）
-1. frontend/index.html 仍偏大（已拆出业务脚本，UI 未改）
-2. 前端采用 legacy 大页面 + Vite 混合模式，可维护性一般
-3. 本地 DB 为 trust 方案，仅适合开发机，不可直接用于线上
-
-后续建议（不改 UI 的前提下）
-- 继续把内联样式从 index.html 抽离到独立 CSS 文件
-- 把 legacy 业务脚本再拆模块（map/pets/chat/profile）
+功能特性
+- 校园宠物地图：标记宠物友好地点、搜索、便签
+- 宠物管理：添加/编辑/删除宠物卡片
+- AI 聊天：与虚拟宠物主人对话（通义千问驱动）
+- AI 健康：图片诊断（Qwen-VL）+ 文字健康/行为/饮食报告
+- 暗色模式：手动切换（header 右上角 🌙/☀️ 按钮）
+- 爪印黑客帝国：彩蛋动画（右下角 🐾 按钮）

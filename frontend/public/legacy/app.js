@@ -36,6 +36,9 @@
     let petCheckInInitialized = false;
     let activeTabName = 'map';
     let activateAppTab = null;
+    let modalSystemInitialized = false;
+    let activeModalId = null;
+    let lastModalTrigger = null;
     const TAB_HEADER_META = {
       map: {
         eyebrow: 'PawTrace',
@@ -68,6 +71,87 @@
         subtitle: 'Owner info, pet summary, and account settings now share the same page shell.'
       }
     };
+    function syncModalState() {
+      const hasOpenModal = !!document.querySelector('.app-modal:not(.hidden)');
+      document.body.classList.toggle('modal-open', hasOpenModal);
+      if (!hasOpenModal) {
+        activeModalId = null;
+      }
+    }
+
+    function setModalState(modalId, isOpen) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      if (isOpen) {
+        if (activeModalId && activeModalId !== modalId) {
+          setModalState(activeModalId, false);
+        }
+        lastModalTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        activeModalId = modalId;
+        syncModalState();
+        const firstField = modal.querySelector('input, textarea, select, button:not([disabled])');
+        if (firstField instanceof HTMLElement) {
+          window.requestAnimationFrame(() => {
+            firstField.focus({ preventScroll: true });
+          });
+        }
+        return;
+      }
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      if (activeModalId === modalId) {
+        activeModalId = null;
+      }
+      syncModalState();
+      if (lastModalTrigger && lastModalTrigger.isConnected) {
+        window.requestAnimationFrame(() => {
+          lastModalTrigger.focus({ preventScroll: true });
+        });
+      }
+      lastModalTrigger = null;
+    }
+
+    function closeAllModals() {
+      document.querySelectorAll('.app-modal:not(.hidden)').forEach((modal) => {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+      });
+      activeModalId = null;
+      lastModalTrigger = null;
+      syncModalState();
+    }
+
+    function initModalSystem() {
+      if (modalSystemInitialized) {
+        syncModalState();
+        return;
+      }
+      modalSystemInitialized = true;
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const closeButton = target.closest('[data-modal-close]');
+        if (closeButton) {
+          const modalId = closeButton.getAttribute('data-modal-close');
+          if (modalId) setModalState(modalId, false);
+          return;
+        }
+        const modalRoot = target.closest('.app-modal');
+        if (modalRoot && target === modalRoot) {
+          setModalState(modalRoot.id, false);
+        }
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && activeModalId) {
+          event.preventDefault();
+          setModalState(activeModalId, false);
+        }
+      });
+      syncModalState();
+    }
+
     // --- Modal Functions ---
     function openProfileEditModal() {
       const currentUser = getCurrentUser();
@@ -86,11 +170,11 @@
       document.getElementById('edit-main-pet-type').value = currentUser.mainPetType || '';
       document.getElementById('edit-main-pet-birth').value = currentUser.mainPetBirth || '';
       document.getElementById('edit-main-pet-notes').value = currentUser.mainPetNotes || '';
-      document.getElementById('profile-edit-modal').classList.remove('hidden');
+      setModalState('profile-edit-modal', true);
     }
 
     function closeProfileEditModal() {
-      document.getElementById('profile-edit-modal').classList.add('hidden');
+      setModalState('profile-edit-modal', false);
     }
 
     function openShareImageModal() {
@@ -107,11 +191,10 @@
       if (fileInput) fileInput.value = '';
       if (preview) preview.classList.add('hidden');
       if (previewImg) previewImg.src = '';
-      modal?.classList.remove('hidden');
+      if (modal) setModalState('share-image-modal', true);
     }
 
     function closeShareImageModal() {
-      const modal = document.getElementById('share-image-modal');
       const preview = document.getElementById('share-image-preview');
       const previewImg = document.getElementById('share-preview-img');
       const urlInput = document.getElementById('share-image-url');
@@ -119,7 +202,7 @@
       const fileInput = document.getElementById('share-image-file');
       shareImageSource = '';
       shareImageIsUpload = false;
-      if (modal) modal.classList.add('hidden');
+      setModalState('share-image-modal', false);
       if (preview) preview.classList.add('hidden');
       if (previewImg) previewImg.src = '';
       if (urlInput) urlInput.value = '';
@@ -234,6 +317,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      initModalSystem();
       const loginScreen = document.getElementById('login-screen');
       const appRoot = document.getElementById('app-root');
       const authMsg = document.getElementById('auth-message');
@@ -834,6 +918,7 @@
 
       function showApp(user) {
         authMsg.textContent = '';
+        closeAllModals();
         loginScreen?.classList.add('hidden');
         appRoot.classList.remove('hidden');
         mobileTabbar?.classList.remove('hidden');
@@ -950,8 +1035,8 @@
         currentUser.mainPetNotes = editMainPetNotes.value;
         currentUser.petInsight = '';
         persistCurrentUser(currentUser);
-        showApp(currentUser);
         closeProfileEditModal();
+        showApp(currentUser);
         sendMonitoringPayload({
           personalInfo: {
             username: currentUser.username,
@@ -976,6 +1061,7 @@
       if (existing) {
         showApp(existing);
       } else {
+        closeAllModals();
         appRoot.classList.add('hidden');
         mobileTabbar?.classList.add('hidden');
         loginScreen?.classList.remove('hidden');
@@ -983,6 +1069,7 @@
 
       document.querySelectorAll('[data-action="logout"]').forEach(btn => {
         btn.addEventListener('click', () => {
+          closeAllModals();
           setCurrentUser(null);
           appRoot.classList.add('hidden');
           mobileTabbar?.classList.add('hidden');

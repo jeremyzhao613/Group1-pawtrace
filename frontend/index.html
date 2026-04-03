@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>PawTrace · Pixel Pet Social</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#fff3f8" />
+  <meta id="theme-color-meta" name="theme-color" content="#fff3f8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -51,109 +51,6 @@
         });
     })();
   </script>
-  <style>
-    body.dark { background: #0f1a1e !important; color: #e2e8f0 !important; background-image: radial-gradient(circle at 14% 18%, rgba(153,205,216,0.08), transparent 55%), radial-gradient(circle at 78% 6%, rgba(153,205,216,0.05), transparent 60%), linear-gradient(180deg, #0f1a1e 0%, #162228 40%, #0f1a1e 100%) !important; }
-    body.dark .pixel-card, body.dark [class*="bg-white"] { background-color: rgba(30,45,55,0.8) !important; border-color: rgba(255,255,255,0.08) !important; color: #e2e8f0 !important; }
-    body.dark .glass-panel { background: rgba(20,35,42,0.7) !important; border-color: rgba(255,255,255,0.06) !important; color: #e2e8f0 !important; }
-    body.dark .pixel-input, body.dark input, body.dark textarea, body.dark select { background: rgba(30,45,55,0.8) !important; border-color: rgba(255,255,255,0.1) !important; color: #e2e8f0 !important; }
-    body.dark .pixel-input::placeholder, body.dark input::placeholder, body.dark textarea::placeholder { color: #6b7f8a !important; }
-    body.dark .pixel-button { background: rgba(153,205,216,0.25) !important; color: #e2e8f0 !important; }
-    body.dark .pixel-button:hover { background: rgba(153,205,216,0.35) !important; }
-    body.dark #login-screen { background: radial-gradient(circle at 20% 20%, rgba(153,205,216,0.15), transparent 52%), radial-gradient(circle at 80% 12%, rgba(100,160,180,0.12), transparent 48%), linear-gradient(135deg, #0f1a1e 0%, #162228 45%, #0f1a1e 100%) !important; }
-    body.dark #login-screen::before { opacity: 0.06 !important; }
-    body.dark h1, body.dark h2, body.dark h3, body.dark h4, body.dark .text-slate-900, body.dark .text-dark { color: #e2e8f0 !important; }
-    body.dark .text-gray-500, body.dark .text-gray-600, body.dark .text-gray-700 { color: #8a9ba5 !important; }
-    body.dark .login-chip { background: rgba(153,205,216,0.12) !important; border-color: rgba(255,255,255,0.08) !important; color: #b0c4ce !important; }
-    body.dark .app-nav-button { background: rgba(255,255,255,0.05) !important; color: #a0b4be !important; }
-    body.dark .app-nav-button.active { background: rgba(153,205,216,0.15) !important; border-color: rgba(153,205,216,0.25) !important; color: #e2e8f0 !important; }
-    body.dark .community-card { background: linear-gradient(180deg, rgba(30,45,55,0.9), rgba(25,40,48,0.85)) !important; border-color: rgba(255,255,255,0.06) !important; }
-    body.dark .halo-pulse { opacity: 0.1 !important; }
-    body.dark .login-orb { opacity: 0.15 !important; }
-    body.dark .ai-panel { background: radial-gradient(circle at 20% 20%, rgba(153,205,216,0.08), transparent 60%), rgba(20,35,42,0.7) !important; }
-    body.dark .ai-service-card { background: rgba(30,45,55,0.7) !important; border-color: rgba(153,205,216,0.2) !important; }
-    body.dark .location-tag { background: rgba(255,255,255,0.08) !important; color: #b0c4ce !important; }
-    body.dark .contact-hover-card { background: rgba(25,40,48,0.96) !important; border-color: rgba(255,255,255,0.08) !important; }
-    body.dark #mobile-tabbar .mobile-tabbar { background: rgba(20,35,42,0.92) !important; border-color: rgba(255,255,255,0.06) !important; }
-    body.dark #mobile-tabbar .app-tab { color: #7a9aa8 !important; }
-    body.dark #mobile-tabbar .app-tab.active { color: #e2e8f0 !important; background: rgba(153,205,216,0.2) !important; }
-    body.dark .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.06), rgba(255,255,255,0.03)) !important; }
-    body.dark #map-background { opacity: 0.88 !important; filter: saturate(0.9) brightness(0.82) contrast(1.02) !important; }
-    body.dark .tracked-pet-row,
-    body.dark .pet-nfc-card,
-    body.dark .health-history-row { background: linear-gradient(180deg, rgba(30,45,55,0.9), rgba(22,34,40,0.78)) !important; border-color: rgba(255,255,255,0.1) !important; color: #e2e8f0 !important; }
-    body.dark .tracked-pet-row__title,
-    body.dark .pet-nfc-card__code,
-    body.dark .pet-action-link,
-    body.dark .map-pet-name { color: #cde8ee !important; }
-    body.dark .tracked-pet-row__subtitle,
-    body.dark .map-pet-status { color: #9ab0b9 !important; }
-    body.dark .map-pet-status { background: rgba(20,35,42,0.88) !important; box-shadow: 0 10px 24px rgba(0,0,0,0.22) !important; }
-    body.dark .health-status-pill { background: rgba(153,205,216,0.16) !important; border: 1px solid rgba(153,205,216,0.22) !important; color: #bfe5ec !important; }
-    body.dark .map-spot-row,
-    body.dark #location-card,
-    body.dark .health-chart-card,
-    body.dark .health-metric-chip,
-    body.dark #diag-dropzone,
-    body.dark #diag-result,
-    body.dark .ai-output-panel,
-    body.dark .chat-left-pane,
-    body.dark .chat-input-bar,
-    body.dark .chat-contact-item,
-    body.dark .chat-empty-state,
-    body.dark .app-topbar,
-    body.dark #profile-edit-modal .pixel-card,
-    body.dark #share-image-modal .pixel-card,
-    body.dark #contact-list button,
-    body.dark .hero-badge { background: linear-gradient(180deg, rgba(30,45,55,0.92), rgba(22,34,40,0.82)) !important; border-color: rgba(255,255,255,0.08) !important; color: #e2e8f0 !important; }
-    body.dark .map-spot-row__meta,
-    body.dark .map-spot-row__foot,
-    body.dark .community-location,
-    body.dark .contact-hover-card .text-gray-600,
-    body.dark .ai-card-desc,
-    body.dark .health-chart-note,
-    body.dark .health-metric-chip__label,
-    body.dark .text-gray-400,
-    body.dark .text-slate-500,
-    body.dark .text-slate-700,
-    body.dark .text-slate-800 { color: #93aab3 !important; }
-    body.dark .community-badge,
-    body.dark .hero-badge,
-    body.dark .health-chart-badge,
-    body.dark .location-tag--emphasis { background: rgba(153,205,216,0.16) !important; color: #cde8ee !important; border-color: rgba(153,205,216,0.22) !important; }
-    body.dark #contact-list button:hover,
-    body.dark .chat-contact-item.active,
-    body.dark .map-spot-row:hover,
-    body.dark .map-spot-row.active { background: linear-gradient(180deg, rgba(34,54,62,0.96), rgba(28,45,52,0.88)) !important; }
-    body.dark #chat-messages .bg-secondary,
-    body.dark #chat-pet-tag,
-    body.dark #chat-pet-traits span,
-    body.dark .bg-secondary,
-    body.dark .bg-secondary\\/40,
-    body.dark .bg-secondary\\/60 { background: rgba(153,205,216,0.14) !important; color: #dce7ec !important; }
-    body.dark .bg-primary\\/10,
-    body.dark .bg-primary\\/15 { background: rgba(153,205,216,0.16) !important; }
-    body.dark .community-location { background: rgba(15,23,42,0.46) !important; }
-    body.dark .text-red-500 { color: #f87171 !important; }
-    body.dark .text-primary { color: #99cdd8 !important; }
-    body.dark p, body.dark span, body.dark label, body.dark li, body.dark td { color: inherit; }
-    .dark-toggle-inline {
-      width: 38px; height: 38px; border-radius: 50%;
-      border: 1.5px solid rgba(153,205,216,0.4);
-      background: rgba(255,255,255,0.7); backdrop-filter: blur(8px);
-      box-shadow: 0 4px 16px rgba(31,59,66,0.1);
-      cursor: pointer; font-size: 17px;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.25s ease; flex-shrink: 0;
-    }
-    .dark-toggle-inline:hover {
-      transform: scale(1.12); box-shadow: 0 6px 24px rgba(153,205,216,0.3);
-      border-color: rgba(153,205,216,0.7);
-    }
-    body.dark .dark-toggle-inline {
-      background: rgba(30,45,55,0.8); border-color: rgba(153,205,216,0.35);
-      box-shadow: 0 0 14px rgba(153,205,216,0.25);
-    }
-  </style>
 </head>
 <body class="min-h-screen font-sans relative">
   <!-- SVG sprite (reduces icon font dependency for core nav) -->
@@ -1200,11 +1097,11 @@
   </div>
 
   <!-- PROFILE EDIT MODAL -->
-  <div id="profile-edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
-    <div class="pixel-card max-w-md w-full">
+  <div id="profile-edit-modal" class="app-modal hidden" aria-hidden="true" data-modal-root>
+    <div class="app-modal__dialog pixel-card w-full animate-fadeIn" role="dialog" aria-modal="true" aria-labelledby="profile-edit-title">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-bold">Edit Profile</h2>
-        <button onclick="closeProfileEditModal()" class="text-gray-500 hover:text-dark">
+        <h2 id="profile-edit-title" class="text-lg font-bold">Edit Profile</h2>
+        <button type="button" data-modal-close="profile-edit-modal" class="text-gray-500 hover:text-dark">
           <i class="fas fa-times text-xl"></i>
         </button>
       </div>
@@ -1263,7 +1160,7 @@
           <button id="btn-save-profile" class="pixel-button flex-1 text-xs">
             <i class="fas fa-save"></i> Save
           </button>
-          <button onclick="closeProfileEditModal()" class="pixel-button flex-1 text-xs bg-gray-400 hover:bg-gray-500">
+          <button type="button" data-modal-close="profile-edit-modal" class="pixel-button flex-1 text-xs bg-gray-400 hover:bg-gray-500">
             <i class="fas fa-times"></i> Cancel
           </button>
         </div>
@@ -1272,11 +1169,11 @@
   </div>
 
   <!-- IMAGE SHARE MODAL -->
-  <div id="share-image-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
-    <div class="pixel-card max-w-md w-full">
+  <div id="share-image-modal" class="app-modal hidden" aria-hidden="true" data-modal-root>
+    <div class="app-modal__dialog pixel-card w-full animate-fadeIn" role="dialog" aria-modal="true" aria-labelledby="share-image-title">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-bold">Share Image with Friend</h2>
-        <button onclick="closeShareImageModal()" class="text-gray-500 hover:text-dark">
+        <h2 id="share-image-title" class="text-lg font-bold">Share Image with Friend</h2>
+        <button type="button" data-modal-close="share-image-modal" class="text-gray-500 hover:text-dark">
           <i class="fas fa-times text-xl"></i>
         </button>
       </div>
@@ -1297,7 +1194,7 @@
           <button id="btn-send-image" class="pixel-button flex-1 text-xs">
             <i class="fas fa-paper-plane"></i> Send
           </button>
-          <button onclick="closeShareImageModal()" class="pixel-button flex-1 text-xs bg-gray-400 hover:bg-gray-500">
+          <button type="button" data-modal-close="share-image-modal" class="pixel-button flex-1 text-xs bg-gray-400 hover:bg-gray-500">
             Cancel
           </button>
         </div>
@@ -1337,11 +1234,14 @@
   <script>
   (function(){
     var KEY='pawtrace_dark';
+    var themeMeta=document.getElementById('theme-color-meta');
     function applyAll(dark){
-      document.body.classList.toggle('dark',dark);
+      document.body.classList.toggle('theme-dark',dark);
+      document.documentElement.style.colorScheme=dark?'dark':'light';
+      if(themeMeta){themeMeta.setAttribute('content',dark?'#081217':'#fff3f8');}
       var icon=dark?'☀️':'🌙';
       var title=dark?'切换到亮色模式':'切换到暗色模式';
-      document.querySelectorAll('.dark-toggle-inline').forEach(function(b){b.textContent=icon;b.title=title;});
+      document.querySelectorAll('.dark-toggle-inline').forEach(function(b){b.textContent=icon;b.title=title;b.setAttribute('aria-pressed',dark?'true':'false');});
       try{localStorage.setItem(KEY,dark?'1':'0');}catch(e){}
     }
     var saved=null;
@@ -1349,7 +1249,7 @@
     var isDark=saved!==null?saved==='1':window.matchMedia('(prefers-color-scheme:dark)').matches;
     applyAll(isDark);
     document.addEventListener('click',function(e){
-      if(e.target.closest('.dark-toggle-inline')){applyAll(!document.body.classList.contains('dark'));}
+      if(e.target.closest('.dark-toggle-inline')){applyAll(!document.body.classList.contains('theme-dark'));}
     });
   })();
   </script>

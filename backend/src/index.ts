@@ -7,13 +7,24 @@ import fs from 'fs';
 import path from 'path';
 import { config } from './config.js';
 import { createMetrics, createMetricsMiddleware } from './middleware/metrics.js';
-import { createRequireDeviceAuth } from './middleware/deviceAuth.js';
 import { optionalAuth } from './middleware/jwtAuth.js';
+import { requestContext } from './middleware/requestContext.js';
 import { registerRoutes } from './registerRoutes.js';
+import { prisma } from './lib/prisma.js';
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
 
 async function main() {
+  try {
+    await prisma.$connect();
+    console.log('[db] connected');
+  } catch (err) {
+    console.error('[db] connection failed – check DATABASE_URL', err);
+    process.exit(1);
+  }
   const metrics = createMetrics();
-  const requireDeviceAuth = createRequireDeviceAuth();
 
   const app = express();
   app.use(helmet({ contentSecurityPolicy: false }));
@@ -21,10 +32,11 @@ async function main() {
   app.use(express.json({ limit: '10mb' }));
   app.use(compression());
   app.set('etag', 'strong');
+  app.use(requestContext);
   app.use(optionalAuth);
   app.use(createMetricsMiddleware(metrics));
 
-  registerRoutes(app, { metrics, requireDeviceAuth });
+  registerRoutes(app, { metrics });
 
   const staticOpts = {
     maxAge: config.NODE_ENV === 'production' ? ('12h' as const) : 0,
@@ -56,6 +68,12 @@ async function main() {
 
   app.use((req, res) => {
     res.status(404).type('json').send({ error: 'Not found', path: req.path });
+  });
+
+  app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const requestId = req.requestId || 'unknown';
+    console.error(`[error] rid=${requestId}`, err);
+    res.status(500).json({ error: 'Internal Server Error', requestId });
   });
 
   const server = app.listen(config.PORT, () => {

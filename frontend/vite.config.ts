@@ -12,13 +12,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          three: ['three'],
-        },
-      },
-    },
+    rollupOptions: {},
   },
   server: {
     port: 5173,

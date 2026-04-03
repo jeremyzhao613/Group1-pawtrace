@@ -3,15 +3,26 @@
   "private": true,
   "description": "PawTrace monorepo：React+TS 前端 + Express+Prisma+Postgres 后端",
   "scripts": {
+    "run": "npm run local:dev",
+    "init": "npm run local:prepare",
+    "stop": "pkill -f \"node dist/index.js\" 2>/dev/null || true; pkill -f \"vite --port 5173\" 2>/dev/null || true; npm run db:local:stop",
     "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "build": "npm run build --prefix frontend && npm run build --prefix backend",
     "start": "npm start --prefix backend",
     "db:up": "docker compose up -d",
+    "db:local:start": "bash ./scripts/local-db.sh start",
+    "db:local:stop": "bash ./scripts/local-db.sh stop",
+    "db:local:status": "bash ./scripts/local-db.sh status",
+    "db:local:reset": "bash ./scripts/local-db.sh reset",
     "db:migrate": "npm run prisma:migrate --prefix backend",
     "db:seed": "npm run db:seed --prefix backend",
+    "db:migrate:local": "DATABASE_URL=postgresql://pawtrace@localhost:55432/pawtrace npm run prisma:migrate --prefix backend",
+    "db:seed:local": "DATABASE_URL=postgresql://pawtrace@localhost:55432/pawtrace npm run db:seed --prefix backend",
     "db:import-json": "npm run db:import-json --prefix backend",
     "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend"
+    "dev:frontend": "npm run dev --prefix frontend",
+    "local:prepare": "npm run db:local:start && npm run db:migrate:local && npm run db:seed:local",
+    "local:dev": "npm run local:prepare && npm run dev"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

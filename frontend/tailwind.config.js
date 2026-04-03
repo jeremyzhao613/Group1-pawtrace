@@ -11,7 +11,7 @@ export default {
         dark: '#1f3b42',
       },
       fontFamily: {
-        pixel: ['system-ui', 'sans-serif'],
+        pixel: ['"Press Start 2P"', 'system-ui', 'sans-serif'],
       },
     },
   },

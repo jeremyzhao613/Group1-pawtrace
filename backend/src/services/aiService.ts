@@ -42,7 +42,7 @@ export function getLocalPetPrediction(profile: Record<string, string> = {}): str
   return `${petName} ${focus} thanks to ${starSign}. Sprinkle in a longer walk and a familiar toy to keep them grounded.`;
 }
 
-export function buildGeminiAdvicePrompt(
+export function buildAdvicePrompt(
   service: string,
   context: string,
   profile: Record<string, unknown>,
@@ -51,7 +51,7 @@ export function buildGeminiAdvicePrompt(
   const owner = (profile.displayName as string) || 'Owner';
   const petLine = profile.mainPetName ? `Pet: ${profile.mainPetName} (${profile.mainPetType || 'Pet'})` : '';
   const notes = profile.mainPetNotes ? `Notes: ${profile.mainPetNotes}` : '';
-    const extraPets =
+  const extraPets =
     Array.isArray(pets) && pets.length
       ? `Other pets: ${pets
           .slice(0, 3)
@@ -106,14 +106,14 @@ Respond in Markdown:
   }
 }
 
-export function buildQwenAdviceMessages(
+export function buildAdviceMessages(
   service: string,
   context: string,
   profile: Record<string, unknown>,
   pets: unknown[]
 ): { role: string; content: string }[] {
   const system = 'You are a concise, friendly pet assistant. Reply in Markdown with clear sections and short bullets.';
-  const prompt = buildGeminiAdvicePrompt(service, context, profile, pets);
+  const prompt = buildAdvicePrompt(service, context, profile, pets);
   return [
     { role: 'system', content: system },
     { role: 'user', content: prompt },
@@ -186,50 +186,4 @@ export async function callQwenVision(opts: {
     choices?: Array<{ message?: { content?: string } }>;
   };
   return data?.choices?.[0]?.message?.content;
-}
-
-export async function callGeminiVision(opts: {
-  imageBase64: string;
-  mimeType?: string;
-  prompt: string;
-}): Promise<string | undefined> {
-  if (!config.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is missing');
-  }
-  const safeMime = opts.mimeType || 'image/jpeg';
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.AI_TIMEOUT_MS);
-  const body = {
-    contents: [
-      {
-        parts: [{ inlineData: { mimeType: safeMime, data: opts.imageBase64 } }, { text: opts.prompt }],
-      },
-    ],
-  };
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': config.GEMINI_API_KEY,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      }
-    );
-    clearTimeout(timer);
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(errText || 'Gemini Vision API error');
-    }
-    const data = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    return data?.candidates?.[0]?.content?.parts?.map((p) => p.text).filter(Boolean).join('\n\n');
-  } catch (err) {
-    clearTimeout(timer);
-    throw err;
-  }
 }

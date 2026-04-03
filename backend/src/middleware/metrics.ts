@@ -37,7 +37,8 @@ export function createMetricsMiddleware(metrics: AppMetrics) {
       routeStat.maxMs = Math.max(routeStat.maxMs, durationMs);
       routeStat.status[res.statusCode] = (routeStat.status[res.statusCode] || 0) + 1;
       if (durationMs > 1200) {
-        console.warn(`[slow] ${req.method} ${key} ${durationMs.toFixed(1)}ms`);
+        const rid = req.requestId ? ` rid=${req.requestId}` : '';
+        console.warn(`[slow] ${req.method} ${key} ${durationMs.toFixed(1)}ms${rid}`);
       }
     });
     next();

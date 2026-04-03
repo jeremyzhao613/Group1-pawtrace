@@ -40,3 +40,7 @@ coverage/
 
 # Misc
 *.local
+
+# Local postgres cluster
+.local-pg/
+frontend/android/

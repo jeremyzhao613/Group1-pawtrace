@@ -1982,8 +1982,9 @@
               })()
             : (p.age || 'Not set');
           const petAvatar = p.avatar || DEFAULT_PET_AVATAR;
-          const isOpen = openPetId ? openPetId === p.id : idx === 0;
-          if (!openPetId && idx === 0) openPetId = p.id;
+          const mobileLayout = window.innerWidth <= 768;
+          const isOpen = openPetId ? openPetId === p.id : (!mobileLayout && idx === 0);
+          if (!openPetId && !mobileLayout && idx === 0) openPetId = p.id;
           const card = document.createElement('div');
           card.className = 'pixel-card flex flex-col gap-2 animate-slideInLeft';
           card.style.animationDelay = (idx * 0.1) + 's';

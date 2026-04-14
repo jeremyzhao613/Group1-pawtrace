@@ -1537,17 +1537,17 @@
         #ai-intro-body.show {
           display: block;
         }
-        .chat-layout {
+      .chat-layout {
           display: flex;
           flex-direction: column;
         }
         .chat-main {
-          order: 1;
+          order: 2;
           min-height: clamp(22rem, 56vh, 31rem);
         }
         .chat-left-pane {
-          order: 2;
-          display: flex;
+          order: 1;
+          display: none;
           position: static;
           inset: auto;
           max-height: none;
@@ -1607,9 +1607,15 @@
           grid-template-columns: 1fr !important;
         }
       }
-      @media (max-width: 768px) {
+        @media (max-width: 768px) {
         body {
           overflow-x: hidden;
+        }
+        body::before,
+        body::after,
+        .halo-pulse,
+        .login-orb {
+          display: none !important;
         }
         :root {
           --app-shell-min-height: auto;
@@ -1625,6 +1631,9 @@
         #login-screen {
           padding: 3.5rem 1.5rem;
         }
+        #login-screen .scroll-section > .rounded-3xl {
+          display: none;
+        }
         .app-shell header.glass-panel {
           display: none;
         }
@@ -1636,6 +1645,12 @@
         }
         .app-shell {
           gap: 1.5rem;
+        }
+        .app-shell-wrapper,
+        main.app-main,
+        .tab-page,
+        .page-section {
+          max-width: 100%;
         }
         .app-shell > .flex-1 {
           order: 1;
@@ -1698,6 +1713,28 @@
         .map-sidebar {
           grid-template-columns: minmax(0, 1fr);
         }
+        #register-form > .grid,
+        #community-pet-feed,
+        #community-skeleton {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+        .community-cover {
+          aspect-ratio: 1 / 1;
+        }
+        .health-pet-select-row {
+          width: 100%;
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .health-pet-select {
+          width: 100%;
+          min-width: 0 !important;
+        }
+        .ai-summary-card {
+          width: 100%;
+          min-width: 0 !important;
+          flex: 1 1 100%;
+        }
       }
       @media (max-width: 540px) {
         #app-root {
@@ -1726,11 +1763,25 @@
           font-size: 0.54rem;
           min-height: 3.15rem;
           gap: 0.2rem;
+          min-width: 0;
+          padding-inline: 0.05rem;
+        }
+        #mobile-tabbar .app-tab span {
+          display: none;
         }
         #mobile-tabbar .mobile-tabbar {
-          gap: 0.25rem;
-          padding: 0.55rem 0.45rem calc(var(--safe-bottom) + 0.45rem);
+          display: flex;
+          gap: 0.15rem;
+          justify-content: space-between;
+          padding: 0.5rem 0.3rem calc(var(--safe-bottom) + 0.4rem);
           border-radius: 1.4rem;
+          overflow: hidden;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        #mobile-tabbar .app-tab {
+          flex: 1 1 0;
         }
         .pixel-input {
           padding: 0.68rem 0.8rem;

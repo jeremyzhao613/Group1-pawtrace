@@ -40,15 +40,15 @@ const PoiStructure = ({ poi }: { poi: PoiRecord }) => {
         <group>
           <mesh position={[0, 0.12, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[2.6, 1.1]} />
-            <meshStandardMaterial color="#14100d" metalness={0.18} roughness={0.78} />
+            <meshStandardMaterial color="#101820" metalness={0.24} roughness={0.78} />
           </mesh>
           <mesh castShadow position={[0.4, 0.28, 0]}>
             <boxGeometry args={[1.4, 0.32, 0.6]} />
-            <meshStandardMaterial color="#1f1812" metalness={0.42} roughness={0.45} />
+            <meshStandardMaterial color="#16242d" metalness={0.42} roughness={0.4} />
           </mesh>
           <mesh castShadow position={[-0.9, 0.12, 0]}>
             <boxGeometry args={[0.35, 0.18, 0.75]} />
-            <meshStandardMaterial color="#f6efe6" emissive="#74c6c0" emissiveIntensity={0.35} />
+            <meshStandardMaterial color="#d7f5ff" emissive="#74e6ff" emissiveIntensity={0.35} />
           </mesh>
         </group>
       );
@@ -57,11 +57,11 @@ const PoiStructure = ({ poi }: { poi: PoiRecord }) => {
         <group>
           <mesh castShadow position={[0, 0.42, 0]}>
             <boxGeometry args={[1.5, 0.8, 1.5]} />
-            <meshStandardMaterial color="#1b140f" metalness={0.35} roughness={0.42} />
+            <meshStandardMaterial color="#162028" metalness={0.32} roughness={0.42} />
           </mesh>
           <mesh castShadow position={[0.2, 0.95, 0.1]}>
             <boxGeometry args={[0.92, 0.44, 0.92]} />
-            <meshStandardMaterial color="#251b13" emissive="#d6a75a" emissiveIntensity={0.16} />
+            <meshStandardMaterial color="#1b2c34" emissive="#ffb15c" emissiveIntensity={0.2} />
           </mesh>
         </group>
       );
@@ -70,11 +70,11 @@ const PoiStructure = ({ poi }: { poi: PoiRecord }) => {
         <group>
           <mesh castShadow position={[0, 0.42, 0]}>
             <boxGeometry args={[0.82, 0.84, 0.22]} />
-            <meshStandardMaterial color="#181310" metalness={0.28} roughness={0.52} />
+            <meshStandardMaterial color="#121a22" metalness={0.28} roughness={0.52} />
           </mesh>
           <mesh castShadow position={[0, 0.35, 0]}>
             <boxGeometry args={[0.22, 0.56, 0.62]} />
-            <meshStandardMaterial color="#8fd4a4" emissive="#8fd4a4" emissiveIntensity={0.22} />
+            <meshStandardMaterial color="#6ff3c8" emissive="#6ff3c8" emissiveIntensity={0.24} />
           </mesh>
         </group>
       );
@@ -83,11 +83,11 @@ const PoiStructure = ({ poi }: { poi: PoiRecord }) => {
         <group>
           <mesh castShadow position={[0, 1.4, 0]}>
             <cylinderGeometry args={[0.08, 0.16, 2.8, 16]} />
-            <meshStandardMaterial color="#f6efe6" emissive="#f6efe6" emissiveIntensity={0.18} />
+            <meshStandardMaterial color="#dff8ff" emissive="#74e6ff" emissiveIntensity={0.16} />
           </mesh>
           <mesh castShadow position={[0, 2.95, 0]}>
             <sphereGeometry args={[0.24, 18, 18]} />
-            <meshStandardMaterial color="#d6a75a" emissive="#d6a75a" emissiveIntensity={0.34} />
+            <meshStandardMaterial color="#74e6ff" emissive="#74e6ff" emissiveIntensity={0.42} />
           </mesh>
         </group>
       );
@@ -107,15 +107,15 @@ export const CityLayer = ({
     <group>
       <mesh position={[0, -0.02, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[32, 32]} />
-        <meshStandardMaterial color="#090705" metalness={0.2} roughness={0.92} />
+        <meshStandardMaterial color="#071019" metalness={0.22} roughness={0.92} />
       </mesh>
 
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[4.9, 14.8, 90]} />
-        <meshBasicMaterial color="#d6a75a" opacity={0.05} transparent />
+        <meshBasicMaterial color="#74e6ff" opacity={0.07} transparent />
       </mesh>
 
-      <Sparkles color="#d6a75a" count={80} opacity={0.5} scale={[18, 6, 18]} size={1.5} speed={0.35} />
+      <Sparkles color="#74e6ff" count={80} opacity={0.52} scale={[18, 6, 18]} size={1.5} speed={0.35} />
 
       {cityBlocks.map((block, index) => (
         <mesh
@@ -125,7 +125,7 @@ export const CityLayer = ({
           receiveShadow
         >
           <boxGeometry args={block.size as [number, number, number]} />
-          <meshStandardMaterial color="#15100c" emissive="#100c09" emissiveIntensity={0.2} metalness={0.45} roughness={0.54} />
+          <meshStandardMaterial color="#111a21" emissive="#0c141a" emissiveIntensity={0.2} metalness={0.45} roughness={0.54} />
         </mesh>
       ))}
 

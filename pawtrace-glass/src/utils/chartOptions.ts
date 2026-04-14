@@ -20,9 +20,9 @@ const rgba = (hex: string, alpha: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 };
 
-const baseText = 'rgba(246, 239, 230, 0.78)';
-const mutedText = 'rgba(246, 239, 230, 0.45)';
-const gridLine = 'rgba(255, 255, 255, 0.08)';
+const baseText = 'rgba(223, 244, 255, 0.84)';
+const mutedText = 'rgba(163, 201, 214, 0.58)';
+const gridLine = 'rgba(116, 230, 255, 0.12)';
 
 export const buildThroughputOption = (
   series: ChartSeries,
@@ -38,8 +38,8 @@ export const buildThroughputOption = (
   },
   tooltip: {
     trigger: 'axis',
-    backgroundColor: 'rgba(6, 5, 4, 0.94)',
-    borderColor: 'rgba(255, 224, 171, 0.16)',
+    backgroundColor: 'rgba(7, 14, 19, 0.96)',
+    borderColor: 'rgba(116, 230, 255, 0.16)',
     textStyle: {
       color: baseText,
     },
@@ -65,7 +65,7 @@ export const buildThroughputOption = (
     type: 'value',
     splitLine: {
       lineStyle: {
-        color: 'rgba(255, 255, 255, 0.05)',
+        color: 'rgba(116, 230, 255, 0.05)',
       },
     },
     axisLine: {
@@ -121,8 +121,8 @@ export const buildAvailabilityOption = (
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(6, 5, 4, 0.94)',
-      borderColor: 'rgba(255, 224, 171, 0.16)',
+      backgroundColor: 'rgba(7, 14, 19, 0.96)',
+      borderColor: 'rgba(116, 230, 255, 0.16)',
       textStyle: {
         color: baseText,
       },
@@ -149,7 +149,7 @@ export const buildAvailabilityOption = (
       max: Number(maximumValue.toFixed(2)),
       splitLine: {
         lineStyle: {
-          color: 'rgba(255, 255, 255, 0.05)',
+          color: 'rgba(116, 230, 255, 0.05)',
         },
       },
       axisLine: {
@@ -182,7 +182,7 @@ export const buildAvailabilityOption = (
         smooth: true,
         showSymbol: false,
         lineStyle: {
-          color: '#f6efe6',
+          color: '#eff9ff',
           width: 1.6,
         },
         data: series.values,

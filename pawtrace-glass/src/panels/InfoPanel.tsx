@@ -1,6 +1,9 @@
 import { ChartPanel } from '@/panels/ChartPanel';
 import { MetricCard } from '@/panels/MetricCard';
-import { buildAvailabilityOption, buildThroughputOption } from '@/utils/chartOptions';
+import {
+  buildAvailabilityOption,
+  buildThroughputOption,
+} from '@/utils/chartOptions';
 import { formatNetworkValue } from '@/utils/format';
 import type { DashboardSnapshot, PoiRecord } from '@/types';
 
@@ -27,8 +30,8 @@ export const InfoPanel = ({ poi, snapshot }: InfoPanelProps) => (
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="eyebrow">{poi.name} Overview</p>
-          <h2 className="mt-3 font-display text-3xl uppercase tracking-[0.18em]">
-            {poi.category}
+          <h2 className="mt-3 font-display text-3xl uppercase tracking-[0.18em] text-[var(--text-strong)]">
+            Node Diagnostics
           </h2>
         </div>
         <span className="hud-chip !px-3 !py-2 text-[0.66rem]">{poi.status}</span>
@@ -37,6 +40,16 @@ export const InfoPanel = ({ poi, snapshot }: InfoPanelProps) => (
       <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
         {poi.overview}
       </p>
+
+      <div className="mt-5 rounded-[22px] border border-[var(--line-soft)] bg-[linear-gradient(180deg,rgba(116,230,255,0.08),transparent_55%),var(--panel-soft)] p-4">
+        <p className="eyebrow">Node Brief</p>
+        <p className="mt-2 font-display text-2xl uppercase tracking-[0.16em] text-[var(--text-strong)]">
+          {poi.category}
+        </p>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          {poi.statusNote}
+        </p>
+      </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
         {snapshot.metrics.map((metric) => (
@@ -59,10 +72,13 @@ export const InfoPanel = ({ poi, snapshot }: InfoPanelProps) => (
 
       <div className="mt-5 space-y-4">
         {snapshot.network.map((item) => (
-          <div key={item.label}>
+          <div
+            key={item.label}
+            className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--panel-soft)] p-4"
+          >
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-[rgba(246,242,235,0.78)]">{item.label}</span>
-              <span className="font-display uppercase tracking-[0.14em] text-[var(--ivory)]">
+              <span className="text-[rgba(223,240,247,0.78)]">{item.label}</span>
+              <span className="font-display uppercase tracking-[0.14em] text-[var(--text-strong)]">
                 {formatNetworkValue(item.value, item.suffix)}
               </span>
             </div>
@@ -72,7 +88,7 @@ export const InfoPanel = ({ poi, snapshot }: InfoPanelProps) => (
                 className="h-full rounded-full"
                 style={{
                   width: `${getBarWidth(item.value, item.suffix)}%`,
-                  background: `linear-gradient(90deg, ${poi.color}, rgba(246, 239, 230, 0.9))`,
+                  background: `linear-gradient(90deg, ${poi.color}, rgba(223, 244, 255, 0.9))`,
                 }}
               />
             </div>
@@ -84,18 +100,27 @@ export const InfoPanel = ({ poi, snapshot }: InfoPanelProps) => (
         ))}
       </div>
 
-      <div className="mt-5 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+      <div className="mt-5 rounded-[22px] border border-[var(--line-soft)] bg-[var(--panel-soft)] p-4">
         <p className="eyebrow">Operational Alerts</p>
         <div className="mt-4 space-y-3">
-          {snapshot.alerts.map((alert) => (
-            <div key={alert} className="flex items-start gap-3">
-              <span
-                className="mt-1 h-2 w-2 rounded-full"
-                style={{ backgroundColor: poi.color }}
-              />
-              <p className="text-sm leading-6 text-[rgba(246,242,235,0.78)]">
-                {alert}
-              </p>
+          {snapshot.alerts.map((alert, index) => (
+            <div key={alert} className="rounded-[18px] border border-white/6 bg-black/20 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <span
+                    className="mt-1 h-2 w-2 rounded-full"
+                    style={{
+                      backgroundColor: index === 0 ? 'var(--accent-amber)' : poi.color,
+                    }}
+                  />
+                  <p className="text-sm leading-6 text-[rgba(223,240,247,0.78)]">
+                    {alert}
+                  </p>
+                </div>
+                <span className="font-display text-xs uppercase tracking-[0.18em] text-[var(--muted-strong)]">
+                  {index === 0 ? 'Prime' : 'Aux'}
+                </span>
+              </div>
             </div>
           ))}
         </div>
@@ -104,13 +129,13 @@ export const InfoPanel = ({ poi, snapshot }: InfoPanelProps) => (
 
     <ChartPanel
       option={buildThroughputOption(snapshot.throughput, poi.color)}
-      subtitle="Rolling edge throughput by focus zone"
-      title="Throughput Chart"
+      subtitle="Rolling uplink and downlink pressure by active zone"
+      title="Flux Graph"
     />
     <ChartPanel
       option={buildAvailabilityOption(snapshot.availability, poi.color)}
-      subtitle="Availability profile across the latest sample window"
-      title="Availability Chart"
+      subtitle="Availability profile across the latest synchronized sample window"
+      title="Reliability Envelope"
     />
   </aside>
 );

@@ -21,13 +21,13 @@ export const ChartPanel = ({
       <span className="hud-chip !px-3 !py-2 text-[0.66rem]">Live</span>
     </div>
 
-    <div className="mt-4">
+    <div className="mt-4 rounded-[22px] border border-[var(--line-soft)] bg-black/20 p-2">
       <ReactECharts
         lazyUpdate
         notMerge
         option={option}
         opts={{ renderer: 'svg' }}
-        style={{ height: 190 }}
+        style={{ height: 210 }}
       />
     </div>
   </section>

@@ -72,7 +72,7 @@ isProject: false
 
 ## 验证状态 / Verification Status
 
-- 已完成 `node --check frontend/public/legacy/app.js` / Completed `node --check frontend/public/legacy/app.js`
+- 已完成 `node --check frontend/public/app/app.js` / Completed `node --check frontend/public/app/app.js`
 - 已完成 `node --check frontend/public/map.js` / Completed `node --check frontend/public/map.js`
 - 已完成 `npm run build --prefix frontend` / Completed `npm run build --prefix frontend`
 

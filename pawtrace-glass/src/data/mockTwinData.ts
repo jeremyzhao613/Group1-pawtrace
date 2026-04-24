@@ -41,7 +41,7 @@ const oscillateSeries = (
   );
 
 export const eventMeta: EventMeta = {
-  eventName: 'Venue Pulse Twin',
+  eventName: 'PawTrace Pulse Twin',
   venue: 'Harbor Stadium Operations Command',
   city: 'Shanghai',
   program: 'Live crowd, device, transport, and access intelligence',

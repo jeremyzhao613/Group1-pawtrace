@@ -1,9 +1,0 @@
-{
-  "name": "PawTrace Glass",
-  "description": "A pixel-art aesthetic pet social and health monitoring platform with glassmorphism UI.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone",
-    "geolocation"
-  ]
-}

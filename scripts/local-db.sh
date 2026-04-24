@@ -2,27 +2,45 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PG_BIN="/opt/homebrew/opt/postgresql@16/bin"
+PG_BIN="${PG_BIN:-}"
 PG_DATA="$ROOT_DIR/.local-pg/data"
 PG_LOG="$ROOT_DIR/.local-pg/log/postgres.log"
 PG_PORT="${PG_PORT:-55432}"
 
 cmd="${1:-status}"
 
-need_bin() {
-  local b="$1"
-  if ! command -v "$b" >/dev/null 2>&1; then
-    echo "[local-db] missing command: $b"
-    exit 1
+find_pg_bin() {
+  if [ -n "$PG_BIN" ] && [ -x "$PG_BIN/pg_ctl" ]; then
+    echo "$PG_BIN"
+    return
   fi
+
+  for candidate in \
+    "/opt/homebrew/opt/postgresql@16/bin" \
+    "/usr/local/opt/postgresql@16/bin" \
+    "$(command -v pg_ctl 2>/dev/null | xargs dirname 2>/dev/null || true)"
+  do
+    if [ -n "$candidate" ] && [ -x "$candidate/pg_ctl" ]; then
+      echo "$candidate"
+      return
+    fi
+  done
+
+  echo "[local-db] PostgreSQL pg_ctl not found." >&2
+  echo "[local-db] Install PostgreSQL 16, or run with PG_BIN=/path/to/postgres/bin." >&2
+  echo "[local-db] macOS Homebrew: brew install postgresql@16" >&2
+  exit 1
 }
 
 need_pg_bin() {
-  if [ ! -x "$PG_BIN/pg_ctl" ]; then
-    echo "[local-db] PostgreSQL 16 not found at $PG_BIN"
-    echo "Install with: brew install postgresql@16"
-    exit 1
-  fi
+  PG_BIN="$(find_pg_bin)"
+  for required in pg_ctl initdb createdb; do
+    if [ ! -x "$PG_BIN/$required" ]; then
+      echo "[local-db] missing $required in $PG_BIN"
+      echo "[local-db] Set PG_BIN=/path/to/postgres/bin and retry."
+      exit 1
+    fi
+  done
 }
 
 init_cluster() {

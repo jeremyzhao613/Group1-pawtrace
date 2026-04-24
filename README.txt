@@ -1,23 +1,23 @@
 PawTrace 是一个全栈宠物社区与健康管理原型：以「地图 + 社交 + AI」为核心，帮助用户在校园环境中发现宠物友好地点、管理多只宠物信息，并通过大模型完成对话式互动与基于图片的健康/行为类辅助分析（服务端集成阿里云通义千问文本与 Qwen-VL 视觉能力，密钥仅在后端配置）。
 
-技术上前端采用 Vite + React + TypeScript + Tailwind，当前主界面以 legacy 单页 HTML/JS 为主并与 React 共存；后端为 Node.js + Express + TypeScript，数据层 Prisma + PostgreSQL，认证使用 JWT。仓库为 monorepo，包含本地数据库脚本、监控静态页与一键启动流程，适合小团队迭代与课程/演示环境部署。
+技术上前端采用 Vite + Tailwind，主站页面为当前完整单页 HTML/JS 界面；后端为 Node.js + Express + TypeScript，数据层 Prisma + PostgreSQL，认证使用 JWT。后端默认只作为 API/Monitor，不在 3000 端口托管前端页面，避免错误界面混淆。
 
 
 PawTrace Web App
 
 快速开始（最简）
-- 首次只做一次：`npm install && npm run init`
+- 首次只做一次：`npm install && npm run install:all && npm run init`
 - 日常启动：`npm run run`
 - 停止服务：`npm run stop`
 
 技术栈
-- 前端：Vite + Tailwind（当前 UI 为 legacy 大页面方案）
+- 前端：Vite + Tailwind（当前 UI 为完整单页页面方案）
 - 后端：Node.js + Express + TypeScript + Prisma + PostgreSQL
 - AI：通义千问 DashScope（Qwen 文本 + Qwen-VL 视觉，仅服务端密钥）
 
 目录
-- frontend/             前端入口（当前为 legacy UI）
-- frontend-legacy/      旧版纯 HTML/JS 页面备份
+- frontend/             主站前端入口（完整单页页面 + Vite）
+- pawtrace-glass/       独立数字孪生展示页（默认端口 3001）
 - backend/              后端源码 src/、Prisma schema、迁移
 - assets/               共享静态资源（生产挂载 /assets）
 - monitor/              监控台静态页（/monitor）
@@ -26,9 +26,11 @@ PawTrace Web App
 环境变量（后端）
 - 复制 backend/.env.example 为 backend/.env
 - 推荐本地：DATABASE_URL="postgresql://pawtrace@localhost:55432/pawtrace"
+- Docker Compose：DATABASE_URL="postgresql://pawtrace:pawtrace@localhost:5432/pawtrace"
 - JWT_SECRET=（本地可简化，生产务必强随机）
 - DASHSCOPE_API_KEY（AI 功能，通义千问密钥）
 - MONITOR_API_TOKEN（可选，保护 /api/monitor/*）
+- SERVE_WEB=0（默认后端不托管前端；单端口部署时才改成 1）
 
 小团队本地推荐流程（无需 Docker）
 1) 安装依赖
@@ -46,7 +48,8 @@ PawTrace Web App
 4) 启动前后端
 - npm run dev
 - 前端：http://localhost:5173
-- 后端：http://localhost:3000
+- 后端 API：http://localhost:3000/api/status
+- Monitor：http://localhost:3000/monitor/index.html
 
 常用命令
 - 一键启动（推荐）：npm run run
@@ -56,7 +59,10 @@ PawTrace Web App
 - 查看本地 DB 状态：npm run db:local:status
 - 重置本地 DB：npm run db:local:reset
 - 停止本地 DB：npm run db:local:stop
-- 构建：npm run build
+- 构建全部：npm run build
+- 只构建主站：npm run build:web
+- 只构建展示页：npm run build:glass
+- 启动展示页：npm run dev:glass
 
 测试账号
 - 用户名：demo

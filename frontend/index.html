@@ -35,7 +35,7 @@
   </script>
     <script>
     (function () {
-      fetch('/legacy/style.tailwind.css')
+      fetch('/app/style.tailwind.css')
         .then(function (r) { return r.text(); })
         .then(function (css) {
           var style = document.createElement('style');
@@ -1212,7 +1212,7 @@
     </div>
   </div>
 
-    <script src="/legacy/app.js"></script>
+    <script src="/app/app.js"></script>
   <script>
   (function(){
     document.addEventListener('error',function(e){

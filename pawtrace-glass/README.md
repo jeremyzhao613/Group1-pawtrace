@@ -1,6 +1,6 @@
-# Venue Pulse Twin
+# PawTrace Glass Dashboard
 
-High-end stadium digital twin demo built with:
+PawTrace's standalone digital twin dashboard for the 3001 showcase surface.
 
 - React + Vite
 - Tailwind CSS
@@ -12,6 +12,8 @@ High-end stadium digital twin demo built with:
 
 1. `npm install`
 2. `npm run dev`
+
+The dev server is pinned to `http://localhost:3001/`.
 
 ## Structure
 

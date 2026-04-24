@@ -124,8 +124,8 @@ isProject: false
   [index.css](/Users/jeremy/Desktop/Group1-pawtrace/pawtrace-glass/src/index.css:1)
 - 主站移动端与交互 / Main frontend mobile and interaction polish:
   [index.html](/Users/jeremy/Desktop/Group1-pawtrace/frontend/index.html:1),
-  [app.js](/Users/jeremy/Desktop/Group1-pawtrace/frontend/public/legacy/app.js:1),
-  [style.tailwind.css](/Users/jeremy/Desktop/Group1-pawtrace/frontend/public/legacy/style.tailwind.css:1)
+  [app.js](/Users/jeremy/Desktop/Group1-pawtrace/frontend/public/app/app.js:1),
+  [style.tailwind.css](/Users/jeremy/Desktop/Group1-pawtrace/frontend/public/app/style.tailwind.css:1)
 - 原生容器与包装 / Native container and packaging:
   [package.json](/Users/jeremy/Desktop/Group1-pawtrace/frontend/package.json:1),
   [capacitor.config.ts](/Users/jeremy/Desktop/Group1-pawtrace/frontend/capacitor.config.ts:1),

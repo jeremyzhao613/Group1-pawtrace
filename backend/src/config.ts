@@ -9,11 +9,15 @@ const repoRoot = path.join(backendRoot, '..');
 
 const keys = getAiKeys();
 
-const frontendDist = path.join(repoRoot, 'frontend', 'dist');
-const frontendRoot = path.join(repoRoot, 'frontend');
+const webApp = String(process.env.WEB_APP || 'frontend').trim();
+const webRootName = webApp === 'glass' || webApp === 'pawtrace-glass' ? 'pawtrace-glass' : 'frontend';
+const frontendDist = path.join(repoRoot, webRootName, 'dist');
+const frontendRoot = path.join(repoRoot, webRootName);
 const hasFrontendDist = fs.existsSync(path.join(frontendDist, 'index.html'));
-const publicPath = hasFrontendDist ? frontendDist : path.join(frontendRoot, 'public');
+const fallbackPublicPath = webRootName === 'frontend' ? path.join(frontendRoot, 'public') : frontendRoot;
+const publicPath = hasFrontendDist ? frontendDist : fallbackPublicPath;
 const usingFrontendDist = hasFrontendDist;
+const serveWeb = process.env.SERVE_WEB === '1' || process.env.SERVE_WEB === 'true';
 
 export const config = {
   PORT: Number(process.env.PORT || 3000),
@@ -33,7 +37,9 @@ export const config = {
   publicPath,
   frontendRoot,
   frontendDist,
+  webRootName,
   usingFrontendDist,
+  serveWeb,
   assetsPath: path.join(repoRoot, 'assets'),
   monitorPath: path.join(repoRoot, 'monitor'),
 } as const;

@@ -42,7 +42,22 @@ async function main() {
     maxAge: config.NODE_ENV === 'production' ? ('12h' as const) : 0,
     etag: true as const,
   };
-  app.use(express.static(config.publicPath, staticOpts));
+
+  if (!config.serveWeb) {
+    app.get('/', (_req, res) => {
+      res.json({
+        service: 'PawTrace backend API',
+        status: '/api/status',
+        frontend: 'http://localhost:5173/',
+        monitor: `http://localhost:${config.PORT}/monitor/index.html`,
+        showcase: 'http://localhost:3001/',
+      });
+    });
+  }
+
+  if (config.serveWeb) {
+    app.use(express.static(config.publicPath, staticOpts));
+  }
   if (fs.existsSync(config.assetsPath)) {
     app.use('/assets', express.static(config.assetsPath, staticOpts));
   }
@@ -57,14 +72,16 @@ async function main() {
     }
   }
 
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
-    res.sendFile(path.join(config.publicPath, 'index.html'), (err) => {
-      if (err) next(err);
+  if (config.serveWeb) {
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) {
+        return next();
+      }
+      res.sendFile(path.join(config.publicPath, 'index.html'), (err) => {
+        if (err) next(err);
+      });
     });
-  });
+  }
 
   app.use((req, res) => {
     res.status(404).type('json').send({ error: 'Not found', path: req.path });
@@ -77,7 +94,7 @@ async function main() {
   });
 
   const server = app.listen(config.PORT, () => {
-    console.log(`PawTrace API + static at http://localhost:${config.PORT}`);
+    console.log(`PawTrace API at http://localhost:${config.PORT}`);
     if (fs.existsSync(config.monitorPath)) {
       console.log(`[monitor] http://localhost:${config.PORT}/monitor/index.html`);
       if (config.MONITOR_API_TOKEN) {
@@ -86,9 +103,9 @@ async function main() {
         );
       }
     }
-    if (!config.usingFrontendDist) {
+    if (config.serveWeb && !config.usingFrontendDist) {
       console.warn(
-        '[static] 未检测到 frontend/dist，请先在前端执行 npm run build；开发时用 Vite 并代理 /api。'
+        `[static] 未检测到 ${config.webRootName}/dist，请先执行 npm run build；开发时用 Vite 并代理 /api。`
       );
     }
   });

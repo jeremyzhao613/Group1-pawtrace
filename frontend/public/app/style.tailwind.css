@@ -2364,6 +2364,154 @@
           padding: 2.25rem;
         }
       }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        min-width: 0;
+        background: var(--theme-bg);
+      }
+      #login-screen {
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding: 4rem 1.5rem;
+      }
+      #login-screen .login-shell,
+      #login-screen .grid > * {
+        min-width: 0;
+      }
+      #login-screen .login-shell {
+        width: min(100%, 72rem);
+        max-width: calc(100vw - 3rem);
+      }
+      #login-screen .glass-panel {
+        width: 100%;
+        max-width: 32rem;
+        margin-inline: auto;
+        box-sizing: border-box;
+      }
+      #login-screen .scroll-section > .rounded-3xl {
+        background: var(--theme-panel);
+        border-color: var(--theme-border);
+      }
+      .true-focus {
+        color: var(--theme-text-strong);
+      }
+      .true-focus-word {
+        color: inherit;
+        filter: none;
+        opacity: 0.82;
+      }
+      .true-focus-word.active {
+        opacity: 1;
+      }
+      body.theme-dark .true-focus {
+        color: #dceff4;
+      }
+      body.theme-dark .true-focus-word {
+        color: inherit;
+        opacity: 0.78;
+        text-shadow: 0 0 18px rgba(153, 205, 216, 0.16);
+      }
+      body.theme-dark .true-focus-word.active {
+        color: #f6fbfc;
+        opacity: 1;
+      }
+      @media (max-width: 768px) {
+        #login-screen {
+          align-items: flex-start;
+          justify-content: flex-start !important;
+          padding:
+            max(2rem, calc(var(--safe-top) + 1.2rem))
+            calc(1.1rem + var(--safe-right))
+            max(2.5rem, calc(var(--safe-bottom) + 1.6rem))
+            calc(1.1rem + var(--safe-left));
+        }
+        #login-screen .grid {
+          width: calc(100vw - 3.25rem) !important;
+          max-width: calc(100vw - 3.25rem) !important;
+          gap: 1.5rem;
+        }
+        #login-screen .login-shell {
+          width: calc(100vw - 3.25rem) !important;
+          max-width: calc(100vw - 3.25rem) !important;
+        }
+        #login-screen .scroll-section {
+          order: 1;
+          gap: 1.25rem;
+        }
+        #login-screen .grid > div:not(.scroll-section) {
+          order: 2;
+          width: calc(100vw - 3.25rem) !important;
+          max-width: calc(100vw - 3.25rem) !important;
+        }
+        #login-screen .glass-panel {
+          width: calc(100vw - 3.25rem) !important;
+          max-width: calc(100vw - 3.25rem) !important;
+          padding: 1.15rem;
+          border-radius: 1.45rem;
+          margin-bottom: 0;
+        }
+        #login-screen .glass-panel .flex.items-center.justify-between {
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }
+        #login-screen .glass-panel .text-right {
+          text-align: left;
+        }
+        #login-screen h1,
+        #login-screen p {
+          max-width: 100%;
+          overflow-wrap: break-word;
+        }
+        #tab-login,
+        #tab-register {
+          min-width: 0;
+          white-space: nowrap;
+        }
+        #login-screen .pixel-input,
+        #login-screen .pixel-button {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        #login-screen .flex-1 {
+          min-width: 0;
+        }
+        #tab-register {
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+      @media (max-width: 540px) {
+        #login-screen {
+          padding-inline: calc(1rem + var(--safe-left)) calc(1rem + var(--safe-right));
+        }
+        #login-screen .grid,
+        #login-screen .login-shell,
+        #login-screen .grid > div:not(.scroll-section),
+        #login-screen .glass-panel {
+          width: min(21rem, calc(100vw - 4rem)) !important;
+          max-width: min(21rem, calc(100vw - 4rem)) !important;
+        }
+        #login-screen h1 {
+          font-size: clamp(1.55rem, 6.7vw, 1.85rem);
+          line-height: 1.08;
+        }
+        #login-screen .login-chip {
+          font-size: 0.78rem;
+          padding: 0.34rem 0.65rem;
+        }
+        #register-form > .grid {
+          grid-template-columns: 1fr !important;
+          gap: 0.75rem;
+        }
+      }
       @keyframes petHaloPulse {
         0% {
           transform: translate(-50%, -50%) scale(0.9);

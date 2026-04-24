@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>PawTrace · Pixel Pet Social</title>
+  <title>PawTrace · Pet Map & Social</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta id="theme-color-meta" name="theme-color" content="#fff3f8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -47,7 +47,7 @@
           }
         })
         .catch(function (e) {
-          console.error('Failed to load legacy styles:', e);
+          console.error('Failed to load app styles:', e);
         });
     })();
   </script>
@@ -82,16 +82,16 @@
   <span class="halo-pulse w-[420px] h-[420px] bg-secondary/60 bottom-10 right-16 rounded-full"></span>
   <span class="halo-pulse halo-soft-pink w-[460px] h-[460px] -bottom-32 left-1/3 rounded-full"></span>
   <!-- LOGIN SCREEN -->
-  <div id="login-screen" class="relative min-h-screen flex items-center justify-center px-6 py-16">
+  <div id="login-screen" class="relative min-h-screen flex items-center justify-center">
     <div class="login-bg-layer"></div>
     <span class="login-orb a"></span>
     <span class="login-orb b"></span>
     <span class="login-orb c"></span>
-    <div class="relative w-full max-w-6xl grid gap-12 lg:grid-cols-[1.2fr,0.8fr] items-center z-10">
+    <div class="login-shell relative grid gap-12 lg:grid-cols-[1.2fr,0.8fr] items-center z-10">
       <!-- Left: marketing copy -->
-      <div class="space-y-10 scroll-section order-2 lg:order-1">
+      <div class="space-y-10 scroll-section order-1">
         <div class="flex flex-wrap items-center gap-4 text-[11px] uppercase tracking-[0.35em] text-gray-500 login-animate" style="--delay:0.05s">
-          <span class="px-4 py-1 rounded-full bg-white/60 border border-white/70 hero-badge">Logo</span>
+          <span class="px-4 py-1 rounded-full bg-white/60 border border-white/70 hero-badge">PawTrace</span>
         </div>
         <div class="space-y-5 login-animate" style="--delay:0.12s">
           <h1 class="text-4xl md:text-5xl font-semibold leading-tight text-slate-900 tracking-tight">
@@ -148,17 +148,17 @@
         </div>
       </div>
       <!-- Right: login/register card -->
-      <div class="order-1 lg:order-2">
+      <div class="order-2">
         <div class="glass-panel relative">
           <div class="relative">
             <div class="flex items-center justify-between mb-6">
               <div>
-                <p class="text-xs uppercase tracking-[0.35em] text-gray-500">True Focus</p>
+                <p class="text-xs uppercase tracking-[0.35em] text-gray-500">Pet Map</p>
                 <h2 class="text-2xl font-semibold text-slate-900">Welcome back</h2>
               </div>
               <div class="text-right text-xs text-gray-500">
-                <p class="font-semibold text-primary">PawTrace OS</p>
-                <p>Signature glass UI</p>
+                <p class="font-semibold text-primary">Live nearby</p>
+                <p>Map · Pets · Chat</p>
               </div>
             </div>
             <div class="flex text-xs mb-6 bg-white/50 rounded-full p-1">
@@ -1256,7 +1256,7 @@
     }
     var saved=null;
     try{saved=localStorage.getItem(KEY);}catch(e){}
-    var isDark=saved!==null?saved==='1':window.matchMedia('(prefers-color-scheme:dark)').matches;
+    var isDark=saved!==null?saved==='1':false;
     applyAll(isDark);
     document.addEventListener('click',function(e){
       if(e.target.closest('.dark-toggle-inline')){applyAll(!document.body.classList.contains('theme-dark'));}

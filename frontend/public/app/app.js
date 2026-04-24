@@ -276,7 +276,7 @@
       return users[0] || createGuestUser();
     }
 
-    // True Focus (feature highlight)
+    // Login feature highlight
     function initTrueFocus() {
       const container = document.getElementById('core-focus');
       if (!container) return;
@@ -662,7 +662,7 @@
         diagRunBtn?.setAttribute('disabled', 'true');
         diagRunBtn?.classList.add('opacity-60', 'cursor-not-allowed');
         toggleDiagLoading(true);
-        setDiagStatus(file ? 'Analyzing pet health with Gemini...' : 'Analyzing symptoms (no photo)...');
+        setDiagStatus(file ? 'Analyzing pet health with Qwen Vision...' : 'Analyzing symptoms (no photo)...');
         try {
           if (diagResult) {
             diagResult.innerHTML = `
@@ -675,7 +675,7 @@
           }
           if (file) {
             const base64 = await fileToBase64(file);
-            const response = await fetch('/api/ai/gemini-diagnosis', {
+            const response = await fetch('/api/ai/qwen-diagnosis', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -686,12 +686,12 @@
             });
             if (!response.ok) {
               const errText = await response.text();
-              throw new Error(errText || 'Gemini request failed');
+              throw new Error(errText || 'Qwen Vision request failed');
             }
             const data = await response.json();
             const text = data?.result || data?.text || 'Unable to generate analysis. Please try a clearer photo.';
             renderDiagnosisResult(text);
-            setDiagStatus('Gemini analysis complete');
+            setDiagStatus('Qwen Vision analysis complete');
           } else {
             const response = await fetch('/api/ai/qwen-advice', {
               method: 'POST',
@@ -713,7 +713,7 @@
             }
           }
         } catch (err) {
-          console.warn('Gemini diagnosis error', err);
+          console.warn('Qwen diagnosis error', err);
           setDiagStatus('AI request failed', true);
           if (diagResult) {
             const fallback = generateMockAIResponse('health', user) || 'Unable to analyze right now. Please try again.';

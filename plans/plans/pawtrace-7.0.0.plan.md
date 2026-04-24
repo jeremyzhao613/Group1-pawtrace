@@ -20,6 +20,9 @@ todos:
   - id: verification
     content: 完成构建、类型检查、端口响应和错误入口阻断验证。 / Verify builds, type checks, port responses, and blocking of the wrong frontend entry.
     status: completed
+  - id: ui-hotfix-login-and-ai-copy
+    content: 修复主站登录首屏移动端裁切、首屏顺序、暗色默认和 Qwen/Gemini 文案/接口命名不一致问题。 / Fix main-site login first-screen mobile clipping, first-screen order, dark-mode default, and Qwen/Gemini copy/API naming mismatch.
+    status: completed
 isProject: false
 ---
 
@@ -85,6 +88,14 @@ isProject: false
 - 新增 Windows/macOS 启动说明，明确哪些脚本适合 macOS/WSL2，哪些步骤适合原生 Windows + Docker / Added a Windows/macOS startup guide that clarifies which scripts fit macOS/WSL2 and which steps fit native Windows + Docker.
 - 旧版本文档中的主站资源引用从 `frontend/public/legacy` 更新为 `frontend/public/app` / Old release docs now reference `frontend/public/app` instead of `frontend/public/legacy` for main-site assets.
 
+### 7) UI 快速修复 / UI Hotfixes
+
+- 登录首屏移动端从“登录框先出现”改为“品牌与主说明先出现”，避免用户一打开页面就看到被截断的表单 / The login first screen now shows the brand and main message before the form on mobile, preventing users from landing on a clipped form.
+- 移动端登录容器改为专用 `login-shell`，并在窄屏下限制实际宽度，修复右侧按钮、表单和说明文字被裁切的问题 / The mobile login container now uses a dedicated `login-shell` with strict narrow-screen width, fixing clipped buttons, fields, and copy.
+- 首屏不再默认跟随系统暗色模式，避免首次打开出现低对比度深色界面；用户仍可手动切换暗色 / The first screen no longer defaults to system dark mode, avoiding low-contrast first loads while keeping the manual dark toggle.
+- 删除首屏 `Logo` 占位和 `True Focus / PawTrace OS / Signature glass UI` 这类不匹配文案，统一为 PawTrace、Pet Map 和真实功能说明 / Removed mismatched first-screen copy such as `Logo`, `True Focus`, `PawTrace OS`, and `Signature glass UI`, replacing it with PawTrace, Pet Map, and real feature language.
+- 前端视觉诊断请求改为 `/api/ai/qwen-diagnosis`，后端保留旧 `gemini-*` 路径作为兼容别名，避免 Qwen 文案和 Gemini 路径互相冲突 / Frontend visual diagnosis now calls `/api/ai/qwen-diagnosis`; the backend keeps old `gemini-*` paths as compatibility aliases so Qwen copy no longer conflicts with Gemini route names.
+
 ## 涉及文件范围 / File Scope
 
 - 主站入口 / Main-site entry:
@@ -97,7 +108,8 @@ isProject: false
 - 后端入口与配置 / Backend entry and config:
   [index.ts](/Users/jeremy/Desktop/Group1-pawtrace/backend/src/index.ts:1),
   [config.ts](/Users/jeremy/Desktop/Group1-pawtrace/backend/src/config.ts:1),
-  [.env.example](/Users/jeremy/Desktop/Group1-pawtrace/backend/.env.example:1)
+  [.env.example](/Users/jeremy/Desktop/Group1-pawtrace/backend/.env.example:1),
+  [registerRoutes.ts](/Users/jeremy/Desktop/Group1-pawtrace/backend/src/registerRoutes.ts:1)
 - 根脚本与本地数据库 / Root scripts and local database:
   [package.json](/Users/jeremy/Desktop/Group1-pawtrace/package.json:1),
   [local-db.sh](/Users/jeremy/Desktop/Group1-pawtrace/scripts/local-db.sh:1),
@@ -121,6 +133,7 @@ isProject: false
 - 已验证 `http://localhost:5173/` 只加载 `/app/app.js`，不再加载 `/legacy` 或 `/src/main.tsx` / Verified that `http://localhost:5173/` loads only `/app/app.js`, not `/legacy` or `/src/main.tsx`.
 - 已验证 `http://localhost:3000/` 返回后端 API 状态 JSON / Verified that `http://localhost:3000/` returns backend API status JSON.
 - 已验证 `http://localhost:3000/app/app.js` 默认返回 `404`，说明后端端口不会泄露主站资源 / Verified that `http://localhost:3000/app/app.js` returns `404` by default, proving the backend port does not leak main-site assets.
+- 已通过 Chrome headless 截图复查移动端登录首屏，确认右侧裁切修复 / Rechecked the mobile login first screen with Chrome headless screenshots and confirmed the right-side clipping is fixed.
 
 ## 已知边界 / Known Boundaries
 

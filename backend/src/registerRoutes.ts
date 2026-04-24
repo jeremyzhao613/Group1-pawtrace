@@ -278,7 +278,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     }
   });
 
-  app.post('/api/ai/qwen-advice', async (req, res) => {
+  app.post(['/api/ai/qwen-advice', '/api/ai/gemini-advice'], async (req, res) => {
     const { service, context, profile, pets } = req.body || {};
     if (!service || !['health', 'behavior', 'diet'].includes(service)) return res.status(400).json({ error: 'service must be health | behavior | diet' });
     try {
@@ -291,20 +291,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     }
   });
 
-  app.post('/api/ai/gemini-advice', async (req, res) => {
-    const { service, context, profile, pets } = req.body || {};
-    if (!service || !['health', 'behavior', 'diet'].includes(service)) return res.status(400).json({ error: 'service must be health | behavior | diet' });
-    try {
-      const messages = ai.buildAdviceMessages(service, context, profile || {}, pets || []);
-      const result = await ai.callQwen(messages);
-      res.json({ result: result || 'Unable to generate advice.' });
-    } catch (err) {
-      console.error('AI advice error:', err);
-      res.status(500).json({ error: 'Server error', detail: String(err) });
-    }
-  });
-
-  app.post('/api/ai/gemini-diagnosis', async (req, res) => {
+  app.post(['/api/ai/qwen-diagnosis', '/api/ai/gemini-diagnosis'], async (req, res) => {
     const { imageBase64, mimeType, symptoms } = req.body || {};
     if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required' });
     const prompt = `You are an expert veterinary AI assistant named "PawTrace Health Engine".

@@ -624,7 +624,11 @@
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
-            throw new Error(data?.error || 'YOLO analysis failed');
+            if (response.status === 401) {
+              throw new Error('Please sign in before running YOLO analysis.');
+            }
+            const detail = typeof data?.detail === 'string' ? data.detail : '';
+            throw new Error(detail || data?.error || 'YOLO analysis failed');
           }
           renderYoloResult(data);
         } catch (err) {

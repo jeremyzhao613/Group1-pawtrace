@@ -13,7 +13,7 @@ from ultralytics import YOLO
 
 
 DISCLAIMER = "This result is only a behavior-risk hint and does not constitute veterinary diagnosis."
-MODEL_NAME = os.getenv("YOLO_MODEL_NAME", "yolo11n.pt")
+MODEL_NAME = os.getenv("YOLO_MODEL_NAME", "yolov8n.pt")
 FRAME_STRIDE = max(1, int(os.getenv("VIDEO_FRAME_STRIDE", "12")))
 MAX_ANALYZED_FRAMES = max(20, int(os.getenv("MAX_ANALYZED_FRAMES", "360")))
 PET_LABELS = {"cat", "dog"}
@@ -25,7 +25,14 @@ _model: YOLO | None = None
 def get_model() -> YOLO:
     global _model
     if _model is None:
-        _model = YOLO(MODEL_NAME)
+        try:
+            _model = YOLO(MODEL_NAME)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Unable to load YOLO model '{MODEL_NAME}'. "
+                "Install ai-video-service dependencies, ensure numpy<2 for OpenCV compatibility, "
+                "and provide a local .pt file or allow Ultralytics to download the model on first run."
+            ) from exc
     return _model
 
 
@@ -121,7 +128,10 @@ def analyze_video_file(video_path: Path) -> dict[str, Any]:
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     duration_sec = frame_count / fps if frame_count > 0 else 0.0
 
-    model = get_model()
+    try:
+        model = get_model()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     frame_index = 0
     analyzed_frames = 0
     detected_frames = 0

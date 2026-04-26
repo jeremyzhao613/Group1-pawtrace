@@ -166,6 +166,12 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8008
 ```
 
+The default model is `yolov8n.pt`. If the machine cannot download weights on first run, put the model file under `ai-video-service/models/` and start with:
+
+```bash
+YOLO_MODEL_NAME=./models/yolov8n.pt uvicorn app:app --host 0.0.0.0 --port 8008
+```
+
 Configure the backend:
 
 ```bash
@@ -276,7 +282,8 @@ Manual checks:
 - It does not perform full pet pose estimation or veterinary diagnosis.
 - Rapid movement can be caused by excitement, shaking, scratching, unstable video, or camera motion.
 - Historical comparison is currently demo-oriented and should be backed by saved per-pet baselines in a future release.
-- The Python YOLO service may download model weights on first run.
+- The Python YOLO service may download `yolov8n.pt` model weights on first run.
+- The Python environment should use `numpy<2.0`; NumPy 2.x can break older OpenCV wheels with `_ARRAY_API` or `numpy.core.multiarray` import errors.
 
 ## Release Notes
 

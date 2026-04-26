@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+os.environ.setdefault("YOLO_CONFIG_DIR", str(Path(tempfile.gettempdir()) / "pawtrace-ultralytics"))
+
 import cv2
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from ultralytics import YOLO

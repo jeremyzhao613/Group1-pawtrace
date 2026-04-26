@@ -12,7 +12,7 @@ import { config } from './config.js';
 import * as ai from './services/aiService.js';
 import type { AppMetrics } from './middleware/metrics.js';
 import { requireMonitorAuth } from './middleware/monitorAuth.js';
-import { optionalAuth, requireAuth } from './middleware/jwtAuth.js';
+import { requireAuth } from './middleware/jwtAuth.js';
 
 type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 const VIDEO_UPLOAD_MAX_BYTES = 150 * 1024 * 1024;
@@ -79,6 +79,10 @@ function mapUser(u: UserRow) {
     id: u.id, username: u.username, displayName: u.displayName,
     avatar: u.avatar, bio: u.bio, campus: u.campus, contact: u.contact,
   };
+}
+
+function scopedContactId(userId: string, contactId: string): string {
+  return `${userId}:${contactId}`;
 }
 
 async function resolveUserId(input: string | undefined | null): Promise<string | null> {
@@ -149,7 +153,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
       const u = String(username || '').trim();
       const p = String(password || '');
       if (!u || u.length < 2) return res.status(400).json({ error: 'username required (min 2 chars)' });
-      if (!p || p.length < 4) return res.status(400).json({ error: 'password required (min 4 chars)' });
+      if (!p || p.length < 8) return res.status(400).json({ error: 'password required (min 8 chars)' });
       const exists = await prisma.user.findUnique({ where: { username: u } });
       if (exists) return res.status(409).json({ error: 'username taken' });
       const passwordHash = await bcrypt.hash(p, 10);
@@ -183,26 +187,29 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     }
   });
 
-  app.get('/api/auth/me', optionalAuth, asyncHandler(async (req, res) => {
-    if (!req.authUser) return res.status(401).json({ error: 'Unauthorized' });
-    const user = await prisma.user.findUnique({ where: { id: req.authUser.sub } });
+  app.get('/api/auth/me', requireAuth, asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({ where: { id: req.authUser!.sub } });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ user: mapUser(user) });
   }));
 
   // ─── Pets & Users ───
-  app.get('/api/pets', asyncHandler(async (_req, res) => {
-    const pets = await prisma.pet.findMany({ orderBy: { id: 'asc' } });
+  app.get('/api/pets', requireAuth, asyncHandler(async (req, res) => {
+    const pets = await prisma.pet.findMany({
+      where: { OR: [{ ownerId: req.authUser!.sub }, { ownerId: null }] },
+      orderBy: { id: 'asc' },
+    });
     res.json({ pets: pets.map(mapPet) });
   }));
 
-  app.get('/api/pets/:id', asyncHandler(async (req, res) => {
+  app.get('/api/pets/:id', requireAuth, asyncHandler(async (req, res) => {
     const pet = await prisma.pet.findUnique({ where: { id: req.params.id } });
     if (!pet) return res.status(404).json({ error: 'Pet not found' });
+    if (pet.ownerId && pet.ownerId !== req.authUser!.sub) return res.status(403).json({ error: 'Forbidden' });
     res.json({ pet: mapPet(pet) });
   }));
 
-  app.post('/api/pets', optionalAuth, asyncHandler(async (req, res) => {
+  app.post('/api/pets', requireAuth, asyncHandler(async (req, res) => {
     const payload = req.body || {};
     if (!payload.name) return res.status(400).json({ error: 'Pet name is required' });
     const petSprites = ['/assets/1.png', '/assets/2.png', '/assets/3.png', '/assets/4.png', '/assets/5.png', '/assets/6.png'];
@@ -212,7 +219,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
       : String(payload.traits || '').split(',').map((t: string) => t.trim()).filter(Boolean);
     const pet = await prisma.pet.create({
       data: {
-        id: `p${Date.now()}`, ownerId: req.authUser?.sub ?? null,
+        id: `p${Date.now()}`, ownerId: req.authUser!.sub,
         name: payload.name, type: payload.type || 'Pet', breed: payload.breed || 'Unknown',
         age: payload.age || 'Unknown', gender: payload.gender || 'Unknown',
         avatar: payload.avatar || randomSprite, traits: traits as unknown as Prisma.InputJsonValue,
@@ -222,31 +229,33 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     res.json({ pet: mapPet(pet) });
   }));
 
-  app.delete('/api/pets/:id', optionalAuth, asyncHandler(async (req, res) => {
+  app.delete('/api/pets/:id', requireAuth, asyncHandler(async (req, res) => {
     const pet = await prisma.pet.findUnique({ where: { id: req.params.id } });
     if (!pet) return res.status(404).json({ error: 'Pet not found' });
-    if (req.authUser && pet.ownerId && pet.ownerId !== req.authUser.sub) return res.status(403).json({ error: 'Forbidden' });
+    if (!pet.ownerId || pet.ownerId !== req.authUser!.sub) return res.status(403).json({ error: 'Forbidden' });
     await prisma.pet.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   }));
 
-  app.get('/api/users', asyncHandler(async (_req, res) => {
-    const users = await prisma.user.findMany({ orderBy: { id: 'asc' } });
-    res.json({ users: users.map(mapUser) });
+  app.get('/api/users', requireAuth, asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({ where: { id: req.authUser!.sub } });
+    res.json({ users: user ? [mapUser(user)] : [] });
   }));
 
   // ─── Chat ───
-  app.get('/api/chat/history/:contactId', asyncHandler(async (req, res) => {
+  app.get('/api/chat/history/:contactId', requireAuth, asyncHandler(async (req, res) => {
+    const contactId = scopedContactId(req.authUser!.sub, req.params.contactId);
     const rows = await prisma.chatMessage.findMany({
-      where: { contactId: req.params.contactId }, orderBy: { id: 'asc' },
+      where: { contactId }, orderBy: { id: 'asc' },
       select: { role: true, content: true },
     });
     res.json({ history: rows });
   }));
 
-  app.post('/api/chat', async (req, res) => {
+  app.post('/api/chat', requireAuth, async (req, res) => {
     const { contactId, messages, contactProfile } = req.body || {};
     if (!contactId || typeof contactId !== 'string') return res.status(400).json({ error: 'contactId is required' });
+    const scopedId = scopedContactId(req.authUser!.sub, contactId);
     if (!config.DASHSCOPE_API_KEY) return res.status(500).json({ error: 'DASHSCOPE_API_KEY not configured.' });
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array is required' });
 
@@ -274,9 +283,9 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
 
       const now = new Date().toISOString();
       for (const m of normalizedMessages) {
-        await prisma.chatMessage.create({ data: { contactId, role: m.role, content: m.content, createdAt: new Date(now) } });
+        await prisma.chatMessage.create({ data: { contactId: scopedId, role: m.role, content: m.content, createdAt: new Date(now) } });
       }
-      await prisma.chatMessage.create({ data: { contactId, role: 'assistant', content: reply, createdAt: new Date(now) } });
+      await prisma.chatMessage.create({ data: { contactId: scopedId, role: 'assistant', content: reply, createdAt: new Date(now) } });
       res.json({ reply });
     } catch (err) {
       console.error('Chat backend error:', err);
@@ -298,35 +307,37 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     });
   });
 
-  app.get('/api/sticky-notes', asyncHandler(async (_req, res) => {
+  app.get('/api/sticky-notes', requireAuth, asyncHandler(async (_req, res) => {
     const notes = await prisma.stickyNote.findMany({ orderBy: { createdAt: 'asc' } });
     res.json({ notes: notes.map((n) => ({ id: n.id, text: n.text, createdAt: n.createdAt.toISOString() })) });
   }));
 
-  app.post('/api/sticky-notes', asyncHandler(async (req, res) => {
+  app.post('/api/sticky-notes', requireAuth, asyncHandler(async (req, res) => {
     const text = String(req.body?.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Note text is required' });
     const note = await prisma.stickyNote.create({ data: { id: `note-${Date.now()}`, text } });
     res.json({ note: { id: note.id, text: note.text, createdAt: note.createdAt.toISOString() } });
   }));
 
-  app.delete('/api/sticky-notes/:id', asyncHandler(async (req, res) => {
+  app.delete('/api/sticky-notes/:id', requireAuth, asyncHandler(async (req, res) => {
     await prisma.stickyNote.deleteMany({ where: { id: req.params.id } });
     res.json({ success: true });
   }));
 
-  app.delete('/api/sticky-notes', asyncHandler(async (_req, res) => {
+  app.delete('/api/sticky-notes', requireAuth, asyncHandler(async (_req, res) => {
     await prisma.stickyNote.deleteMany();
     res.json({ success: true });
   }));
 
   // ─── Location (simplified, JWT-auth only) ───
-  app.get('/api/location/points', asyncHandler(async (req, res) => {
+  app.get('/api/location/points', requireAuth, asyncHandler(async (req, res) => {
     const { userId, limit } = req.query || {};
     const max = Math.min(Number(limit || 100), 500);
-    const normalizedUserId = userId ? await resolveUserId(String(userId)) : null;
-    const where: Prisma.LocationPointWhereInput = {};
-    if (normalizedUserId) where.userId = normalizedUserId;
+    const normalizedUserId = userId ? await resolveUserId(String(userId)) : req.authUser!.sub;
+    if (normalizedUserId !== req.authUser!.sub) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const where: Prisma.LocationPointWhereInput = { userId: req.authUser!.sub };
     const points = await prisma.locationPoint.findMany({ where, orderBy: { createdAt: 'desc' }, take: max });
     res.json({ points: points.reverse().map((r) => ({ id: r.id, source: r.source, userId: r.userId, timestamp: r.timestamp, lat: r.lat, lon: r.lon })) });
   }));
@@ -346,7 +357,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
   }));
 
   // ─── AI (Qwen only) ───
-  app.post('/api/pet-prediction', async (req, res) => {
+  app.post('/api/pet-prediction', requireAuth, async (req, res) => {
     const profile = req.body?.profile || {};
     if (!profile.starSign && !profile.petName) return res.json({ prediction: 'Share your star sign or pet info to unlock predictions.' });
     const fallback = ai.getLocalPetPrediction(profile);
@@ -363,7 +374,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     }
   });
 
-  app.post(['/api/ai/qwen-advice', '/api/ai/gemini-advice'], async (req, res) => {
+  app.post(['/api/ai/qwen-advice', '/api/ai/gemini-advice'], requireAuth, async (req, res) => {
     const { service, context, profile, pets } = req.body || {};
     if (!service || !['health', 'behavior', 'diet'].includes(service)) return res.status(400).json({ error: 'service must be health | behavior | diet' });
     try {
@@ -376,7 +387,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     }
   });
 
-  app.post(['/api/ai/qwen-diagnosis', '/api/ai/gemini-diagnosis'], async (req, res) => {
+  app.post(['/api/ai/qwen-diagnosis', '/api/ai/gemini-diagnosis'], requireAuth, async (req, res) => {
     const { imageBase64, mimeType, symptoms } = req.body || {};
     if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required' });
     const prompt = `You are an expert veterinary AI assistant named "PawTrace Health Engine".
@@ -403,7 +414,7 @@ Provide a structured Markdown response:
     }
   });
 
-  app.post('/api/ai/video-behavior', (req, res) => {
+  app.post('/api/ai/video-behavior', requireAuth, (req, res) => {
     videoUpload.single('video')(req, res, async (uploadErr: unknown) => {
       const uploaded = req.file;
       const cleanup = () => {

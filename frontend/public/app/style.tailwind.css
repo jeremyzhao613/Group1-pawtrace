@@ -1591,6 +1591,7 @@
         padding: clamp(1.15rem, 2.4vw, 2rem);
       }
       .app-browser-frame {
+        border: 0;
         border-radius: 2rem;
       }
       .app-browser-toolbar {
@@ -1600,7 +1601,7 @@
         gap: 0.8rem;
         min-height: 3.5rem;
         padding: 0.65rem 1rem;
-        border-bottom: 1px solid rgba(31, 59, 66, 0.16);
+        border-bottom: 0;
         background: var(--theme-surface-elevated);
       }
       .app-window-controls {
@@ -1623,7 +1624,7 @@
         gap: 0.45rem;
         border-radius: 999px;
         padding: 0.45rem 0.8rem;
-        border: 1.5px solid rgba(31, 59, 66, 0.36);
+        border: 0;
         background: var(--theme-input-bg);
         color: var(--theme-text-muted);
         box-shadow: inset 0 1px 0 rgba(255,255,255,0.64);
@@ -3543,11 +3544,31 @@
       #map-container .map-frame-layer,
       #map-markers-layer,
       #map-pets-layer {
-        contain: layout paint;
+        contain: none;
         height: 100%;
         inset: 0;
-        overflow: clip;
+        overflow: visible;
         width: 100%;
+      }
+      #map-background {
+        z-index: 1;
+      }
+      #map-container::after {
+        z-index: 2;
+      }
+      #map-markers-layer {
+        pointer-events: none;
+        z-index: 5;
+      }
+      #map-pets-layer {
+        pointer-events: none;
+        z-index: 6;
+      }
+      .map-marker,
+      .map-pet {
+        opacity: 1;
+        pointer-events: auto;
+        visibility: visible;
       }
       #map-background {
         max-width: 100%;
@@ -4028,5 +4049,10 @@
           transform: translate(-50%, -50%) scale(0.9);
           opacity: 0.22;
         }
+      }
+      #app-root .app-browser-frame,
+      #app-root .app-browser-toolbar,
+      #app-root .app-address-bar {
+        border: 0 !important;
       }
     }

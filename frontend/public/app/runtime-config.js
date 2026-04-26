@@ -1,0 +1,1 @@
+window.PAWTRACE_API_BASE_URL = window.PAWTRACE_API_BASE_URL || '';

@@ -242,30 +242,106 @@
     // --- Auth & local storage ---
     const LS_USERS_KEY = 'pawtrace_users';
     const LS_CURRENT_USER_KEY = 'pawtrace_current_user';
+    const LS_AUTH_TOKEN_KEY = 'pawtrace_auth_token';
+    const API_BASE_URL = getApiBaseUrl();
+
+    function getApiBaseUrl() {
+      const metaBase = document.querySelector('meta[name="pawtrace-api-base"]')?.getAttribute('content') || '';
+      const rawBase = String(window.PAWTRACE_API_BASE_URL || metaBase || '').trim();
+      return rawBase.replace(/\/+$/, '');
+    }
+
+    function apiUrl(path) {
+      const target = String(path || '');
+      if (!target || /^(?:[a-z][a-z\d+\-.]*:)?\/\//i.test(target) || /^(data|blob):/i.test(target)) return target;
+      if (!API_BASE_URL) return target;
+      const normalizedPath = target.startsWith('/') ? target : `/${target}`;
+      if (API_BASE_URL.endsWith('/api') && normalizedPath.startsWith('/api/')) {
+        return `${API_BASE_URL}${normalizedPath.slice('/api'.length)}`;
+      }
+      return `${API_BASE_URL}${normalizedPath}`;
+    }
+
+    function sanitizeStoredUser(user = {}) {
+      if (!user || typeof user !== 'object') return null;
+      const { password, passwordHash, token, ...safeUser } = user;
+      return safeUser;
+    }
 
     function loadUsers() {
       try {
-        return JSON.parse(localStorage.getItem(LS_USERS_KEY)) || [];
+        const parsed = JSON.parse(localStorage.getItem(LS_USERS_KEY)) || [];
+        if (!Array.isArray(parsed)) return [];
+        const sanitized = parsed.map(sanitizeStoredUser).filter(Boolean);
+        if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
+          saveUsers(sanitized);
+        }
+        return sanitized;
       } catch { return []; }
     }
     function saveUsers(users) {
-      localStorage.setItem(LS_USERS_KEY, JSON.stringify(users));
+      const sanitized = (Array.isArray(users) ? users : []).map(sanitizeStoredUser).filter(Boolean);
+      localStorage.setItem(LS_USERS_KEY, JSON.stringify(sanitized));
     }
     function persistCurrentUser(user) {
       if (!user) return;
-      setCurrentUser(user);
+      const safeUser = normalizeSessionUser(user);
+      setCurrentUser(safeUser);
       let users = loadUsers();
-      users = users.map(u => u.username === user.username ? user : u);
+      users = users.map(u => u.username === safeUser.username ? safeUser : u);
       saveUsers(users);
     }
     function setCurrentUser(user) {
-      if (user) localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(user));
+      if (user) localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(normalizeSessionUser(user)));
       else localStorage.removeItem(LS_CURRENT_USER_KEY);
     }
     function getCurrentUser() {
       try {
-        return JSON.parse(localStorage.getItem(LS_CURRENT_USER_KEY));
+        const user = sanitizeStoredUser(JSON.parse(localStorage.getItem(LS_CURRENT_USER_KEY)));
+        if (user) localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(user));
+        return user;
       } catch { return null; }
+    }
+
+    function setAuthToken(token) {
+      if (token) localStorage.setItem(LS_AUTH_TOKEN_KEY, token);
+      else localStorage.removeItem(LS_AUTH_TOKEN_KEY);
+    }
+
+    function getAuthToken() {
+      try {
+        return localStorage.getItem(LS_AUTH_TOKEN_KEY) || '';
+      } catch {
+        return '';
+      }
+    }
+
+    function authHeaders(extra = {}) {
+      const token = getAuthToken();
+      return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+    }
+
+    async function authJsonFetch(url, options = {}) {
+      const headers = authHeaders({ 'Content-Type': 'application/json', ...(options.headers || {}) });
+      return fetch(apiUrl(url), { ...options, headers });
+    }
+
+    function normalizeSessionUser(user = {}) {
+      const safeUser = sanitizeStoredUser(user) || {};
+      return {
+        username: safeUser.username || 'guest',
+        displayName: safeUser.displayName || safeUser.username || 'Guest Explorer',
+        avatar: safeUser.avatar || 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png',
+        bio: safeUser.bio || '',
+        campus: safeUser.campus || 'Taicang',
+        contact: safeUser.contact || '',
+        starSign: safeUser.starSign || '',
+        mainPetName: safeUser.mainPetName || '',
+        mainPetType: safeUser.mainPetType || '',
+        mainPetBirth: safeUser.mainPetBirth || '',
+        mainPetNotes: safeUser.mainPetNotes || '',
+        petInsight: safeUser.petInsight || ''
+      };
     }
 
     function escapeHtml(value = '') {
@@ -289,7 +365,6 @@
       return {
         username: 'guest',
         displayName: 'Guest Explorer',
-        password: '',
         avatar: 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png',
         bio: 'Exploring PawTrace without logging in.',
         campus: 'Taicang',
@@ -304,8 +379,7 @@
     }
 
     function getDefaultUser() {
-      const users = loadUsers();
-      return users[0] || createGuestUser();
+      return createGuestUser();
     }
 
     function initBehaviourCheck() {
@@ -543,8 +617,9 @@
         formData.append('video', file);
         setStatus('Running YOLO...');
         try {
-          const response = await fetch('/api/ai/video-behavior', {
+          const response = await fetch(apiUrl('/api/ai/video-behavior'), {
             method: 'POST',
+            headers: authHeaders(),
             body: formData
           });
           const data = await response.json().catch(() => ({}));
@@ -684,7 +759,6 @@
       const regUsername = document.getElementById('reg-username');
       const regDisplayName = document.getElementById('reg-displayname');
       const regPassword = document.getElementById('reg-password');
-      const regAvatar = document.getElementById('reg-avatar');
       const mapOptions = {
         container: document.getElementById('map-container'),
         background: document.getElementById('map-background'),
@@ -893,9 +967,8 @@
         }
         petInsightText.textContent = 'Asking AI for a fresh insight...';
         try {
-          const response = await fetch('/api/pet-prediction', {
+          const response = await authJsonFetch('/api/pet-prediction', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               profile: {
                 displayName: user.displayName,
@@ -1000,9 +1073,8 @@
           }
           if (file) {
             const base64 = await fileToBase64(file);
-            const response = await fetch('/api/ai/qwen-diagnosis', {
+            const response = await authJsonFetch('/api/ai/qwen-diagnosis', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 imageBase64: base64,
                 mimeType: file.type || 'image/jpeg',
@@ -1018,9 +1090,8 @@
             renderDiagnosisResult(text);
             setDiagStatus('Qwen Vision analysis complete');
           } else {
-            const response = await fetch('/api/ai/qwen-advice', {
+            const response = await authJsonFetch('/api/ai/qwen-advice', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 service: 'health',
                 context: symptoms,
@@ -1129,9 +1200,8 @@
           `;
         }
         try {
-          const response = await fetch(config.endpoint, {
+          const response = await authJsonFetch(config.endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               service: selectedAIService,
               context,
@@ -1287,55 +1357,72 @@
       tabLogin.addEventListener('click', () => switchAuthTab('login'));
       tabRegister.addEventListener('click', () => switchAuthTab('register'));
 
-      loginForm.addEventListener('submit', (e) => {
+      loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const users = loadUsers();
-        const u = users.find(x => x.username === loginUsername.value.trim());
-        if (!u || u.password !== loginPassword.value) {
-          authMsg.textContent = 'Incorrect username or password.';
+        const username = loginUsername.value.trim();
+        const password = loginPassword.value;
+        if (!username || !password) {
+          authMsg.textContent = 'Username and password are required.';
           return;
         }
-        authMsg.textContent = '';
-        setCurrentUser(u);
-        showApp(u);
+        authMsg.textContent = 'Signing in...';
+        try {
+          const response = await fetch(apiUrl('/api/auth/login'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.token || !data.user) {
+            throw new Error(data.error || 'Incorrect username or password.');
+          }
+          const localProfile = loadUsers().find(x => x.username === data.user.username) || {};
+          const sessionUser = normalizeSessionUser({ ...localProfile, ...data.user });
+          setAuthToken(data.token);
+          saveUsers([...loadUsers().filter(x => x.username !== sessionUser.username), sessionUser]);
+          setCurrentUser(sessionUser);
+          authMsg.textContent = '';
+          showApp(sessionUser);
+        } catch (err) {
+          authMsg.textContent = err instanceof Error ? err.message : 'Login failed.';
+        }
       });
 
-      registerForm.addEventListener('submit', (e) => {
+      registerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        let users = loadUsers();
         const username = regUsername.value.trim();
         if (!username) {
           authMsg.textContent = 'Username is required.';
           return;
         }
-        if (users.find(x => x.username === username)) {
-          authMsg.textContent = 'This username is already taken.';
+        if (regPassword.value.length < 8) {
+          authMsg.textContent = 'Password should be at least 8 characters.';
           return;
         }
-        if (regPassword.value.length < 6) {
-          authMsg.textContent = 'Password should be at least 6 characters.';
-          return;
+        authMsg.textContent = 'Creating account...';
+        try {
+          const response = await fetch(apiUrl('/api/auth/register'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username,
+              password: regPassword.value,
+              displayName: regDisplayName.value.trim() || username
+            })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.token || !data.user) {
+            throw new Error(data.error || 'Registration failed.');
+          }
+          const sessionUser = normalizeSessionUser(data.user);
+          setAuthToken(data.token);
+          saveUsers([...loadUsers().filter(x => x.username !== sessionUser.username), sessionUser]);
+          setCurrentUser(sessionUser);
+          authMsg.textContent = '';
+          showApp(sessionUser);
+        } catch (err) {
+          authMsg.textContent = err instanceof Error ? err.message : 'Registration failed.';
         }
-        const newUser = {
-          username,
-          displayName: regDisplayName.value.trim() || username,
-          password: regPassword.value,
-          avatar: regAvatar.value.trim() || 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png',
-          bio: '',
-          campus: 'Taicang',
-          contact: '',
-          starSign: '',
-          mainPetName: '',
-          mainPetType: '',
-          mainPetBirth: '',
-          mainPetNotes: '',
-          petInsight: ''
-        };
-        users.push(newUser);
-        saveUsers(users);
-        setCurrentUser(newUser);
-        authMsg.textContent = '';
-        showApp(newUser);
       });
 
       btnEditProfile.addEventListener('click', openProfileEditModal);
@@ -1378,14 +1465,17 @@
 
       guestAccessBtn?.addEventListener('click', () => {
         const guestUser = getDefaultUser();
+        setAuthToken('');
         setCurrentUser(guestUser);
         showApp(guestUser);
       });
 
       const existing = getCurrentUser();
-      if (existing) {
+      if (existing && (existing.username === 'guest' || getAuthToken())) {
         showApp(existing);
       } else {
+        setAuthToken('');
+        setCurrentUser(null);
         closeAllModals();
         appRoot.classList.add('hidden');
         mobileTabbar?.classList.add('hidden');
@@ -1395,6 +1485,7 @@
       document.querySelectorAll('[data-action="logout"]').forEach(btn => {
         btn.addEventListener('click', () => {
           closeAllModals();
+          setAuthToken('');
           setCurrentUser(null);
           appRoot.classList.add('hidden');
           mobileTabbar?.classList.add('hidden');
@@ -1879,10 +1970,10 @@
     }
 
     async function sendMonitoringPayload(payload = {}) {
+      if (!window.PAWTRACE_ENABLE_MONITORING) return;
       try {
-        await fetch(MONITORING_API, {
+        await authJsonFetch(MONITORING_API, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
       } catch (err) {
@@ -2898,9 +2989,8 @@
         })
         .filter(m => m.content);
       try {
-        const response = await fetch('/api/chat', {
+        const response = await authJsonFetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contactId,
             contactProfile: buildContactProfile(contact),

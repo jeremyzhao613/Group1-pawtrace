@@ -17,6 +17,10 @@ process.on('unhandledRejection', (reason) => {
 });
 
 async function main() {
+  if (config.NODE_ENV === 'production' && config.JWT_SECRET === 'dev-only-change-me') {
+    console.error('[fatal] JWT_SECRET must be set to a strong value in production.');
+    process.exit(1);
+  }
   try {
     await prisma.$connect();
     console.log('[db] connected');
@@ -27,8 +31,23 @@ async function main() {
   const metrics = createMetrics();
 
   const app = express();
-  app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        objectSrc: ["'none'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.bootcdn.net'],
+        fontSrc: ["'self'", 'https://cdn.bootcdn.net', 'data:'],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        mediaSrc: ["'self'", 'data:', 'blob:'],
+        connectSrc: config.CORS_ORIGIN ? ["'self'", config.CORS_ORIGIN] : ["'self'"],
+      },
+    },
+  }));
+  app.use(cors(config.CORS_ORIGIN ? { origin: config.CORS_ORIGIN } : undefined));
   app.use(express.json({ limit: '10mb' }));
   app.use(compression());
   app.set('etag', 'strong');

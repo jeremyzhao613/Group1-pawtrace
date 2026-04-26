@@ -8,49 +8,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
   <link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
   <link rel="preload" as="image" href="/assets/m1.jpg">
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/app/app.css" />
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#99cdd8',
-            secondary: '#e1f5f8',
-            accent: '#bfe5ec',
-            neutral: '#fffef1',
-            dark: '#1f3b42',
-          },
-          fontFamily: {
-            pixel: ['"Press Start 2P"', 'system-ui', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
-    <script>
-    (function () {
-      fetch('/app/style.tailwind.css')
-        .then(function (r) { return r.text(); })
-        .then(function (css) {
-          var style = document.createElement('style');
-          style.type = 'text/tailwindcss';
-          style.textContent = css;
-          document.head.appendChild(style);
-          if (window.tailwind && typeof window.tailwind.refresh === 'function') {
-            window.tailwind.refresh();
-          }
-        })
-        .catch(function (e) {
-          console.error('Failed to load app styles:', e);
-        });
-    })();
-  </script>
 </head>
 <body class="min-h-screen font-sans relative">
   <!-- SVG sprite (reduces icon font dependency for core nav) -->
@@ -180,7 +142,7 @@
               </div>
               <div>
                 <label class="block text-xs font-semibold mb-1 uppercase tracking-[0.3em] text-gray-500">Password</label>
-                <input id="reg-password" type="password" class="pixel-input input-glow" placeholder="At least 6 characters" required />
+                  <input id="reg-password" type="password" class="pixel-input input-glow" placeholder="At least 8 characters" required />
               </div>
               <button type="submit" class="pixel-button w-full mt-2 flex items-center justify-center gap-2">
                 <i class="fas fa-user-plus"></i><span>Create account</span>
@@ -204,19 +166,6 @@
   <div id="app-root" class="hidden min-h-screen px-4 sm:px-6 py-10 lg:px-12 relative z-10">
     <div class="app-shell-wrapper relative z-10 w-full max-w-6xl mx-auto">
       <div class="app-browser-frame">
-        <div class="app-browser-toolbar">
-          <div class="app-window-controls" aria-hidden="true">
-            <span></span><span></span><span></span>
-          </div>
-          <div class="app-address-bar" aria-label="Current PawTrace workspace">
-            <strong>PawTrace</strong>
-            <span>/</span>
-            <span id="app-address-section">campus-map</span>
-          </div>
-          <button type="button" class="app-toolbar-action" onclick="openProfileEditModal()" aria-label="Open profile">
-            <i class="fas fa-user"></i>
-          </button>
-        </div>
         <div class="app-browser-content">
       <div class="app-shell relative z-10 flex flex-col lg:flex-row gap-6 w-full">
           <aside class="glass-panel app-sidebar">
@@ -1387,6 +1336,7 @@
     </div>
   </div>
 
+    <script src="/app/runtime-config.js"></script>
     <script src="/app/app.js"></script>
   <script>
   (function(){

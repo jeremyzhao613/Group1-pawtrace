@@ -18,12 +18,14 @@ const fallbackPublicPath = webRootName === 'frontend' ? path.join(frontendRoot, 
 const publicPath = hasFrontendDist ? frontendDist : fallbackPublicPath;
 const usingFrontendDist = hasFrontendDist;
 const serveWeb = process.env.SERVE_WEB === '1' || process.env.SERVE_WEB === 'true';
+const corsOrigin = String(process.env.CORS_ORIGIN || '').trim();
 
 export const config = {
   PORT: Number(process.env.PORT || 3000),
   NODE_ENV: process.env.NODE_ENV || 'development',
   JWT_SECRET: process.env.JWT_SECRET || 'dev-only-change-me',
   JWT_EXPIRES: process.env.JWT_EXPIRES || '7d',
+  CORS_ORIGIN: corsOrigin,
 
   DASHSCOPE_API_KEY: keys.DASHSCOPE_API_KEY,
   AI_TIMEOUT_MS: Number(process.env.AI_TIMEOUT_MS || 15000),

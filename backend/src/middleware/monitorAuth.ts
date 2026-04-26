@@ -4,7 +4,9 @@ import { config } from '../config.js';
 
 export function requireMonitorAuth(req: Request, res: Response, next: NextFunction) {
   const expected = config.MONITOR_API_TOKEN;
-  if (!expected) return next();
+  if (!expected) {
+    return res.status(503).json({ error: 'Monitor API token is not configured' });
+  }
 
   const bearer =
     req.headers.authorization && req.headers.authorization.startsWith('Bearer ')

@@ -43,32 +43,44 @@
       map: {
         eyebrow: 'PawTrace',
         title: 'Campus Map',
-        subtitle: 'Watch pet locations, nearby spots, and live campus movement without losing the overall layout.'
+        subtitle: '12 pets nearby · 5 campus spots',
+        path: 'campus-map'
       },
       pets: {
         eyebrow: 'PawTrace',
         title: 'Pet Cards',
-        subtitle: 'Manage your pets, NFC cards, and community activity in a tighter card stack.'
+        subtitle: 'Community feed · My pets',
+        path: 'pet-cards'
       },
       chat: {
         eyebrow: 'PawTrace',
         title: 'Friends Chat',
-        subtitle: 'Keep conversations, contact details, and pet info in a single responsive chat shell.'
+        subtitle: 'Friends · Care context',
+        path: 'friends-chat'
       },
       health: {
         eyebrow: 'PawTrace',
         title: 'Health Monitoring',
-        subtitle: 'Temperature, heart rate, and recent trends stay visible without stretching the whole page.'
+        subtitle: 'Latest vitals · Trend history',
+        path: 'health-monitoring'
+      },
+      behaviour: {
+        eyebrow: 'PawTrace',
+        title: 'Video Behaviour Check',
+        subtitle: 'Video upload · Behaviour timeline · Risk review',
+        path: 'video-behaviour-check'
       },
       ai: {
         eyebrow: 'PawTrace',
         title: 'AI Assist',
-        subtitle: 'Run diagnosis and text reports in a cleaner panel with better scrolling and less visual noise.'
+        subtitle: 'Photo diagnosis · Care reports',
+        path: 'ai-assist'
       },
       profile: {
         eyebrow: 'PawTrace',
         title: 'Profile Center',
-        subtitle: 'Owner info, pet summary, and account settings now share the same page shell.'
+        subtitle: 'Owner card · Settings',
+        path: 'profile-center'
       }
     };
     function syncModalState() {
@@ -105,12 +117,15 @@
         activeModalId = null;
       }
       syncModalState();
-      if (lastModalTrigger && lastModalTrigger.isConnected) {
+      const triggerToRestore = lastModalTrigger;
+      lastModalTrigger = null;
+      if (triggerToRestore && triggerToRestore.isConnected) {
         window.requestAnimationFrame(() => {
-          lastModalTrigger.focus({ preventScroll: true });
+          if (triggerToRestore.isConnected) {
+            triggerToRestore.focus({ preventScroll: true });
+          }
         });
       }
-      lastModalTrigger = null;
     }
 
     function closeAllModals() {
@@ -253,6 +268,23 @@
       } catch { return null; }
     }
 
+    function escapeHtml(value = '') {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[char]);
+    }
+
+    function safeImageSrc(value, fallback = '') {
+      const src = String(value || '').trim();
+      if (!src) return fallback;
+      if (/^(https?:\/\/|data:image\/|\/|\.\/|\.\.\/)/i.test(src)) return src;
+      return fallback;
+    }
+
     function createGuestUser() {
       return {
         username: 'guest',
@@ -276,44 +308,333 @@
       return users[0] || createGuestUser();
     }
 
-    // Login feature highlight
-    function initTrueFocus() {
-      const container = document.getElementById('core-focus');
-      if (!container) return;
-      const words = Array.from(container.querySelectorAll('.true-focus-word'));
-      if (!words.length) return;
-      const frame = document.createElement('div');
-      frame.className = 'true-focus-frame';
-      frame.innerHTML = `
-        <span class="true-focus-corner tl"></span>
-        <span class="true-focus-corner tr"></span>
-        <span class="true-focus-corner bl"></span>
-        <span class="true-focus-corner br"></span>
-      `;
-      container.appendChild(frame);
-      let currentIndex = 0;
-      const duration = 2000;
-      const pause = 800;
+    function initBehaviourCheck() {
+      const fileInput = document.getElementById('behaviour-video-input');
+      const uploadTrigger = document.getElementById('behaviour-upload-trigger');
+      const demoRunBtn = document.getElementById('behaviour-demo-run');
+      const dropzone = document.getElementById('behaviour-dropzone');
+      const videoPreview = document.getElementById('behaviour-video-preview');
+      const uploadEmpty = document.getElementById('behaviour-upload-empty');
+      const analysisStatus = document.getElementById('behaviour-analysis-status');
+      const detectedPetEl = document.getElementById('behaviour-detected-pet');
+      const durationEl = document.getElementById('behaviour-video-duration');
+      const detectionRateEl = document.getElementById('behaviour-detection-rate');
+      const movementScoreEl = document.getElementById('behaviour-movement-score');
+      const eventCountEl = document.getElementById('behaviour-event-count');
+      const timelineEl = document.getElementById('behaviour-timeline');
+      const markersEl = document.getElementById('behaviour-alert-markers');
+      const eventListEl = document.getElementById('behaviour-event-list');
+      const adviceListEl = document.getElementById('behaviour-advice-list');
+      const historyBarsEl = document.getElementById('behaviour-history-bars');
+      const riskSummaryEl = document.getElementById('behaviour-risk-summary');
+      const riskTitleEl = document.getElementById('behaviour-risk-title');
+      const riskBadgeEl = document.getElementById('behaviour-risk-badge');
+      const riskCopyEl = document.getElementById('behaviour-risk-copy');
+      const timeAxisEl = document.querySelector('#tab-behaviour .behaviour-time-axis');
+      const timelineTitleEl = document.querySelector('#tab-behaviour .behaviour-timeline-card h3');
+      if (!fileInput || !dropzone || !timelineEl) return;
 
-      function highlight(idx) {
-        words.forEach((w, i) => w.classList.toggle('active', i === idx));
-        const active = words[idx];
-        if (!active) return;
-        const parentRect = container.getBoundingClientRect();
-        const rect = active.getBoundingClientRect();
-        const x = rect.left - parentRect.left;
-        const y = rect.top - parentRect.top;
-        frame.style.width = rect.width + 'px';
-        frame.style.height = rect.height + 'px';
-        frame.style.transform = `translate(${x}px, ${y}px)`;
-        frame.classList.add('show');
+      let previewUrl = '';
+      let selectedVideoFile = null;
+      const behaviorDisclaimer = 'This result is only a behavior-risk hint and does not constitute veterinary diagnosis.';
+      const timeline = [
+        { label: 'Resting', type: 'rest', width: 18, color: '#60a5fa' },
+        { label: 'Walking', type: 'walk', width: 14, color: '#10b981' },
+        { label: 'Repeated paw licking', type: 'alert', width: 7, color: '#ec4899' },
+        { label: 'Grooming', type: 'groom', width: 13, color: '#f59e0b' },
+        { label: 'Resting', type: 'rest', width: 16, color: '#60a5fa' },
+        { label: 'Frequent ear scratching', type: 'alert', width: 6, color: '#ec4899' },
+        { label: 'Walking', type: 'walk', width: 18, color: '#10b981' },
+        { label: 'Frequent head shaking', type: 'alert', width: 8, color: '#ec4899' }
+      ];
+      const demoEvents = [
+        { time: '08:20', action: 'Frequent head shaking', hint: 'May indicate ear discomfort. Record frequency and duration.', risk: 'medium' },
+        { time: '14:45', action: 'Frequent ear scratching', hint: 'Check whether the ear has odor, redness, or discharge.', risk: 'high' },
+        { time: '22:10', action: 'One-sided limping', hint: 'May indicate joint, paw, or muscle discomfort. Reduce intense activity and record gait changes.', risk: 'high' },
+        { time: '31:40', action: 'Long low-activity period', hint: 'Activity is below the usual baseline. Continue observing appetite, water intake, and energy.', risk: 'medium' },
+        { time: '42:30', action: 'Repeated paw licking', hint: 'May indicate skin irritation, anxiety, or a foreign object. Check paw pads and between toes.', risk: 'medium' },
+        { time: '53:05', action: 'Arched back or tucked abdomen', hint: 'May indicate pain or discomfort. Record posture duration and watch appetite or stool changes.', risk: 'medium' }
+      ];
+      const advice = [
+        { title: 'Ear observation', detail: 'Record head-shaking and ear-scratching frequency. Check for odor, redness, or discharge.' },
+        { title: 'Paw observation', detail: 'Record paw-licking frequency. Check paw pads, between toes, skin irritation, or foreign objects.' },
+        { title: 'Gait observation', detail: 'If one-sided limping appears, capture a short side-view walking video and avoid intense activity.' },
+        { title: 'Daily context', detail: 'Track appetite, water intake, stool, sleep, and energy changes alongside the video.' },
+        { title: 'Safety boundary', detail: behaviorDisclaimer }
+      ];
+      const history = [
+        { label: 'Head shaking', value: 44, delta: '+18%', color: '#ec4899' },
+        { label: 'Ear scratching', value: 52, delta: '+24%', color: '#f59e0b' },
+        { label: 'Paw licking', value: 48, delta: '+16%', color: '#ec4899' },
+        { label: 'Limping signal', value: 22, delta: '+9%', color: '#ef4444' },
+        { label: 'Normal walking', value: 68, delta: '-7%', color: '#10b981' }
+      ];
+
+      function setRisk(level = 'medium') {
+        const normalized = level.toLowerCase();
+        const label = normalized === 'high' ? 'High' : normalized === 'low' ? 'Low' : 'Medium';
+        riskSummaryEl?.classList.remove('behaviour-risk-summary--low', 'behaviour-risk-summary--medium', 'behaviour-risk-summary--high');
+        riskSummaryEl?.classList.add(`behaviour-risk-summary--${normalized}`);
+        if (riskSummaryEl) riskSummaryEl.innerHTML = `<span>Risk</span><strong>${label}</strong>`;
+        riskBadgeEl?.classList.remove('behaviour-risk-badge--low', 'behaviour-risk-badge--medium', 'behaviour-risk-badge--high');
+        riskBadgeEl?.classList.add(`behaviour-risk-badge--${normalized}`);
+        if (riskBadgeEl) riskBadgeEl.textContent = label;
+        if (riskTitleEl) riskTitleEl.textContent = `${label} risk`;
+        if (riskCopyEl) {
+          riskCopyEl.textContent = normalized === 'high'
+            ? 'Multiple behavior signals appeared in the same clip. Record frequency, duration, and context, and consult a veterinarian if needed.'
+            : normalized === 'low'
+              ? 'No strong abnormal movement cluster was detected. Keep short videos for future comparison.'
+              : 'Some behaviors are above the weekly baseline. PawTrace only provides observation hints and does not judge the cause.';
+        }
       }
 
-      highlight(currentIndex);
-      setInterval(() => {
-        currentIndex = (currentIndex + 1) % words.length;
-        highlight(currentIndex);
-      }, duration + pause);
+      function toTitleLabel(value = '') {
+        return String(value || '')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+      }
+
+      function riskColor(risk = 'low') {
+        const normalized = String(risk).toLowerCase();
+        if (normalized === 'high') return '#ef4444';
+        if (normalized === 'medium') return '#ec4899';
+        return '#10b981';
+      }
+
+      function formatPercent(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return '--';
+        const pct = num <= 1 ? num * 100 : num;
+        return `${Math.round(pct)}%`;
+      }
+
+      function formatEventTime(event) {
+        if (Number.isFinite(Number(event.timeSec))) return `${Math.round(Number(event.timeSec) * 10) / 10}s`;
+        return String(event.time || '0:00');
+      }
+
+      function eventPosition(event, duration = 60) {
+        if (Number.isFinite(Number(event.timeSec))) {
+          return Math.min(100, (Number(event.timeSec) / Math.max(duration, 1)) * 100);
+        }
+        const minutes = Number(String(event.time || '0').split(':')[0]) || 0;
+        return Math.min(100, (minutes / 60) * 100);
+      }
+
+      function renderAxis(duration = 60, unit = 'min') {
+        if (!timeAxisEl) return;
+        const steps = [0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round(duration * ratio));
+        timeAxisEl.innerHTML = steps.map((value) => `<span>${value}${unit === 'sec' && value === duration ? 's' : ''}</span>`).join('');
+      }
+
+      function renderTimeline(segments = timeline, events = demoEvents, duration = 60, unit = 'min') {
+        if (timelineTitleEl) timelineTitleEl.textContent = unit === 'sec' ? `${Math.round(duration)}s YOLO scan` : '60min activity scan';
+        renderAxis(duration, unit);
+        timelineEl.innerHTML = segments.map((segment) => `
+          <span class="behaviour-segment" title="${escapeHtml(segment.label)}" style="--width:${segment.width}%; --segment-color:${segment.color};"></span>
+        `).join('');
+        if (markersEl) {
+          markersEl.innerHTML = events.map((event) => `
+            <span class="behaviour-alert-marker" style="--left:${eventPosition(event, duration)}%;" title="${escapeHtml(event.action || event.type)}">
+              <i class="fas fa-triangle-exclamation"></i>
+            </span>
+          `).join('');
+        }
+      }
+
+      function renderEvents(events = demoEvents) {
+        if (!eventListEl) return;
+        eventListEl.innerHTML = events.map((event) => `
+          <div class="behaviour-event-row">
+            <span class="behaviour-event-time">${escapeHtml(formatEventTime(event))}</span>
+            <div>
+              <strong>${escapeHtml(event.action || toTitleLabel(event.type || 'movement_event'))}</strong>
+              <span>${escapeHtml(event.hint || event.note || 'Movement event detected for observation.')}</span>
+            </div>
+            <span class="behaviour-event-score behaviour-event-score--${escapeHtml(event.risk || 'medium')}">${escapeHtml(event.risk || formatPercent(event.confidence))}</span>
+          </div>
+        `).join('');
+        if (eventCountEl) eventCountEl.textContent = String(events.length);
+      }
+
+      function renderAdvice(items = advice) {
+        if (!adviceListEl) return;
+        adviceListEl.innerHTML = items.map((item) => `
+          <div class="behaviour-advice-row">
+            <i class="fas fa-clipboard-check"></i>
+            <div>
+              <strong>${escapeHtml(item.title)}</strong>
+              <span>${escapeHtml(item.detail)}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function renderHistory() {
+        if (!historyBarsEl) return;
+        historyBarsEl.innerHTML = history.map((item) => `
+          <div class="behaviour-history-row">
+            <strong>${escapeHtml(item.label)}</strong>
+            <div class="behaviour-history-track" aria-hidden="true">
+              <span style="--value:${item.value}%; --segment-color:${item.color};"></span>
+            </div>
+            <span>${escapeHtml(item.delta)}</span>
+          </div>
+        `).join('');
+      }
+
+      function setStatus(text, mode = '') {
+        if (!analysisStatus) return;
+        analysisStatus.textContent = text;
+        analysisStatus.classList.toggle('behaviour-status-chip--high', mode === 'high');
+      }
+
+      function detectPetFromFile(file) {
+        const name = String(file?.name || '').toLowerCase();
+        if (/cat|kitty/.test(name)) return 'Cat · 91%';
+        if (/dog|puppy/.test(name)) return 'Dog · 93%';
+        return 'Cat/Dog · 88%';
+      }
+
+      function renderYoloResult(data) {
+        const summary = data?.summary || {};
+        const durationSec = Number(summary.durationSec) || 0;
+        const apiTimeline = Array.isArray(data?.timeline) ? data.timeline : [];
+        const apiEvents = Array.isArray(data?.events) ? data.events : [];
+        const totalDuration = durationSec || Math.max(...apiTimeline.map((item) => Number(item.endSec) || 0), 1);
+        const yoloSegments = apiTimeline.length
+          ? apiTimeline.map((item) => {
+              const start = Number(item.startSec) || 0;
+              const end = Number(item.endSec) || start + 1;
+              return {
+                label: toTitleLabel(item.behavior || 'normal_movement'),
+                type: item.risk || 'low',
+                width: Math.max(3, ((end - start) / Math.max(totalDuration, 1)) * 100),
+                color: riskColor(item.risk || 'low')
+              };
+            })
+          : [{ label: toTitleLabel(summary.activityType || 'normal_movement'), type: summary.riskLevel || 'low', width: 100, color: riskColor(summary.riskLevel || 'low') }];
+
+        const risk = String(summary.riskLevel || 'low').toLowerCase();
+        setRisk(risk);
+        if (detectedPetEl) detectedPetEl.textContent = Number(summary.detectedFrames) > 0 ? 'Cat/Dog detected' : 'Low visibility';
+        if (durationEl) durationEl.textContent = `${Math.round((durationSec || 0) * 10) / 10}s`;
+        if (detectionRateEl) detectionRateEl.textContent = formatPercent(summary.detectionRate);
+        if (movementScoreEl) movementScoreEl.textContent = `${Number.isFinite(Number(summary.movementScore)) ? summary.movementScore : 0}`;
+        renderTimeline(yoloSegments, apiEvents, totalDuration, 'sec');
+        renderEvents(apiEvents);
+        renderAdvice([
+          { title: 'YOLO activity type', detail: toTitleLabel(summary.activityType || 'normal_movement') },
+          { title: 'Movement score', detail: `${Number.isFinite(Number(summary.movementScore)) ? summary.movementScore : 0} / 100` },
+          { title: 'Advice', detail: data?.advice || 'Movement pattern looks generally normal in this short video.' },
+          { title: 'Disclaimer', detail: data?.disclaimer || behaviorDisclaimer }
+        ]);
+        renderHistory();
+        if (riskCopyEl) {
+          riskCopyEl.textContent = `YOLO sampled ${summary.analyzedFrames || 0} frames and detected the pet in ${summary.detectedFrames || 0}. ${data?.disclaimer || behaviorDisclaimer}`;
+        }
+        setStatus('YOLO analysis complete', risk === 'high' ? 'high' : '');
+      }
+
+      async function analyzeUploadedVideo(file) {
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('video', file);
+        setStatus('Running YOLO...');
+        try {
+          const response = await fetch('/api/ai/video-behavior', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data?.error || 'YOLO analysis failed');
+          }
+          renderYoloResult(data);
+        } catch (err) {
+          console.warn('Standalone YOLO behavior check failed', err);
+          setStatus(err instanceof Error ? err.message : 'YOLO service unavailable', 'high');
+          if (riskCopyEl) {
+            riskCopyEl.textContent = 'The YOLO service is unavailable. Start the Python FastAPI service and try again.';
+          }
+        }
+      }
+
+      function analyseVideo(file = null) {
+        const detected = file ? detectPetFromFile(file) : 'Dog · 92%';
+        const highSignal = file && /limp|ear|paw|scratch|shake|arched|abdomen/.test(file.name.toLowerCase());
+        const level = highSignal ? 'high' : 'medium';
+        if (detectedPetEl) detectedPetEl.textContent = detected;
+        setRisk(level);
+        renderTimeline();
+        renderEvents();
+        renderAdvice();
+        renderHistory();
+        if (durationEl) durationEl.textContent = '60 min';
+        if (detectionRateEl) detectionRateEl.textContent = '92%';
+        if (movementScoreEl) movementScoreEl.textContent = highSignal ? '68' : '42';
+        setStatus(file ? 'Demo analysis complete' : 'Demo ready', highSignal ? 'high' : '');
+      }
+
+      function handleVideoFile(file) {
+        if (!file) return;
+        const allowedExt = /\.(mp4|mov|avi|webm)$/i.test(file.name);
+        const allowedMime = /^video\//i.test(file.type || '');
+        if (!allowedExt && !allowedMime) {
+          alert('Please choose a video file: mp4, mov, avi, or webm.');
+          fileInput.value = '';
+          return;
+        }
+        if (file.size > 150 * 1024 * 1024) {
+          alert('Please choose a video under 150MB.');
+          fileInput.value = '';
+          return;
+        }
+        selectedVideoFile = file;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(file);
+        if (videoPreview) {
+          videoPreview.src = previewUrl;
+          videoPreview.classList.remove('hidden');
+          videoPreview.addEventListener('loadedmetadata', () => {
+            if (!durationEl || !Number.isFinite(videoPreview.duration)) return;
+            const minutes = Math.max(1, Math.round(videoPreview.duration / 60));
+            durationEl.textContent = `${minutes} min`;
+          }, { once: true });
+        }
+        uploadEmpty?.classList.add('hidden');
+        setStatus('Ready for YOLO');
+        if (riskCopyEl) riskCopyEl.textContent = 'Click Start YOLO Check to send this video to the backend and Python YOLO service.';
+      }
+
+      uploadTrigger?.addEventListener('click', () => fileInput.click());
+      demoRunBtn?.addEventListener('click', () => {
+        if (selectedVideoFile) {
+          analyzeUploadedVideo(selectedVideoFile);
+          return;
+        }
+        analyseVideo();
+      });
+      dropzone.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+      dropzone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        dropzone.classList.add('is-dragover');
+      });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragover'));
+      dropzone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        dropzone.classList.remove('is-dragover');
+        handleVideoFile(event.dataTransfer?.files?.[0]);
+      });
+      fileInput.addEventListener('change', () => handleVideoFile(fileInput.files?.[0]));
+      analyseVideo();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -373,6 +694,7 @@
         trackedCountEl: document.getElementById('tracked-pet-count'),
         locationListEl: document.getElementById('location-list'),
         locationCountEl: document.getElementById('location-count'),
+        searchInput: document.getElementById('map-search'),
         cardElements: {
           wrapper: document.getElementById('location-card'),
           name: document.getElementById('loc-name'),
@@ -396,6 +718,7 @@
         mapController = new window.PawMapController(mapOptions);
         mapController.init();
       }
+      initBehaviourCheck();
       window.focusPetOnMap = (petId) => {
         document.querySelector('[data-tab="map"]')?.click();
         window.setTimeout(() => {
@@ -419,7 +742,6 @@
       const storedCollapsed = localStorage.getItem('pawtraceSidebarCollapsed');
       const defaultCollapsed = storedCollapsed ? storedCollapsed === '1' : false;
       setSidebarState(defaultCollapsed);
-      initTrueFocus();
       aiServiceButtons.forEach(btn => {
         btn.addEventListener('click', () => {
           const key = btn.getAttribute('data-ai-service');
@@ -513,6 +835,7 @@
       const profileStarSignEl = document.getElementById('profile-star-sign');
       const profileMainPetEl = document.getElementById('profile-main-pet');
       const profilePetNotesEl = document.getElementById('profile-pet-notes');
+      const profileSideFocusEl = document.getElementById('profile-side-focus');
       const petInsightText = document.getElementById('pet-insight-text');
       const btnRefreshPetInsight = document.getElementById('btn-refresh-pet-insight');
       const btnEditProfile = document.getElementById('btn-edit-profile');
@@ -540,7 +863,9 @@
             ? `Star sign: ${user.starSign}${tagline ? ' · ' + tagline : ''}`
             : 'Star sign: Not set';
         }
-        if (profileMainPetEl) profileMainPetEl.textContent = user.mainPetName ? `${user.mainPetName} · ${user.mainPetType || 'Pet'}` : 'Add your main pet to personalize insights.';
+        const mainPetLabel = user.mainPetName ? `${user.mainPetName} · ${user.mainPetType || 'Pet'}` : 'Add your main pet to personalize insights.';
+        if (profileMainPetEl) profileMainPetEl.textContent = mainPetLabel;
+        if (profileSideFocusEl) profileSideFocusEl.textContent = user.mainPetName || 'Not set';
         if (profilePetNotesEl) profilePetNotesEl.textContent = user.mainPetNotes || 'Share habits and quirks to give the AI more context.';
         if (petInsightText) {
           petInsightText.textContent = user.petInsight || 'Tap "Ask AI" to get a behavior prediction.';
@@ -643,7 +968,7 @@
 
       function renderDiagnosisResult(text) {
         if (!diagResult) return;
-        const formatted = text
+        const formatted = escapeHtml(text)
           .replace(/\n/g, '<br/>')
           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
           .replace(/### (.*?)(<br\/>|$)/g, '<h4 class="text-primary font-bold text-sm mt-3 mb-2 border-b border-primary/20 pb-1">$1</h4>')
@@ -717,7 +1042,7 @@
           setDiagStatus('AI request failed', true);
           if (diagResult) {
             const fallback = generateMockAIResponse('health', user) || 'Unable to analyze right now. Please try again.';
-            diagResult.innerHTML = `<p class="text-xs text-gray-700">${fallback}</p>`;
+            diagResult.innerHTML = `<p class="text-xs text-gray-700">${escapeHtml(fallback)}</p>`;
           }
         } finally {
           toggleDiagLoading(false);
@@ -767,7 +1092,7 @@
 
       function renderTextResult(text) {
         if (!aiServiceOutputEl) return;
-        const formatted = text
+        const formatted = escapeHtml(text)
           .replace(/\n/g, '<br/>')
           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
           .replace(/### (.*?)(<br\/>|$)/g, '<h4 class="text-primary font-bold text-sm mt-3 mb-2 border-b border-primary/20 pb-1">$1</h4>')
@@ -1088,6 +1413,7 @@
         pets: document.getElementById('tab-pets'),
         chat: document.getElementById('tab-chat'),
         health: document.getElementById('tab-health'),
+        behaviour: document.getElementById('tab-behaviour'),
         profile: document.getElementById('tab-profile'),
         ai: document.getElementById('tab-ai'),
       };
@@ -1095,11 +1421,22 @@
       const headerEyebrow = document.getElementById('header-tab-eyebrow');
       const headerTitle = document.getElementById('header-tab-title');
       const headerSubtitle = document.getElementById('header-tab-subtitle');
+      const appAddressSection = document.getElementById('app-address-section');
+      const mobileMoreButton = document.getElementById('mobile-more-button');
+      const mobileMoreSheet = document.getElementById('mobile-more-sheet');
+      const mobileMoreItems = document.querySelectorAll('[data-mobile-tab]');
+      const mobileMoreTabs = new Set(['behaviour', 'ai', 'profile']);
       if (tabsInitialized) {
         activateAppTab?.(activeTabName);
         return;
       }
       tabsInitialized = true;
+
+      function setMobileMoreOpen(isOpen) {
+        mobileMoreSheet?.classList.toggle('hidden', !isOpen);
+        mobileMoreSheet?.setAttribute('aria-hidden', String(!isOpen));
+        mobileMoreButton?.setAttribute('aria-expanded', String(isOpen));
+      }
 
       function activateTab(name) {
         if (!tabPages[name]) name = 'map';
@@ -1113,9 +1450,15 @@
         topTabs.forEach(btn => {
           btn.classList.toggle('active', btn.getAttribute('data-tab') === name);
         });
+        mobileMoreButton?.classList.toggle('active', mobileMoreTabs.has(name));
+        mobileMoreItems.forEach(btn => {
+          btn.classList.toggle('active', btn.getAttribute('data-mobile-tab') === name);
+        });
+        setMobileMoreOpen(false);
         if (headerEyebrow) headerEyebrow.textContent = meta.eyebrow;
         if (headerTitle) headerTitle.textContent = meta.title;
         if (headerSubtitle) headerSubtitle.textContent = meta.subtitle;
+        if (appAddressSection) appAddressSection.textContent = meta.path || name;
         if (tabPages[name]) {
           tabPages[name].classList.add('visible');
         }
@@ -1138,9 +1481,36 @@
         btn.addEventListener('click', () => {
           const name = btn.getAttribute('data-tab');
           activateTab(name);
+          if (name && tabPages[name]) {
+            history.replaceState(null, '', `#${name}`);
+          }
         });
       });
-      activateTab('map');
+      mobileMoreButton?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setMobileMoreOpen(mobileMoreSheet?.classList.contains('hidden'));
+      });
+      mobileMoreItems.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const name = btn.getAttribute('data-mobile-tab');
+          activateTab(name);
+          if (name && tabPages[name]) {
+            history.replaceState(null, '', `#${name}`);
+          }
+        });
+      });
+      document.addEventListener('click', (event) => {
+        if (!mobileMoreSheet || mobileMoreSheet.classList.contains('hidden')) return;
+        const target = event.target;
+        if (target instanceof Element && (mobileMoreSheet.contains(target) || mobileMoreButton?.contains(target))) return;
+        setMobileMoreOpen(false);
+      });
+      window.addEventListener('hashchange', () => {
+        const hashTab = window.location.hash.replace('#', '');
+        if (hashTab && tabPages[hashTab]) activateTab(hashTab);
+      });
+      const initialTab = window.location.hash.replace('#', '');
+      activateTab(initialTab && tabPages[initialTab] ? initialTab : 'map');
     }
 
     // --- Pet data & UI ---
@@ -1225,7 +1595,7 @@
       if (!timestamp) return 'Just now';
       const date = new Date(timestamp);
       if (Number.isNaN(date.getTime())) return 'Just now';
-      return date.toLocaleString([], {
+      return date.toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -1289,7 +1659,7 @@
       if (!Number.isFinite(value)) return '--';
       return metric === 'temperature'
         ? `${value.toFixed(1)}°C`
-        : `${Math.round(value)} bpm`;
+        : `${Math.round(value)}`;
     }
 
     function getTrendSeries(history = [], metric = 'temperature', limit = 7) {
@@ -1320,7 +1690,7 @@
       const average = values.reduce((sum, value) => sum + value, 0) / values.length;
       return {
         badge,
-        caption: `${series.length} recent readings · last ${formatReadingTimestamp(series[series.length - 1].timestamp)}`,
+        caption: `${series.length} readings · ${formatReadingTimestamp(series[series.length - 1].timestamp)}`,
         min: formatMetricValue(metric, Math.min(...values)),
         avg: formatMetricValue(metric, average),
         max: formatMetricValue(metric, Math.max(...values)),
@@ -1359,8 +1729,8 @@
       const dots = points
         .map((point) => `<circle class="health-trend-dot" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4" fill="${metric === 'temperature' ? '#f59e0b' : '#38bdf8'}"></circle>`)
         .join('');
-      const firstLabel = new Date(points[0].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const lastLabel = new Date(points[points.length - 1].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const firstLabel = new Date(points[0].timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const lastLabel = new Date(points[points.length - 1].timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
       return `
         <svg class="health-trend-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${metric} trend">
@@ -1613,17 +1983,22 @@
         return;
       }
       pets.forEach(p => {
+        const petId = escapeHtml(p.id);
+        const petAvatar = escapeHtml(safeImageSrc(p.avatar, DEFAULT_PET_AVATAR));
+        const petName = escapeHtml(p.name || 'Unnamed pet');
+        const petType = escapeHtml(p.type || 'Pet');
+        const petBreed = escapeHtml(p.breed || 'Unknown');
         const row = document.createElement('div');
         row.className = 'flex items-center justify-between bg-secondary/40 px-2 py-2 rounded-sm';
         row.innerHTML = `
           <div class="flex items-center gap-2 min-w-0">
-            <img src="${p.avatar || DEFAULT_PET_AVATAR}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-neutral" />
+            <img src="${petAvatar}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-neutral" />
             <div class="min-w-0">
-              <p class="font-semibold text-[11px] truncate">${p.name}</p>
-              <p class="text-[10px] text-gray-500 truncate">${p.type} · ${p.breed}</p>
+              <p class="font-semibold text-[11px] truncate">${petName}</p>
+              <p class="text-[10px] text-gray-500 truncate">${petType} · ${petBreed}</p>
             </div>
           </div>
-          <button class="text-[10px] text-red-500 hover:underline" data-profile-pet-delete="${p.id}" type="button">
+          <button class="text-[10px] text-red-500 hover:underline" data-profile-pet-delete="${petId}" type="button">
             Delete
           </button>
         `;
@@ -1796,10 +2171,12 @@
         history.slice(0, 6).forEach((entry) => {
           const row = document.createElement('div');
           row.className = 'health-history-row';
+          const petName = escapeHtml(activePet.name || 'Pet');
+          const petLocation = escapeHtml(activePet.location || 'Campus');
           row.innerHTML = `
             <div class="health-history-row__meta">
               <p class="font-semibold text-dark">${formatReadingTimestamp(entry.timestamp)}</p>
-              <p class="text-[10px] text-gray-500">${activePet.name} · ${activePet.location || 'Campus'}</p>
+              <p class="text-[10px] text-gray-500">${petName} · ${petLocation}</p>
             </div>
             <div class="health-history-row__stats">
               <span class="health-status-pill">Temp ${Number.isFinite(entry.temperature) ? `${entry.temperature.toFixed(1)}°C` : '--'}</span>
@@ -1873,6 +2250,7 @@
       const petList = document.getElementById('pet-list');
       const petEmpty = document.getElementById('pet-empty');
       const profilePetCount = document.getElementById('profile-pet-count');
+      const profileSidePetCount = document.getElementById('profile-side-pet-count');
       const btnAddPet = document.getElementById('btn-add-pet');
       const petForm = document.getElementById('pet-form');
       const btnClosePetForm = document.getElementById('btn-close-pet-form');
@@ -1965,6 +2343,7 @@
         if (!petList) return;
         petList.innerHTML = '';
         if (profilePetCount) profilePetCount.textContent = pets.length.toString();
+        if (profileSidePetCount) profileSidePetCount.textContent = pets.length.toString();
         if (pets.length === 0) {
           petEmpty?.classList.remove('hidden');
           renderProfilePetList();
@@ -1981,7 +2360,23 @@
                 } catch { return p.birthday; }
               })()
             : (p.age || 'Not set');
-          const petAvatar = p.avatar || DEFAULT_PET_AVATAR;
+          const petAvatar = safeImageSrc(p.avatar, DEFAULT_PET_AVATAR);
+          const petAvatarEsc = escapeHtml(petAvatar);
+          const petId = escapeHtml(p.id);
+          const petName = escapeHtml(p.name || 'Unnamed pet');
+          const petType = escapeHtml(p.type || 'Pet');
+          const petBreed = escapeHtml(p.breed || 'Unknown');
+          const petBirthday = escapeHtml(birthdayDisplay);
+          const petGender = escapeHtml(p.gender || 'Unknown');
+          const petStatus = escapeHtml(p.status || 'No recent notes');
+          const petLocation = escapeHtml(p.location || 'Campus map not set');
+          const petHealth = escapeHtml(p.health || 'No health notes yet');
+          const petNfcId = escapeHtml(p.nfcId || '');
+          const petNfcContact = escapeHtml(p.nfcContact || 'Add an emergency contact');
+          const petNfcNote = escapeHtml(p.nfcNote || 'No care note added yet.');
+          const traitMarkup = (p.traits || [])
+            .map(t => `<span class="px-2 py-0.5 rounded-full bg-secondary text-dark">${escapeHtml(t)}</span>`)
+            .join('');
           const mobileLayout = window.innerWidth <= 768;
           const isOpen = openPetId ? openPetId === p.id : (!mobileLayout && idx === 0);
           if (!openPetId && !mobileLayout && idx === 0) openPetId = p.id;
@@ -1989,37 +2384,37 @@
           card.className = 'pixel-card flex flex-col gap-2 animate-slideInLeft';
           card.style.animationDelay = (idx * 0.1) + 's';
           card.innerHTML = `
-            <button class="w-full flex justify-between items-center text-left" data-pet-toggle="${p.id}">
+            <button class="w-full flex justify-between items-center text-left" data-pet-toggle="${petId}">
               <div class="flex items-center gap-3">
-                <img src="${petAvatar}" alt="${p.name}" loading="lazy" decoding="async" class="w-12 h-12 rounded-full object-cover pixel-border bg-secondary" />
+                <img src="${petAvatarEsc}" alt="${petName}" loading="lazy" decoding="async" class="w-12 h-12 rounded-full object-cover pixel-border bg-secondary" />
                 <div>
-                  <p class="font-semibold text-sm">${p.name}</p>
-                  <p class="text-[11px] text-gray-500">${p.type} · ${p.breed}</p>
+                  <p class="font-semibold text-sm">${petName}</p>
+                  <p class="text-[11px] text-gray-500">${petType} · ${petBreed}</p>
                 </div>
               </div>
               <div class="flex items-center gap-3 text-gray-500">
-                <span class="text-[10px]">${birthdayDisplay}</span>
+                <span class="text-[10px]">${petBirthday}</span>
                 <i class="fas fa-chevron-${isOpen ? 'up' : 'down'}"></i>
               </div>
             </button>
             <div class="${isOpen ? '' : 'hidden'} space-y-2 pt-2 border-t border-white/60">
               <div class="flex gap-3">
-                <img src="${petAvatar}" alt="${p.name}" loading="lazy" decoding="async" class="w-16 h-16 rounded-full object-cover pixel-border bg-secondary" />
+                <img src="${petAvatarEsc}" alt="${petName}" loading="lazy" decoding="async" class="w-16 h-16 rounded-full object-cover pixel-border bg-secondary" />
                 <div class="space-y-1 text-[11px]">
-                  <p><span class="font-semibold">Type:</span> ${p.type}</p>
-                  <p><span class="font-semibold">Breed:</span> ${p.breed}</p>
-                  <p><span class="font-semibold">Birthday:</span> ${birthdayDisplay}</p>
-                  <p><span class="font-semibold">Gender:</span> ${p.gender || 'Unknown'}</p>
+                  <p><span class="font-semibold">Type:</span> ${petType}</p>
+                  <p><span class="font-semibold">Breed:</span> ${petBreed}</p>
+                  <p><span class="font-semibold">Birthday:</span> ${petBirthday}</p>
+                  <p><span class="font-semibold">Gender:</span> ${petGender}</p>
                 </div>
               </div>
               <div>
                 <p class="font-semibold text-[11px]">Status</p>
-                <p class="text-[11px] text-gray-600">${p.status || 'No recent notes'}</p>
+                <p class="text-[11px] text-gray-600">${petStatus}</p>
               </div>
               <div class="grid md:grid-cols-2 gap-3">
                 <div>
                   <p class="font-semibold text-[11px]">Location</p>
-                  <p class="text-[11px] text-gray-600">${p.location || 'Campus map not set'}</p>
+                  <p class="text-[11px] text-gray-600">${petLocation}</p>
                 </div>
                 <div>
                   <p class="font-semibold text-[11px]">Latest vitals</p>
@@ -2033,33 +2428,33 @@
               <div>
                 <p class="font-semibold text-[11px]">Personality</p>
                 <div class="flex flex-wrap gap-1">
-                  ${(p.traits || []).map(t => `<span class="px-2 py-0.5 rounded-full bg-secondary text-dark">${t}</span>`).join('')}
+                  ${traitMarkup}
                 </div>
               </div>
               <div class="flex items-center justify-between">
                 <div>
                   <p class="font-semibold text-[11px]">Health</p>
-                  <p class="text-[11px] text-gray-600">${p.health || 'No health notes yet'}</p>
+                  <p class="text-[11px] text-gray-600">${petHealth}</p>
                 </div>
-                <button data-id="${p.id}" class="pet-edit text-primary text-[12px] hover:underline flex items-center gap-1"><i class="fas fa-edit"></i>Edit</button>
+                <button data-id="${petId}" class="pet-edit text-primary text-[12px] hover:underline flex items-center gap-1"><i class="fas fa-edit"></i>Edit</button>
               </div>
               <div class="pet-nfc-card">
                 <div class="flex items-center justify-between gap-2">
                   <div>
                     <p class="text-[10px] uppercase tracking-[0.28em] text-gray-500">NFC Pet Card</p>
-                    <p class="font-semibold text-sm text-dark">${p.name}</p>
+                    <p class="font-semibold text-sm text-dark">${petName}</p>
                   </div>
-                  <span class="pet-nfc-card__code">${p.nfcId}</span>
+                  <span class="pet-nfc-card__code">${petNfcId}</span>
                 </div>
                 <div class="space-y-1 text-[11px] text-gray-700">
-                  <p><span class="font-semibold">Emergency:</span> ${p.nfcContact || 'Add an emergency contact'}</p>
-                  <p><span class="font-semibold">Care note:</span> ${p.nfcNote || 'No care note added yet.'}</p>
+                  <p><span class="font-semibold">Emergency:</span> ${petNfcContact}</p>
+                  <p><span class="font-semibold">Care note:</span> ${petNfcNote}</p>
                 </div>
                 <div class="flex flex-wrap gap-2 pt-1">
-                  <button type="button" class="pet-action-link" data-copy-nfc="${p.id}">
+                  <button type="button" class="pet-action-link" data-copy-nfc="${petId}">
                     <i class="fas fa-id-card"></i><span>Copy NFC Card</span>
                   </button>
-                  <button type="button" class="pet-action-link" data-open-map="${p.id}">
+                  <button type="button" class="pet-action-link" data-open-map="${petId}">
                     <i class="fas fa-location-arrow"></i><span>Locate on Map</span>
                   </button>
                 </div>
@@ -2126,17 +2521,22 @@
           return;
         }
         pets.forEach(p => {
+          const petId = escapeHtml(p.id);
+          const petAvatar = escapeHtml(safeImageSrc(p.avatar, DEFAULT_PET_AVATAR));
+          const petName = escapeHtml(p.name || 'Unnamed pet');
+          const petType = escapeHtml(p.type || 'Pet');
+          const petBreed = escapeHtml(p.breed || 'Unknown');
           const row = document.createElement('div');
           row.className = 'flex items-center justify-between bg-secondary/40 px-2 py-2 rounded-sm';
           row.innerHTML = `
             <div class="flex items-center gap-2 min-w-0">
-              <img src="${p.avatar || DEFAULT_PET_AVATAR}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-neutral" />
+              <img src="${petAvatar}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-neutral" />
               <div class="min-w-0">
-                <p class="font-semibold text-[11px] truncate">${p.name}</p>
-                <p class="text-[10px] text-gray-500 truncate">${p.type} · ${p.breed}</p>
+                <p class="font-semibold text-[11px] truncate">${petName}</p>
+                <p class="text-[10px] text-gray-500 truncate">${petType} · ${petBreed}</p>
               </div>
             </div>
-            <button class="text-[10px] text-red-500 hover:underline" data-profile-pet-delete="${p.id}" type="button">
+            <button class="text-[10px] text-red-500 hover:underline" data-profile-pet-delete="${petId}" type="button">
               Delete
             </button>
           `;
@@ -2158,27 +2558,36 @@
         if (!communityPetFeed) return;
         communityPetFeed.innerHTML = '';
         COMMUNITY_PETS.forEach((pet, idx) => {
+          const petPhoto = escapeHtml(safeImageSrc(pet.photo, DEFAULT_PET_AVATAR));
+          const petName = escapeHtml(pet.name || 'Community pet');
+          const petType = escapeHtml(pet.type || 'Pet');
+          const petMood = escapeHtml(pet.mood || '');
+          const petLocation = escapeHtml(pet.location || '');
+          const ownerContact = escapeHtml(pet.ownerContact || '');
+          const traitsMarkup = (pet.traits || [])
+            .map(tag => `<span class="px-2 py-0.5 rounded-full bg-secondary/60">${escapeHtml(tag)}</span>`)
+            .join('');
           const card = document.createElement('div');
           card.className = 'pixel-card flex flex-col gap-2 animate-slideIn';
           card.style.animationDelay = (idx * 0.05) + 's';
           card.innerHTML = `
             <div class="relative">
-              <img src="${pet.photo}" alt="${pet.name}" loading="lazy" decoding="async" class="community-cover w-full object-cover rounded-sm pixel-border" />
+              <img src="${petPhoto}" alt="${petName}" loading="lazy" decoding="async" class="community-cover w-full object-cover rounded-sm pixel-border" />
               <span class="absolute top-2 left-2 bg-primary text-white text-[10px] px-2 py-0.5 rounded-full">Community</span>
             </div>
             <div class="flex items-center justify-between">
               <div>
-                <p class="font-semibold text-sm">${pet.name}</p>
-                <p class="text-[11px] text-gray-600">${pet.type}</p>
+                <p class="font-semibold text-sm">${petName}</p>
+                <p class="text-[11px] text-gray-600">${petType}</p>
               </div>
-              <button class="text-[10px] text-primary underline" data-community-contact="${pet.ownerContact}">
+              <button class="text-[10px] text-primary underline" data-community-contact="${ownerContact}">
                 Message owner
               </button>
             </div>
-            <p class="text-[11px] text-gray-600">${pet.mood}</p>
-            <p class="text-[10px] text-gray-500"><i class="fas fa-map-marker-alt text-primary mr-1"></i>${pet.location}</p>
+            <p class="text-[11px] text-gray-600">${petMood}</p>
+            <p class="text-[10px] text-gray-500"><i class="fas fa-map-marker-alt text-primary mr-1"></i>${petLocation}</p>
             <div class="flex flex-wrap gap-1 text-[10px]">
-              ${(pet.traits || []).map(tag => `<span class="px-2 py-0.5 rounded-full bg-secondary/60">${tag}</span>`).join('')}
+              ${traitsMarkup}
             </div>
           `;
           communityPetFeed.appendChild(card);
@@ -2541,6 +2950,7 @@
       const chatPetHealth = document.getElementById('chat-pet-health');
       const chatPetTraits = document.getElementById('chat-pet-traits');
       const profileFriendsCount = document.getElementById('profile-friends-count');
+      const profileSideFriendCount = document.getElementById('profile-side-friend-count');
       const chatScrollUp = document.getElementById('chat-scroll-up');
       const chatScrollDown = document.getElementById('chat-scroll-down');
       if (!chatHoverCard) {
@@ -2563,6 +2973,7 @@
       const hoverCard = chatHoverCard;
 
       if (profileFriendsCount) profileFriendsCount.textContent = CHAT_STATE.contacts.length;
+      if (profileSideFriendCount) profileSideFriendCount.textContent = CHAT_STATE.contacts.length;
 
       const getActiveContact = () => CHAT_STATE.contacts.find(c => c.id === CHAT_STATE.activeId);
       const ensureActiveContact = () => {
@@ -2595,11 +3006,14 @@
           item.style.animationDelay = (idx * 0.05) + 's';
           item.dataset.id = c.id;
           item.dataset.contactId = c.id;
+          const avatar = escapeHtml(safeImageSrc(c.avatar, DEFAULT_PET_AVATAR));
+          const name = escapeHtml(c.name || 'Friend');
+          const preview = escapeHtml(c.lastPreview || '');
           item.innerHTML = `
-              <img src="${c.avatar}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-secondary" />
+              <img src="${avatar}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-secondary" />
               <div class="flex-1 min-w-0">
-                <p class="font-semibold text-xs truncate">${c.name}</p>
-                <p class="text-[11px] text-gray-600 truncate">${c.lastPreview}</p>
+                <p class="font-semibold text-xs truncate">${name}</p>
+                <p class="text-[11px] text-gray-600 truncate">${preview}</p>
               </div>
             `;
             const showHover = (event) => {
@@ -2618,7 +3032,7 @@
               if (healthEl) healthEl.textContent = data.petHealth ? `Health: ${data.petHealth}` : '';
               if (tagsEl) {
                 const tags = data.petTraits || [];
-                tagsEl.innerHTML = tags.map(t => `<span>${t}</span>`).join('');
+                tagsEl.innerHTML = tags.map(t => `<span>${escapeHtml(t)}</span>`).join('');
               }
               hoverCard.style.top = `${rect.top + window.scrollY + rect.height + 8}px`;
               hoverCard.style.left = `${Math.min(window.innerWidth - 260, rect.left + window.scrollX + 10)}px`;
@@ -2646,18 +3060,20 @@
         const content = message.content || '';
         const media = message.media;
         const isUser = role === 'user';
+        const safeContent = escapeHtml(content);
         const wrapper = document.createElement('div');
         wrapper.className = `flex items-end gap-2 ${isUser ? 'justify-end' : ''} animate-slideInLeft bubble-entry bubble-bounce`;
         const bubble = document.createElement('div');
         bubble.className = `px-3 py-2 max-w-[70%] ${isUser ? 'bg-primary text-white rounded-br-none' : 'bg-secondary text-dark rounded-bl-none'}`;
         if (media?.type === 'image') {
           bubble.className += ' bubble-image';
+          const mediaSrc = escapeHtml(safeImageSrc(media.src, ''));
           bubble.innerHTML = `
-            <img src="${media.src}" class="w-full h-auto object-cover rounded-sm border-2 border-dark mb-1" />
-            ${content ? `<p class="text-[11px]">${content}</p>` : ''}
+            <img src="${mediaSrc}" class="w-full h-auto object-cover rounded-sm border-2 border-dark mb-1" />
+            ${safeContent ? `<p class="text-[11px]">${safeContent}</p>` : ''}
           `;
         } else {
-          bubble.innerHTML = `<p class="text-[11px]">${content}</p>`;
+          bubble.innerHTML = `<p class="text-[11px]">${safeContent}</p>`;
         }
         const avatar = document.createElement('img');
         const contact = CHAT_STATE.contacts.find(x => x.id === contactId);
@@ -2688,7 +3104,7 @@
         if (chatPetHealth) chatPetHealth.textContent = contact.petHealth;
         if (chatPetTraits) {
           chatPetTraits.innerHTML = (contact.petTraits || []).length
-            ? contact.petTraits.map(t => `<span class="px-2 py-0.5 rounded-full bg-secondary text-dark">${t}</span>`).join('')
+            ? contact.petTraits.map(t => `<span class="px-2 py-0.5 rounded-full bg-secondary text-dark">${escapeHtml(t)}</span>`).join('')
             : '<span class="text-gray-400">No traits added yet</span>';
         }
         if (chatPetSummary) {
@@ -2886,6 +3302,7 @@
       }
       rerenderChat = () => {
         if (profileFriendsCount) profileFriendsCount.textContent = CHAT_STATE.contacts.length;
+        if (profileSideFriendCount) profileSideFriendCount.textContent = CHAT_STATE.contacts.length;
         renderContacts(searchEl?.value || '');
         const nextId = CHAT_STATE.contacts.some((contact) => contact.id === CHAT_STATE.activeId)
           ? CHAT_STATE.activeId

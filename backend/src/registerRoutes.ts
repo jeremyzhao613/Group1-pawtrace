@@ -1,6 +1,10 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import jwt, { type SignOptions } from 'jsonwebtoken';
+import multer from 'multer';
 import type { Express, Request, Response, NextFunction } from 'express';
 import type { Prisma, Pet as PetRow, User as UserRow } from '@prisma/client';
 import { prisma } from './lib/prisma.js';
@@ -11,6 +15,43 @@ import { requireMonitorAuth } from './middleware/monitorAuth.js';
 import { optionalAuth, requireAuth } from './middleware/jwtAuth.js';
 
 type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
+const VIDEO_UPLOAD_MAX_BYTES = 150 * 1024 * 1024;
+const VIDEO_UPLOAD_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.webm']);
+const VIDEO_UPLOAD_MIME_TYPES = new Set([
+  'video/mp4',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/avi',
+  'video/webm',
+  'application/octet-stream',
+]);
+const VIDEO_BEHAVIOR_DISCLAIMER = 'This result is only a behavior-risk hint and does not constitute veterinary diagnosis.';
+const videoUploadDir = path.join(os.tmpdir(), 'pawtrace-video-uploads');
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      fs.mkdir(videoUploadDir, { recursive: true })
+        .then(() => cb(null, videoUploadDir))
+        .catch((err) => cb(err, videoUploadDir));
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.video';
+      cb(null, `video-${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: VIDEO_UPLOAD_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const mime = String(file.mimetype || '').toLowerCase();
+    const isAllowed = VIDEO_UPLOAD_EXTENSIONS.has(ext) || VIDEO_UPLOAD_MIME_TYPES.has(mime);
+    if (!isAllowed) {
+      cb(new Error('Unsupported video format. Use mp4, mov, avi, or webm.'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
 function asyncHandler(fn: AsyncRouteHandler) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -48,11 +89,55 @@ async function resolveUserId(input: string | undefined | null): Promise<string |
   return u?.id ?? v;
 }
 
-async function trimRows(model: { count: () => Promise<number>; findMany: (args: unknown) => Promise<{ id: string }[]>; deleteMany: (args: unknown) => Promise<unknown> }, max: number, orderField = 'createdAt') {
-  const count = await model.count();
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function textField(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function monitorId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+}
+
+function jsonObject(value: Record<string, unknown>): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
+function jsonList(value: Record<string, unknown>[]): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
+function normalizeRecordList(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter(isRecord);
+  return isRecord(value) ? [value] : [];
+}
+
+function ownerLabelFrom(payload: Record<string, unknown>): string {
+  const personalInfo = isRecord(payload.personalInfo) ? payload.personalInfo : {};
+  const profile = isRecord(payload.userProfile) ? payload.userProfile : {};
+  return (
+    textField(personalInfo, 'displayName') ||
+    textField(profile, 'displayName') ||
+    textField(personalInfo, 'username') ||
+    textField(profile, 'username') ||
+    'Unknown owner'
+  );
+}
+
+async function trimRows(
+  countRows: () => Promise<number>,
+  findOldestIds: (take: number) => Promise<{ id: string }[]>,
+  deleteIds: (ids: string[]) => Promise<unknown>,
+  max: number
+) {
+  const count = await countRows();
   if (count <= max) return;
-  const rows = await (model.findMany as Function)({ orderBy: { [orderField]: 'asc' }, take: count - max, select: { id: true } });
-  await (model.deleteMany as Function)({ where: { id: { in: rows.map((r: { id: string }) => r.id) } } });
+  const rows = await findOldestIds(count - max);
+  const ids = rows.map((row) => row.id);
+  if (ids.length) await deleteIds(ids);
 }
 
 export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
@@ -318,6 +403,79 @@ Provide a structured Markdown response:
     }
   });
 
+  app.post('/api/ai/video-behavior', (req, res) => {
+    videoUpload.single('video')(req, res, async (uploadErr: unknown) => {
+      const uploaded = req.file;
+      const cleanup = () => {
+        if (uploaded?.path) fs.unlink(uploaded.path).catch(() => undefined);
+      };
+
+      if (uploadErr) {
+        cleanup();
+        if (uploadErr instanceof multer.MulterError) {
+          const message = uploadErr.code === 'LIMIT_FILE_SIZE'
+            ? 'Video is too large. Please upload a file under 150MB.'
+            : uploadErr.message;
+          return res.status(400).json({ error: message });
+        }
+        return res.status(400).json({ error: uploadErr instanceof Error ? uploadErr.message : 'Video upload failed' });
+      }
+
+      if (!uploaded) {
+        return res.status(400).json({ error: 'video file is required' });
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), config.VIDEO_AI_TIMEOUT_MS);
+
+      try {
+        const fileBuffer = await fs.readFile(uploaded.path);
+        const form = new FormData();
+        const videoBlob = new Blob([new Uint8Array(fileBuffer)], {
+          type: uploaded.mimetype || 'application/octet-stream',
+        });
+        form.append('video', videoBlob, uploaded.originalname || 'pet-video.mp4');
+
+        const response = await fetch(config.VIDEO_AI_URL, {
+          method: 'POST',
+          body: form,
+          signal: controller.signal,
+        });
+        const responseText = await response.text();
+        let payload: unknown = responseText;
+        try {
+          payload = responseText ? JSON.parse(responseText) : {};
+        } catch {
+          payload = { raw: responseText };
+        }
+
+        if (!response.ok) {
+          console.error('Video AI service error:', response.status, payload);
+          return res.status(502).json({
+            error: 'Video AI service error',
+            status: response.status,
+            detail: payload,
+          });
+        }
+
+        const result = isRecord(payload)
+          ? { ...payload, disclaimer: String(payload.disclaimer || VIDEO_BEHAVIOR_DISCLAIMER) }
+          : { success: true, result: payload, disclaimer: VIDEO_BEHAVIOR_DISCLAIMER };
+        return res.json(result);
+      } catch (err) {
+        const isAbort = err instanceof Error && err.name === 'AbortError';
+        console.error('Video behavior analysis error:', err);
+        return res.status(isAbort ? 504 : 502).json({
+          error: isAbort ? 'Video AI service timed out' : 'Unable to analyze video right now',
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        clearTimeout(timer);
+        cleanup();
+      }
+    });
+  });
+
   // ─── Monitor (simplified) ───
   app.get('/api/monitor/metrics', requireMonitorAuth, (_req, res) => {
     const m = deps.metrics;
@@ -329,24 +487,131 @@ Provide a structured Markdown response:
   });
 
   app.post('/api/monitor/collect', requireMonitorAuth, asyncHandler(async (req, res) => {
-    const payload = req.body || {};
+    const payload = isRecord(req.body) ? req.body : {};
     const metadata = (payload.metadata && typeof payload.metadata === 'object') ? payload.metadata : {};
-    const captured = { userProfiles: 0, petProfiles: 0, purchases: 0 };
-    if (payload.userProfile && typeof payload.userProfile === 'object') {
+    const captured = { userProfiles: 0, petProfiles: 0, purchases: 0, chatLogs: 0 };
+    const personalInfo = isRecord(payload.personalInfo) ? payload.personalInfo : null;
+    const userProfile = isRecord(payload.userProfile) ? payload.userProfile : null;
+    const pets = normalizeRecordList(payload.pets ?? payload.pet);
+    const purchases = normalizeRecordList(payload.purchases ?? payload.purchase);
+    const chatLogs = normalizeRecordList(payload.chatLogs ?? payload.chatLog);
+    const metadataJson = jsonObject(metadata as Record<string, unknown>);
+
+    if (userProfile) {
       await prisma.monitoringUserProfile.create({
-        data: { id: `profile-${Date.now()}-${Math.floor(Math.random() * 1000)}`, profileJson: payload.userProfile as Prisma.InputJsonValue, metadataJson: metadata as Prisma.InputJsonValue },
+        data: {
+          id: monitorId('profile'),
+          profileJson: jsonObject(userProfile),
+          ...(personalInfo ? { personalInfoJson: jsonObject(personalInfo) } : {}),
+          metadataJson,
+        },
       });
-      await trimRows(prisma.monitoringUserProfile as never, config.MONITOR_MAX, 'capturedAt');
       captured.userProfiles = 1;
     }
+    for (const pet of pets) {
+      await prisma.monitoringPetProfile.create({
+        data: {
+          id: monitorId('pet'),
+          ownerLabel: ownerLabelFrom(payload),
+          petJson: jsonObject(pet),
+          metadataJson,
+        },
+      });
+      captured.petProfiles += 1;
+    }
+    for (const purchase of purchases) {
+      await prisma.monitoringPurchase.create({
+        data: {
+          id: monitorId('purchase'),
+          purchaseJson: jsonObject(purchase),
+          metadataJson,
+        },
+      });
+      captured.purchases += 1;
+    }
+    for (const log of chatLogs) {
+      const messages = normalizeRecordList(log.messages);
+      await prisma.monitoringChatLog.create({
+        data: {
+          id: monitorId('chat'),
+          contactId: textField(log, 'contactId') || 'unknown',
+          messagesJson: jsonList(messages),
+          reply: textField(log, 'reply'),
+        },
+      });
+      captured.chatLogs += 1;
+    }
+    await Promise.all([
+      trimRows(
+        () => prisma.monitoringUserProfile.count(),
+        (take) => prisma.monitoringUserProfile.findMany({ orderBy: { capturedAt: 'asc' }, take, select: { id: true } }),
+        (ids) => prisma.monitoringUserProfile.deleteMany({ where: { id: { in: ids } } }),
+        config.MONITOR_MAX
+      ),
+      trimRows(
+        () => prisma.monitoringPetProfile.count(),
+        (take) => prisma.monitoringPetProfile.findMany({ orderBy: { capturedAt: 'asc' }, take, select: { id: true } }),
+        (ids) => prisma.monitoringPetProfile.deleteMany({ where: { id: { in: ids } } }),
+        config.MONITOR_MAX
+      ),
+      trimRows(
+        () => prisma.monitoringPurchase.count(),
+        (take) => prisma.monitoringPurchase.findMany({ orderBy: { capturedAt: 'asc' }, take, select: { id: true } }),
+        (ids) => prisma.monitoringPurchase.deleteMany({ where: { id: { in: ids } } }),
+        config.MONITOR_MAX
+      ),
+      trimRows(
+        () => prisma.monitoringChatLog.count(),
+        (take) => prisma.monitoringChatLog.findMany({ orderBy: { capturedAt: 'asc' }, take, select: { id: true } }),
+        (ids) => prisma.monitoringChatLog.deleteMany({ where: { id: { in: ids } } }),
+        config.MONITOR_MAX
+      ),
+    ]);
     res.json({ success: true, captured });
   }));
 
   app.get('/api/monitor/overview', requireMonitorAuth, asyncHandler(async (_req, res) => {
-    const [userProfiles, petProfiles, purchases, chatLogs] = await Promise.all([
+    const [userProfiles, petProfiles, purchases, chatLogs, contacts, recentUsers, recentPets, recentPurchases, recentChatLogs] = await Promise.all([
       prisma.monitoringUserProfile.count(), prisma.monitoringPetProfile.count(),
       prisma.monitoringPurchase.count(), prisma.monitoringChatLog.count(),
+      prisma.monitoringChatLog.findMany({ distinct: ['contactId'], select: { contactId: true } }),
+      prisma.monitoringUserProfile.findMany({ orderBy: { capturedAt: 'desc' }, take: 50 }),
+      prisma.monitoringPetProfile.findMany({ orderBy: { capturedAt: 'desc' }, take: 100 }),
+      prisma.monitoringPurchase.findMany({ orderBy: { capturedAt: 'desc' }, take: 100 }),
+      prisma.monitoringChatLog.findMany({ orderBy: { capturedAt: 'desc' }, take: 100 }),
     ]);
-    res.json({ capturedAt: new Date().toISOString(), summary: { userProfiles, petProfiles, purchases, chatLogs } });
+    res.json({
+      capturedAt: new Date().toISOString(),
+      summary: { userProfiles, petProfiles, purchases, chatLogs, contactsTracked: contacts.length },
+      monitoring: {
+        userProfiles: recentUsers.map((row) => ({
+          id: row.id,
+          capturedAt: row.capturedAt.toISOString(),
+          profile: row.profileJson,
+          personalInfo: row.personalInfoJson,
+          metadata: row.metadataJson,
+        })),
+        petProfiles: recentPets.map((row) => ({
+          id: row.id,
+          capturedAt: row.capturedAt.toISOString(),
+          ownerLabel: row.ownerLabel,
+          pet: row.petJson,
+          metadata: row.metadataJson,
+        })),
+        purchases: recentPurchases.map((row) => ({
+          id: row.id,
+          capturedAt: row.capturedAt.toISOString(),
+          purchase: row.purchaseJson,
+          metadata: row.metadataJson,
+        })),
+        chatLogs: recentChatLogs.map((row) => ({
+          id: row.id,
+          capturedAt: row.capturedAt.toISOString(),
+          contactId: row.contactId,
+          messages: row.messagesJson,
+          reply: row.reply,
+        })),
+      },
+    });
   }));
 }

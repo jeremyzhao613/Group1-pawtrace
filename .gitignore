@@ -21,6 +21,10 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Python
+__pycache__/
+*.pyc
+
 # IDE
 .idea/
 .vscode/
@@ -37,6 +41,9 @@ backend/data/*.sqlite3
 
 # Coverage
 coverage/
+
+# Local verification artifacts
+output/
 
 # Misc
 *.local

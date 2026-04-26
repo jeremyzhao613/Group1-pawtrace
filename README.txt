@@ -1,77 +1,121 @@
-PawTrace 是一个全栈宠物社区与健康管理原型：以「地图 + 社交 + AI」为核心，帮助用户在校园环境中发现宠物友好地点、管理多只宠物信息，并通过大模型完成对话式互动与基于图片的健康/行为类辅助分析（服务端集成阿里云通义千问文本与 Qwen-VL 视觉能力，密钥仅在后端配置）。
+PawTrace is a full-stack pet community and health-management prototype. It combines a campus pet map, social features, pet profiles, AI chat, image-based AI health assistance, and video-based behavior-risk hints.
 
-技术上前端采用 Vite + Tailwind，主站页面为当前完整单页 HTML/JS 界面；后端为 Node.js + Express + TypeScript，数据层 Prisma + PostgreSQL，认证使用 JWT。后端默认只作为 API/Monitor，不在 3000 端口托管前端页面，避免错误界面混淆。
+The main web app is a Vite + Tailwind single-page frontend. The backend is Node.js + Express + TypeScript with Prisma + PostgreSQL and JWT auth. By default, the backend runs as an API/monitor service only and does not serve the frontend on port 3000 unless `SERVE_WEB=1` is enabled.
 
 
 PawTrace Web App
 
-快速开始（最简）
-- 首次只做一次：`npm install && npm run install:all && npm run init`
-- 日常启动：`npm run run`
-- 停止服务：`npm run stop`
+Quick Start
+- First-time setup: `npm install && npm run install:all && npm run init`
+- Daily startup: `npm run run`
+- Stop services: `npm run stop`
 
-技术栈
-- 前端：Vite + Tailwind（当前 UI 为完整单页页面方案）
-- 后端：Node.js + Express + TypeScript + Prisma + PostgreSQL
-- AI：通义千问 DashScope（Qwen 文本 + Qwen-VL 视觉，仅服务端密钥）
+Tech Stack
+- Frontend: Vite + Tailwind
+- Backend: Node.js + Express + TypeScript + Prisma + PostgreSQL
+- AI text/image: DashScope Qwen text + Qwen-VL vision, configured only on the backend
+- AI video: standalone FastAPI + Ultralytics YOLO service for pet behavior-risk hints, not veterinary diagnosis
 
-目录
-- frontend/             主站前端入口（完整单页页面 + Vite）
-- pawtrace-glass/       独立数字孪生展示页（默认端口 3001）
-- backend/              后端源码 src/、Prisma schema、迁移
-- assets/               共享静态资源（生产挂载 /assets）
-- monitor/              监控台静态页（/monitor）
-- scripts/local-db.sh   本地 PostgreSQL（项目私有）管理脚本
+Project Structure
+- frontend/             Main PawTrace web app
+- pawtrace-glass/       Separate digital-twin showcase app, default port 3001
+- backend/              Express API, Prisma schema, migrations
+- ai-video-service/     Python FastAPI YOLO video behavior-analysis service
+- assets/               Shared static assets, mounted as /assets in production
+- monitor/              Static monitor UI, served at /monitor
+- scripts/local-db.sh   Project-local PostgreSQL helper
 
-环境变量（后端）
-- 复制 backend/.env.example 为 backend/.env
-- 推荐本地：DATABASE_URL="postgresql://pawtrace@localhost:55432/pawtrace"
-- Docker Compose：DATABASE_URL="postgresql://pawtrace:pawtrace@localhost:5432/pawtrace"
-- JWT_SECRET=（本地可简化，生产务必强随机）
-- DASHSCOPE_API_KEY（AI 功能，通义千问密钥）
-- MONITOR_API_TOKEN（可选，保护 /api/monitor/*）
-- SERVE_WEB=0（默认后端不托管前端；单端口部署时才改成 1）
+Backend Environment Variables
+- Copy `backend/.env.example` to `backend/.env`
+- Recommended local DB: `DATABASE_URL="postgresql://pawtrace@localhost:55432/pawtrace"`
+- Docker Compose DB: `DATABASE_URL="postgresql://pawtrace:pawtrace@localhost:5432/pawtrace"`
+- `JWT_SECRET`: use a strong random value outside local development
+- `DASHSCOPE_API_KEY`: Qwen/Qwen-VL features
+- `VIDEO_AI_URL`: default `http://127.0.0.1:8008/analyze-video`
+- `VIDEO_AI_TIMEOUT_MS`: default `120000`
+- `MONITOR_API_TOKEN`: optional protection for `/api/monitor/*`
+- `SERVE_WEB=0`: default API-only backend; set to `1` for single-port deployment
 
-小团队本地推荐流程（无需 Docker）
-1) 安装依赖
-- 根目录：npm install
-- backend：npm install
-- frontend：npm install
+Local Development Without Docker
+1. Install dependencies
+- Root: `npm install`
+- Backend: `npm install --prefix backend`
+- Frontend: `npm install --prefix frontend`
 
-2) 启动项目私有数据库（端口 55432）
-- npm run db:local:start
+2. Start the project-local database on port 55432
+- `npm run db:local:start`
 
-3) 初始化数据库（首次或模型变更后）
-- npm run db:migrate
-- npm run db:seed
+3. Initialize the database
+- `npm run db:migrate`
+- `npm run db:seed`
 
-4) 启动前后端
-- npm run dev
-- 前端：http://localhost:5173
-- 后端 API：http://localhost:3000/api/status
-- Monitor：http://localhost:3000/monitor/index.html
+4. Start backend and frontend
+- `npm run dev`
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3000/api/status`
+- Monitor: `http://localhost:3000/monitor/index.html`
 
-常用命令
-- 一键启动（推荐）：npm run run
-- 首次初始化：npm run init
-- 一键停止：npm run stop
-- 一键准备并开发：npm run local:dev
-- 查看本地 DB 状态：npm run db:local:status
-- 重置本地 DB：npm run db:local:reset
-- 停止本地 DB：npm run db:local:stop
-- 构建全部：npm run build
-- 只构建主站：npm run build:web
-- 只构建展示页：npm run build:glass
-- 启动展示页：npm run dev:glass
+Pet Video Behavior Analysis
+Architecture:
 
-测试账号
-- 用户名：demo
-- 密码：demo123
+`Frontend -> Node/Express /api/ai/video-behavior -> Python FastAPI /analyze-video -> JSON result -> Frontend display`
 
-功能特性
-- 校园宠物地图：标记宠物友好地点、搜索、便签
-- 宠物管理：添加/编辑/删除宠物卡片
-- AI 聊天：与虚拟宠物主人对话（通义千问驱动）
-- AI 健康：图片诊断（Qwen-VL）+ 文字健康/行为/饮食报告
-- 暗色模式：手动切换（header 右上角 🌙/☀️ 按钮）
-- 爪印黑客帝国：彩蛋动画（右下角 🐾 按钮）
+1. Start the Python YOLO service
+
+```bash
+cd ai-video-service
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8008
+```
+
+2. Configure the backend
+
+Add this to `backend/.env`:
+
+```bash
+VIDEO_AI_URL=http://127.0.0.1:8008/analyze-video
+```
+
+3. Start PawTrace
+
+```bash
+npm run run
+```
+
+4. Test the upload flow
+- Open the frontend.
+- Open the standalone `Video Check` tab.
+- Upload an `mp4`, `mov`, `avi`, or `webm` clip.
+- Click `Start YOLO Check`.
+
+The result includes risk level, activity type, duration, detection rate, movement score, abnormal events, timeline, advice, and this disclaimer:
+
+`This result is only a behavior-risk hint and does not constitute veterinary diagnosis.`
+
+Common Commands
+- One-command startup: `npm run run`
+- First-time initialization: `npm run init`
+- Stop all services: `npm run stop`
+- Prepare and start development: `npm run local:dev`
+- Local DB status: `npm run db:local:status`
+- Reset local DB: `npm run db:local:reset`
+- Stop local DB: `npm run db:local:stop`
+- Build all apps: `npm run build`
+- Build main web app: `npm run build:web`
+- Build showcase app: `npm run build:glass`
+- Start showcase app: `npm run dev:glass`
+
+Demo Account
+- Username: `demo`
+- Password: `demo123`
+
+Features
+- Campus pet map: pet-friendly places, search, notes
+- Pet management: create, edit, and remove pet cards
+- AI chat: virtual pet-owner conversations powered by Qwen
+- AI Assist area: Qwen-VL visual assistance plus text health, behavior, and diet reports through AI API routes
+- Video Check: uploads short videos, forwards them to the Python YOLO service, and returns activity type, risk level, events, timeline, and observation advice
+- Dark mode: manual toggle in the top-right header
+- Paw animation easter egg: bottom-right paw button

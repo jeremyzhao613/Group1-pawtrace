@@ -27,10 +27,11 @@ export const config = {
 
   DASHSCOPE_API_KEY: keys.DASHSCOPE_API_KEY,
   AI_TIMEOUT_MS: Number(process.env.AI_TIMEOUT_MS || 15000),
+  VIDEO_AI_URL: String(process.env.VIDEO_AI_URL || 'http://127.0.0.1:8008/analyze-video').trim(),
+  VIDEO_AI_TIMEOUT_MS: Number(process.env.VIDEO_AI_TIMEOUT_MS || 120000),
 
   MONITOR_MAX: Number(process.env.MONITOR_MAX || 500),
   MONITOR_API_TOKEN: String(process.env.MONITOR_API_TOKEN || '').trim(),
-  SENSOR_MAX: Number(process.env.SENSOR_MAX || 2000),
 
   repoRoot,
   backendRoot,

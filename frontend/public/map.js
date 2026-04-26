@@ -10,6 +10,23 @@
     { label: 'Stadium Track Edge', coords: { x: 50, y: 69 } },
     { label: 'South Ring Gate', coords: { x: 72, y: 79 } },
   ];
+
+  function escapeHtml(value = '') {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[char]);
+  }
+
+  function safeImageSrc(value, fallback = '') {
+    const src = String(value || '').trim();
+    if (!src) return fallback;
+    if (/^(https?:\/\/|data:image\/|\/|\.\/|\.\.\/)/i.test(src)) return src;
+    return fallback;
+  }
   const DEMO_LOCATIONS = [
     {
       id: 'canal-paw-cafe',
@@ -167,11 +184,13 @@
       this.trackedCountEl = options.trackedCountEl;
       this.locationListEl = options.locationListEl;
       this.locationCountEl = options.locationCountEl;
+      this.searchInput = options.searchInput;
       this.cardElements = options.cardElements || {};
       this.locationCard = this.cardElements.wrapper;
       this.activeMarker = null;
       this.activeTrackedPetId = null;
       this.activeLocationId = null;
+      this.searchQuery = '';
       this.locationMarkerMap = new Map();
       this.locationRowMap = new Map();
       this.trackedPetMap = new Map();
@@ -188,9 +207,11 @@
       this.renderLocationList();
       this.renderTrackedPets();
       this.attachCardHandlers();
+      this.attachSearchHandler();
       this.updateLocationCount();
-      if (this.locations.length && window.innerWidth > 768) {
-        this.showLocationCard(this.locations[0]);
+      const visibleLocations = this.getVisibleLocations();
+      if (visibleLocations.length && window.innerWidth > 768) {
+        this.showLocationCard(visibleLocations[0]);
       } else {
         this.hideLocationCard();
       }
@@ -200,8 +221,13 @@
     ensureBackground() {
       if (!this.background) return;
       if (!this.handleResize) {
-        this.handleResize = () => this.updateMapFrame();
+        this.handleResize = () => {
+          this.updateMapFrame();
+          window.requestAnimationFrame(() => this.updateMapFrame());
+        };
         window.addEventListener('resize', this.handleResize);
+        window.addEventListener('orientationchange', this.handleResize);
+        window.visualViewport?.addEventListener('resize', this.handleResize);
       }
       if (!this.resizeObserver && this.container && typeof ResizeObserver === 'function') {
         this.resizeObserver = new ResizeObserver(() => this.updateMapFrame());
@@ -269,20 +295,26 @@
       if (!this.markersLayer) return;
       this.markersLayer.innerHTML = '';
       this.locationMarkerMap.clear();
-      this.locations.forEach(location => {
+      this.activeMarker = null;
+      this.getVisibleLocations().forEach(location => {
         const marker = document.createElement('button');
         marker.type = 'button';
-        marker.className = 'map-marker';
+        marker.className = `map-marker ${location.id === this.activeLocationId ? 'map-marker--active' : ''}`;
         marker.style.left = `${location.coords?.x ?? 50}%`;
         marker.style.top = `${location.coords?.y ?? 50}%`;
         marker.setAttribute('aria-label', `${location.name} marker`);
+        const markerIcon = escapeHtml(location.markerIcon || 'fa-store');
+        const markerLabel = escapeHtml(location.markerLabel || location.name);
         marker.innerHTML = `
-          <span class="map-marker__icon" aria-hidden="true"><i class="fas ${location.markerIcon || 'fa-store'}"></i></span>
-          <span class="map-marker__label">${location.markerLabel || location.name}</span>
+          <span class="map-marker__icon" aria-hidden="true"><i class="fas ${markerIcon}"></i></span>
+          <span class="map-marker__label">${markerLabel}</span>
         `;
         marker.addEventListener('click', () => this.showLocationCard(location, marker));
         this.markersLayer.appendChild(marker);
         this.locationMarkerMap.set(location.id, marker);
+        if (location.id === this.activeLocationId) {
+          this.activeMarker = marker;
+        }
       });
     }
 
@@ -290,23 +322,65 @@
       if (!this.locationListEl) return;
       this.locationListEl.innerHTML = '';
       this.locationRowMap.clear();
-      this.locations.forEach(location => {
+      const visibleLocations = this.getVisibleLocations();
+      if (!visibleLocations.length) {
+        this.locationListEl.innerHTML = '<p class="map-empty-state">No matching spots.</p>';
+        return;
+      }
+      visibleLocations.forEach(location => {
         const entry = document.createElement('button');
         entry.type = 'button';
         entry.className = 'map-spot-row';
         entry.innerHTML = `
           <span class="flex items-center justify-between">
-            <span class="map-spot-row__title">${location.name}</span>
-            <span class="text-[10px] text-gray-500">${location.rating}</span>
+            <span class="map-spot-row__title">${escapeHtml(location.name)}</span>
+            <span class="text-[10px] text-gray-500">${escapeHtml(location.rating)}</span>
           </span>
-          <span class="map-spot-row__meta">${location.type}</span>
-          <span class="map-spot-row__foot">${location.address}</span>
+          <span class="map-spot-row__meta">${escapeHtml(location.type)}</span>
+          <span class="map-spot-row__foot">${escapeHtml(location.address)}</span>
         `;
         entry.addEventListener('click', () => this.showLocationCard(location));
         this.locationListEl.appendChild(entry);
         this.locationRowMap.set(location.id, entry);
       });
       this.updateLocationSelection();
+    }
+
+    getVisibleLocations() {
+      const query = this.searchQuery.trim().toLowerCase();
+      if (!query) return this.locations;
+      return this.locations.filter((location) => {
+        const haystack = [
+          location.name,
+          location.markerLabel,
+          location.type,
+          location.description,
+          location.rating,
+          location.address,
+          location.status,
+          ...(location.tags || []),
+          ...(location.pets || [])
+        ].join(' ').toLowerCase();
+        return haystack.includes(query);
+      });
+    }
+
+    attachSearchHandler() {
+      if (!this.searchInput) return;
+      this.searchInput.addEventListener('input', () => {
+        this.searchQuery = this.searchInput.value || '';
+        this.renderMarkers();
+        this.renderLocationList();
+        this.updateLocationCount();
+        const visibleLocations = this.getVisibleLocations();
+        if (this.activeLocationId && !visibleLocations.some((entry) => entry.id === this.activeLocationId)) {
+          this.hideLocationCard();
+          return;
+        }
+        if (!this.activeLocationId && !this.activeTrackedPetId && visibleLocations.length && window.innerWidth > 768) {
+          this.showLocationCard(visibleLocations[0]);
+        }
+      });
     }
 
     getTrackedPets() {
@@ -338,10 +412,14 @@
         node.style.top = `${record.coords?.y ?? 50}%`;
         node.title = `${record.name} · ${record.location}`;
         node.setAttribute('aria-label', `${record.name} live location`);
+        const avatar = safeImageSrc(record.avatar, '');
+        const avatarMarkup = avatar
+          ? `<img src="${escapeHtml(avatar)}" alt="${escapeHtml(record.name)}" />`
+          : escapeHtml(record.emoji);
         node.innerHTML = `
-          <span class="map-pet-circle">${record.avatar ? `<img src="${record.avatar}" alt="${record.name}" />` : record.emoji}</span>
-          <span class="map-pet-name">${record.name}</span>
-          <span class="map-pet-status">${record.location}</span>
+          <span class="map-pet-circle">${avatarMarkup}</span>
+          <span class="map-pet-name">${escapeHtml(record.name)}</span>
+          <span class="map-pet-status">${escapeHtml(record.location)}</span>
         `;
         node.addEventListener('click', () => this.focusTrackedPet(record.id));
         this.petsLayer.appendChild(node);
@@ -397,9 +475,9 @@
       this.cardElements.phone.textContent = pet.nfcContact || 'Emergency contact not set';
       this.cardElements.address.textContent = pet.location || '';
       this.cardElements.status.textContent = pet.note || '';
-      this.cardElements.tags.innerHTML = `<span class="location-tag">Tracked</span><span class="location-tag">NFC ${pet.nfcId || 'pending'}</span>`;
+      this.cardElements.tags.innerHTML = `<span class="location-tag">Tracked</span><span class="location-tag">NFC ${escapeHtml(pet.nfcId || 'pending')}</span>`;
       this.cardElements.pets.innerHTML = pet.latestVitals
-        ? `<span class="location-tag location-tag--emphasis">Temp ${pet.latestVitals.temperature}°C</span><span class="location-tag location-tag--emphasis">HR ${pet.latestVitals.heartRate} bpm</span>`
+        ? `<span class="location-tag location-tag--emphasis">Temp ${escapeHtml(pet.latestVitals.temperature)}°C</span><span class="location-tag location-tag--emphasis">HR ${escapeHtml(pet.latestVitals.heartRate)} bpm</span>`
         : '<span class="location-tag location-tag--emphasis">Waiting for vitals</span>';
       const linkButton = this.cardElements.linkButton;
       if (linkButton) {
@@ -418,12 +496,19 @@
         const row = document.createElement('button');
         row.type = 'button';
         row.className = `tracked-pet-row ${this.activeTrackedPetId === pet.id ? 'active' : ''}`;
+        const avatar = safeImageSrc(pet.avatar, '');
+        const avatarMarkup = avatar
+          ? `<img src="${escapeHtml(avatar)}" alt="${escapeHtml(pet.name)}" />`
+          : escapeHtml(pet.emoji);
+        const vitals = pet.latestVitals
+          ? `Temp ${pet.latestVitals.temperature}°C · HR ${pet.latestVitals.heartRate} bpm`
+          : 'No vitals yet';
         row.innerHTML = `
-          <span class="tracked-pet-row__avatar">${pet.avatar ? `<img src="${pet.avatar}" alt="${pet.name}" />` : pet.emoji}</span>
+          <span class="tracked-pet-row__avatar">${avatarMarkup}</span>
           <span class="tracked-pet-row__meta">
-            <span class="tracked-pet-row__title">${pet.name}</span>
-            <span class="tracked-pet-row__subtitle">${pet.location}</span>
-            <span class="tracked-pet-row__subtitle">${pet.latestVitals ? `Temp ${pet.latestVitals.temperature}°C · HR ${pet.latestVitals.heartRate} bpm` : 'No vitals yet'}</span>
+            <span class="tracked-pet-row__title">${escapeHtml(pet.name)}</span>
+            <span class="tracked-pet-row__subtitle">${escapeHtml(pet.location)}</span>
+            <span class="tracked-pet-row__subtitle">${escapeHtml(vitals)}</span>
           </span>
         `;
         row.addEventListener('click', () => this.focusTrackedPet(pet.id));
@@ -477,10 +562,10 @@
       this.cardElements.address.textContent = location.address || '';
       this.cardElements.status.textContent = location.status || '';
       this.cardElements.tags.innerHTML = (location.tags || [])
-        .map(tag => `<span class="location-tag">${tag}</span>`)
+        .map(tag => `<span class="location-tag">${escapeHtml(tag)}</span>`)
         .join('');
       this.cardElements.pets.innerHTML = (location.pets || [])
-        .map(pet => `<span class="location-tag location-tag--emphasis">${pet}</span>`)
+        .map(pet => `<span class="location-tag location-tag--emphasis">${escapeHtml(pet)}</span>`)
         .join('');
       if (this.cardElements.linkButton) {
         this.cardElements.linkButton.innerHTML = '<i class="fas fa-directions mr-1"></i>Visit this spot';
@@ -530,7 +615,10 @@
 
     updateLocationCount() {
       if (!this.locationCountEl) return;
-      this.locationCountEl.textContent = `${this.locations.length} spots`;
+      const visibleCount = this.getVisibleLocations().length;
+      this.locationCountEl.textContent = this.searchQuery.trim()
+        ? `${visibleCount}/${this.locations.length} spots`
+        : `${this.locations.length} spots`;
     }
 
     syncMapView() {
@@ -543,8 +631,9 @@
           return;
         }
         if (this.activeLocationId) {
-          const location = this.locations.find((entry) => entry.id === this.activeLocationId);
+          const location = this.getVisibleLocations().find((entry) => entry.id === this.activeLocationId);
           if (location) this.showLocationCard(location);
+          else this.hideLocationCard();
         }
       });
     }

@@ -78,72 +78,55 @@
     </symbol>
   </svg>
   
-  <span class="halo-pulse w-[520px] h-[520px] bg-primary/40 top-10 left-6 rounded-full"></span>
-  <span class="halo-pulse w-[420px] h-[420px] bg-secondary/60 bottom-10 right-16 rounded-full"></span>
-  <span class="halo-pulse halo-soft-pink w-[460px] h-[460px] -bottom-32 left-1/3 rounded-full"></span>
   <!-- LOGIN SCREEN -->
   <div id="login-screen" class="relative min-h-screen flex items-center justify-center">
-    <div class="login-bg-layer"></div>
-    <span class="login-orb a"></span>
-    <span class="login-orb b"></span>
-    <span class="login-orb c"></span>
-    <div class="login-shell relative grid gap-12 lg:grid-cols-[1.2fr,0.8fr] items-center z-10">
-      <!-- Left: marketing copy -->
-      <div class="space-y-10 scroll-section order-1">
-        <div class="flex flex-wrap items-center gap-4 text-[11px] uppercase tracking-[0.35em] text-gray-500 login-animate" style="--delay:0.05s">
-          <span class="px-4 py-1 rounded-full bg-white/60 border border-white/70 hero-badge">PawTrace</span>
+    <div class="login-shell relative z-10">
+      <div class="app-browser-toolbar login-browser-toolbar" aria-hidden="true">
+        <div class="app-window-controls">
+          <span></span><span></span><span></span>
         </div>
-        <div class="space-y-5 login-animate" style="--delay:0.12s">
+        <div class="app-address-bar">
+          <strong>PawTrace</strong>
+          <span>/ campus pet map</span>
+        </div>
+        <div class="app-toolbar-status">Live</div>
+      </div>
+      <div class="login-browser-body grid gap-12 lg:grid-cols-[1.2fr,0.8fr] items-center">
+      <div class="login-intro space-y-8 scroll-section order-1">
+        <div class="space-y-5 login-animate" style="--delay:0.08s">
+          <span class="inline-flex px-4 py-1 rounded-full bg-white/60 border border-white/70 hero-badge text-[11px] uppercase tracking-[0.35em] text-gray-500">PawTrace</span>
           <h1 class="text-4xl md:text-5xl font-semibold leading-tight text-slate-900 tracking-tight">
-            PawTrace · pets near you
+            Campus pet map
           </h1>
-          <p class="text-base md:text-lg text-gray-600 max-w-2xl">
-            Map nearby pets, meet owners, and spot pet-friendly places in one clean view.
+          <p class="text-base md:text-lg text-gray-600 max-w-xl">
+            Live pet locations, owner contacts, and care notes in one calm workspace.
           </p>
           <div class="flex flex-wrap gap-2">
-            <span class="login-chip">Live map</span>
-            <span class="login-chip">Pet cards</span>
-            <span class="login-chip">Chat</span>
-            <span class="login-chip">AI</span>
+            <span class="login-chip">12 pets nearby</span>
+            <span class="login-chip">5 open spots</span>
+            <span class="login-chip">3 care alerts</span>
           </div>
         </div>
-        <div class="rounded-3xl border border-white/60 bg-white/60 p-5 space-y-4 mt-6 shadow-[0_20px_45px_rgba(31,59,66,0.25)] login-animate" style="--delay:0.36s">
-          <div id="core-focus" class="true-focus" aria-hidden="true">
-            <span class="true-focus-word">Dynamic</span>
-            <span class="true-focus-word">Map</span>
-            <span class="true-focus-word">Instant</span>
-            <span class="true-focus-word">Chat</span>
-            <span class="true-focus-word">Pet</span>
-            <span class="true-focus-word">Records</span>
-            <span class="true-focus-word">Nearby</span>
-            <span class="true-focus-word">Pets</span>
-            <span class="true-focus-word">Discovery</span>
+        <div class="login-preview-panel login-animate" style="--delay:0.2s" aria-hidden="true">
+          <div class="login-preview-map">
+            <img src="/assets/m1.jpg" alt="" loading="eager" decoding="async" />
+            <span class="login-map-pin pin-a"><i class="fas fa-paw"></i></span>
+            <span class="login-map-pin pin-b"><i class="fas fa-mug-hot"></i></span>
+            <span class="login-map-pin pin-c"><i class="fas fa-location-dot"></i></span>
           </div>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <article class="pixel-card space-y-2 login-animate motion-tilt" style="--delay:0.42s">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Dynamic Map</p>
-              <p class="text-sm text-gray-700">Pinch/zoom a live pet map with locations and routes.</p>
-            </article>
-            <article class="pixel-card space-y-2 login-animate motion-tilt" style="--delay:0.46s">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Instant Chat</p>
-              <p class="text-sm text-gray-700">DM owners, swap photos, jump to map in one tap.</p>
-            </article>
-            <article class="pixel-card space-y-2 login-animate motion-tilt" style="--delay:0.5s">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Pet Records</p>
-              <p class="text-sm text-gray-700">Profiles with photos, breeds, shots, habits, and tags.</p>
-            </article>
-            <article class="pixel-card space-y-2 login-animate motion-tilt" style="--delay:0.54s">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Pet Social</p>
-              <p class="text-sm text-gray-700">Add friends, form groups, share quick updates.</p>
-            </article>
-            <article class="pixel-card space-y-2 login-animate motion-tilt" style="--delay:0.58s">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Nearby Pets</p>
-              <p class="text-sm text-gray-700">See nearby pets and find walking buddies.</p>
-            </article>
-            <article class="pixel-card space-y-2 login-animate motion-tilt" style="--delay:0.62s">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Pet Discovery</p>
-              <p class="text-sm text-gray-700">Cues guide you to friendly spots and safe paths.</p>
-            </article>
+          <div class="login-preview-strip">
+            <div>
+              <p>Mocha</p>
+              <span>Central Ring · 38.2°C</span>
+            </div>
+            <div>
+              <p>Canal Paw Cafe</p>
+              <span>Open · water bowls</span>
+            </div>
+            <div>
+              <p>Pixel</p>
+              <span>Track Edge · owner online</span>
+            </div>
           </div>
         </div>
       </div>
@@ -213,15 +196,28 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
   </div>
 
   <!-- MAIN APP -->
   <div id="app-root" class="hidden min-h-screen px-4 sm:px-6 py-10 lg:px-12 relative z-10">
-    <span class="halo-pulse hidden lg:block w-[480px] h-[480px] bg-primary/30 -top-16 right-0 rounded-full"></span>
-    <span class="halo-pulse hidden md:block w-[360px] h-[360px] bg-secondary/50 bottom-0 left-10 rounded-full"></span>
-    <span class="halo-pulse halo-soft-blossom hidden xl:block w-[420px] h-[420px] -top-10 left-40 rounded-full"></span>
     <div class="app-shell-wrapper relative z-10 w-full max-w-6xl mx-auto">
+      <div class="app-browser-frame">
+        <div class="app-browser-toolbar">
+          <div class="app-window-controls" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="app-address-bar" aria-label="Current PawTrace workspace">
+            <strong>PawTrace</strong>
+            <span>/</span>
+            <span id="app-address-section">campus-map</span>
+          </div>
+          <button type="button" class="app-toolbar-action" onclick="openProfileEditModal()" aria-label="Open profile">
+            <i class="fas fa-user"></i>
+          </button>
+        </div>
+        <div class="app-browser-content">
       <div class="app-shell relative z-10 flex flex-col lg:flex-row gap-6 w-full">
           <aside class="glass-panel app-sidebar">
             <div class="flex items-center gap-3">
@@ -251,6 +247,10 @@
             <button class="app-nav-button app-tab tab-shimmer" data-tab="health" aria-label="Health Monitoring">
               <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-heart"></use></svg>
               <span>Health</span>
+            </button>
+            <button class="app-nav-button app-tab tab-shimmer" data-tab="behaviour" aria-label="Video Behaviour Health Check">
+              <i class="fas fa-video text-primary text-lg"></i>
+              <span>Video Check</span>
             </button>
             <button class="app-nav-button app-tab tab-shimmer" data-tab="ai" aria-label="AI Assist">
               <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-ai"></use></svg>
@@ -282,10 +282,10 @@
               <div class="page-copy app-topbar-copy">
                 <p id="header-tab-eyebrow" class="text-[10px] uppercase tracking-[0.3em] text-gray-500">PawTrace</p>
                 <h2 id="header-tab-title" class="text-lg font-semibold text-slate-900 leading-tight">Campus Map</h2>
-                <p id="header-tab-subtitle" class="text-xs text-gray-600">Live locations, pet cards, chat, and AI tools in one shell.</p>
+                <p id="header-tab-subtitle" class="text-xs text-gray-600">Map · Pets · Chat · Health · AI</p>
               </div>
               <div class="flex items-center gap-3">
-                <button id="header-dark-toggle" type="button" class="dark-toggle-inline" title="切换亮/暗模式">🌙</button>
+                <button id="header-dark-toggle" type="button" class="dark-toggle-inline" title="Switch light/dark mode">🌙</button>
                 <div class="hidden sm:flex flex-col text-right text-sm space-y-0.5">
                   <span id="current-user-name" class="font-semibold">User</span>
                   <span id="header-connection-status" class="text-[11px] text-gray-500">Connected</span>
@@ -308,22 +308,20 @@
                   <i class="fas fa-map-marked-alt text-primary"></i>
                   Taicang Pet Map
                 </h2>
-                <p class="text-xs text-gray-600">
-                  Click markers to discover pet-friendly spots on campus while keeping notes like a campus planner.
-                </p>
+                <p class="text-xs text-gray-600">Campus spots, live pet pins, and owner context.</p>
               </div>
             </div>
             <div class="grid map-layout gap-4 items-start">
               <div class="space-y-4">
-                <div class="pixel-card shadow-sm">
-                  <div class="flex items-center gap-2 text-[11px] text-gray-500">
+                <div class="pixel-card shadow-sm map-search-card">
+                  <label for="map-search" class="flex items-center gap-2 text-[11px] text-gray-500">
                     <i class="fas fa-search text-primary"></i>
-                    <span>Search pet friendly locations...</span>
-                  </div>
-                  <input class="pixel-input mt-3 text-xs w-full" placeholder="e.g. best park or café" />
+                    <span>Filter campus spots</span>
+                  </label>
+                  <input id="map-search" class="pixel-input mt-3 text-xs w-full" placeholder="Cafe, lawn, supplies..." />
                 </div>
                 <div class="map-stage">
-                  <div class="pixel-card relative overflow-hidden map-container magic-bento-halo" id="map-container">
+                  <div class="pixel-card relative overflow-hidden map-container" id="map-container">
                     <img
                       id="map-background"
                       class="absolute inset-0 h-full w-full object-cover object-center pointer-events-none select-none map-frame-layer"
@@ -390,7 +388,7 @@
                     </h3>
                     <span id="tracked-pet-count" class="text-[10px] text-gray-500">0 tracked</span>
                   </div>
-                  <p class="text-[11px] text-gray-500">Live location pins for your own pets appear here and on the map.</p>
+                  <p class="text-[11px] text-gray-500">Live pins from saved pet cards.</p>
                   <div id="pet-location-feed" class="space-y-2 text-[11px] text-gray-700 pr-1 custom-scrollbar"></div>
                 </div>
                 <div class="pixel-card space-y-2 map-location-card">
@@ -414,7 +412,7 @@
                   <i class="fas fa-paw text-primary"></i>
                   Pets
                 </h2>
-                <p class="text-xs text-gray-600">Community updates and your pack timeline.</p>
+                <p class="text-xs text-gray-600">Community feed and your pet cards.</p>
               </div>
               <div class="page-actions">
                 <button id="btn-pet-checkin" class="pixel-button flex items-center gap-2 text-xs">
@@ -432,7 +430,7 @@
                     <h3 class="font-semibold text-sm flex items-center gap-2">
                       <i class="fas fa-users text-primary"></i>Community Pets
                     </h3>
-                    <p class="text-[11px] text-gray-500">Tap a card to chat with the owner.</p>
+                    <p class="text-[11px] text-gray-500">Owner chat is one tap away.</p>
                   </div>
                   <span class="text-[10px] text-gray-500">6 pals online</span>
                 </div>
@@ -443,7 +441,7 @@
                     <div class="skeleton-card flex-col"><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line mt-2"></div><div class="skeleton skeleton-line short"></div></div>
                     <div class="skeleton-card flex-col hidden xl:flex"><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line mt-2"></div><div class="skeleton skeleton-line short"></div></div>
                   </div>
-                  <div id="community-error" class="data-error hidden"><i class="fas fa-exclamation-circle"></i><p>加载社区宠物失败</p><button class="retry-btn" onclick="location.reload()">重试</button></div>
+                  <div id="community-error" class="data-error hidden"><i class="fas fa-exclamation-circle"></i><p>Failed to load community pets</p><button class="retry-btn" onclick="location.reload()">Retry</button></div>
                 </div>
               </div>
               <div class="pixel-card space-y-3 pet-scroll-card">
@@ -452,9 +450,9 @@
                     <h3 class="font-semibold text-sm flex items-center gap-2">
                       <i class="fas fa-heart text-primary"></i>My Pets
                     </h3>
-                    <p class="text-[11px] text-gray-500">Only visible to you</p>
+                    <p class="text-[11px] text-gray-500">Private list</p>
                   </div>
-                  <span class="text-[10px] text-gray-500">Stay organized</span>
+                  <span class="text-[10px] text-gray-500">NFC ready</span>
                 </div>
                 <div class="pet-scroll-body space-y-3">
                   <div id="pet-list" class="grid gap-3 text-xs">
@@ -465,12 +463,12 @@
                     <div class="skeleton-card"><div class="skeleton skeleton-circle"></div><div class="flex-1"><div class="skeleton skeleton-line medium"></div><div class="skeleton skeleton-line short"></div></div></div>
                   </div>
                   <p id="pet-empty" class="text-[11px] text-gray-500 italic hidden">
-                    It looks empty. Add a pet and their info will appear here.
+                    Add a pet to start tracking.
                   </p>
                     <div class="space-y-2 text-xs">
                       <div class="flex items-center justify-between">
-                      <h4 class="font-semibold text-[11px] text-gray-500">Pet profile builder</h4>
-                      <span id="pet-form-subtitle" class="text-[10px] text-gray-500">Ready when you need it</span>
+                      <h4 class="font-semibold text-[11px] text-gray-500">Add pet</h4>
+                      <span id="pet-form-subtitle" class="text-[10px] text-gray-500">Collapsed</span>
                     </div>
                     <form id="pet-form" class="space-y-3 hidden">
                       <div class="flex items-center justify-between gap-2">
@@ -543,9 +541,7 @@
                     <i class="fas fa-comments text-primary"></i>
                     Friends Chat
                   </h2>
-                  <p class="text-xs text-gray-600">
-                    Connect with your pet-loving friends in the community.
-                  </p>
+                  <p class="text-xs text-gray-600">Friends, pet context, and image sharing.</p>
                 </div>
               </div>
               <div class="page-actions">
@@ -579,7 +575,7 @@
                     <i class="fas fa-paw text-primary"></i>Friend's Pet Info
                   </h3>
                   <div id="chat-pet-info" class="space-y-2 text-xs">
-                    <p id="chat-pet-info-placeholder" class="text-gray-500">Select a friend to see their pet details.</p>
+                    <p id="chat-pet-info-placeholder" class="text-gray-500">Choose a friend.</p>
                     <div id="chat-pet-details" class="hidden space-y-1">
                       <p id="chat-pet-name" class="font-semibold text-sm"></p>
                       <p id="chat-pet-summary" class="text-[11px] text-gray-600"></p>
@@ -640,84 +636,255 @@
 
           <!-- PROFILE TAB -->
           <div id="tab-profile" class="tab-page hidden scroll-section page-section">
+            <div class="page-stack">
+              <div class="page-head">
+                <div class="page-copy">
+                  <h2 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-user text-primary"></i>
+                    My Profile
+                  </h2>
+                  <p class="text-xs text-gray-600">Owner card, pet list, settings.</p>
+                </div>
+              </div>
+
+              <div class="profile-layout text-xs">
+                <div class="profile-main-column">
+                  <section class="pixel-card profile-owner-card">
+                    <img id="profile-avatar" loading="lazy" decoding="async" class="profile-avatar"
+                         src="https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png"
+                         alt="Profile avatar" />
+                    <div class="profile-owner-body">
+                      <div class="profile-name-row">
+                        <span id="profile-name" class="font-semibold text-sm">User</span>
+                        <span class="profile-tag">Pet lover</span>
+                      </div>
+                      <p id="profile-username" class="text-[11px] text-gray-600">@user</p>
+                      <p id="profile-bio" class="text-[11px] text-gray-700">Welcome to PawTrace! Share your pet journey here.</p>
+                      <p id="profile-campus" class="text-[11px] text-gray-600"></p>
+                      <p id="profile-contact" class="text-[11px] text-gray-600"></p>
+                      <p id="profile-star-sign" class="text-[11px] text-gray-600"></p>
+                      <div class="profile-focus">
+                        <p class="font-semibold text-[11px]">My pet focus</p>
+                        <p id="profile-main-pet" class="text-[11px] text-gray-700"></p>
+                        <p id="profile-pet-notes" class="text-[11px] text-gray-500"></p>
+                      </div>
+                      <div class="profile-stats">
+                        <div>
+                          <p class="font-semibold">Pets</p>
+                          <p id="profile-pet-count">0</p>
+                        </div>
+                        <div>
+                          <p class="font-semibold">Friends</p>
+                          <p id="profile-friends-count">0</p>
+                        </div>
+                        <div>
+                          <p class="font-semibold">Campus</p>
+                          <p>Taicang</p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="pixel-card profile-pets-card">
+                    <h3 class="font-semibold flex items-center gap-2">
+                      <i class="fas fa-dog text-primary"></i>Manage My Pets
+                    </h3>
+                    <p class="text-[11px] text-gray-600">Active pets from your private list.</p>
+                    <div id="profile-pet-manager" class="space-y-2 pr-1 custom-scrollbar"></div>
+                  </section>
+                </div>
+
+                <div class="profile-side-column">
+                  <section class="pixel-card profile-settings-card">
+                    <h3 class="font-semibold text-xs flex items-center gap-2">
+                      <i class="fas fa-cog text-primary"></i>Settings
+                    </h3>
+                    <button id="btn-edit-profile" class="pixel-button w-full flex items-center justify-center gap-2 text-[11px]">
+                      <i class="fas fa-edit"></i><span>Edit Profile</span>
+                    </button>
+                    <button class="pixel-button w-full flex items-center justify-center gap-2 text-[11px] bg-red-500 hover:bg-red-600 text-white" data-action="logout">
+                      <i class="fas fa-sign-out-alt"></i><span>Log out</span>
+                    </button>
+                  </section>
+
+                  <section class="pixel-card profile-insight-card">
+                    <div class="flex items-center justify-between gap-3">
+                      <h3 class="font-semibold text-xs flex items-center gap-2">
+                        <i class="fas fa-moon text-primary"></i>Pet Behavior Insight
+                      </h3>
+                      <button id="btn-refresh-pet-insight" class="text-[10px] text-primary underline" type="button">
+                        Ask AI
+                      </button>
+                    </div>
+                    <p id="pet-insight-text" class="text-[11px] text-gray-700">
+                      Save your profile to generate personalized behavior tips.
+                    </p>
+                  </section>
+
+                  <section class="pixel-card profile-snapshot-card">
+                    <h3 class="font-semibold text-xs flex items-center gap-2">
+                      <i class="fas fa-chart-line text-primary"></i>Care Snapshot
+                    </h3>
+                    <div class="profile-snapshot-grid">
+                      <div>
+                        <span>Pets</span>
+                        <strong id="profile-side-pet-count">0</strong>
+                      </div>
+                      <div>
+                        <span>Friends</span>
+                        <strong id="profile-side-friend-count">0</strong>
+                      </div>
+                      <div>
+                        <span>Main focus</span>
+                        <strong id="profile-side-focus">Not set</strong>
+                      </div>
+                    </div>
+                    <p class="text-[11px] text-gray-600">
+                      Keep profile details and pet cards updated so PawTrace can show cleaner care context across the app.
+                    </p>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        <!-- VIDEO BEHAVIOUR TAB -->
+        <div id="tab-behaviour" class="tab-page hidden scroll-section page-section">
+          <div class="page-stack">
             <div class="page-head">
               <div class="page-copy">
                 <h2 class="text-xl font-bold flex items-center gap-2">
-                  <i class="fas fa-user text-primary"></i>
-                  My Profile
+                  <i class="fas fa-video text-primary"></i>
+                  Video Behaviour Health Check
                 </h2>
-                <p class="text-xs text-gray-600">Owner card, pet summary, and settings in a single mobile-friendly layout.</p>
+                <p class="text-xs text-gray-600">Upload a pet video, review behaviour segments, and show observation prompts without judging the cause.</p>
+              </div>
+              <div id="behaviour-risk-summary" class="behaviour-risk-summary behaviour-risk-summary--medium">
+                <span>Risk</span>
+                <strong>Medium</strong>
               </div>
             </div>
-            <div class="grid md:grid-cols-[1.3fr,1fr] gap-4 text-xs profile-layout">
-          <div class="pixel-card flex gap-4">
-            <img id="profile-avatar" loading="lazy" decoding="async" class="w-16 h-16 rounded-full object-cover pixel-border bg-secondary"
-                 src="https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png"
-                 alt="Profile avatar" />
-            <div class="space-y-1 flex-1">
-              <div class="flex items-center gap-2">
-                <span id="profile-name" class="font-semibold text-sm">User</span>
-                <span class="px-2 py-0.5 rounded-full bg-secondary text-[10px] font-semibold">Pet lover</span>
-              </div>
-              <p id="profile-username" class="text-[11px] text-gray-600">@user</p>
-              <p id="profile-bio" class="text-[11px] text-gray-700">
-                Welcome to PawTrace! Share your pet journey here.
-                </p>
-              <p id="profile-campus" class="text-[11px] text-gray-600 mt-1"></p>
-              <p id="profile-contact" class="text-[11px] text-gray-600"></p>
-              <p id="profile-star-sign" class="text-[11px] text-gray-600"></p>
-              <div class="border-t border-primary/25 pt-2 mt-2 space-y-1">
-                <p class="font-semibold text-[11px]">My pet focus</p>
-                <p id="profile-main-pet" class="text-[11px] text-gray-700"></p>
-                <p id="profile-pet-notes" class="text-[11px] text-gray-500"></p>
-              </div>
-              <div class="flex gap-3 text-[11px] mt-2">
-                <div>
-                  <p class="font-semibold">Pets</p>
-                  <p id="profile-pet-count">0</p>
+
+            <div class="behaviour-dashboard">
+              <section class="pixel-card behaviour-upload-card">
+                <div class="behaviour-card-head">
+                  <div>
+                    <p class="behaviour-kicker">Video Upload</p>
+                    <h3>Daily pet clip</h3>
+                  </div>
+                  <span id="behaviour-analysis-status" class="behaviour-status-chip">YOLO ready</span>
                 </div>
-                <div>
-                  <p class="font-semibold">Friends</p>
-                  <p id="profile-friends-count">0</p>
-                </div>
-                <div>
-                      <p class="font-semibold">Campus</p>
-                      <p>Taicang</p>
-                    </div>
+                <div id="behaviour-dropzone" class="behaviour-dropzone" role="button" tabindex="0" aria-label="Upload pet video">
+                  <input id="behaviour-video-input" type="file" accept=".mp4,.mov,.avi,.webm,video/mp4,video/quicktime,video/x-msvideo,video/webm" class="hidden" />
+                  <video id="behaviour-video-preview" class="hidden" controls playsinline muted></video>
+                  <div id="behaviour-upload-empty" class="behaviour-upload-empty">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                    <p>Upload pet routine video</p>
+                    <span>MP4, MOV, AVI, or WebM · daily walking, resting, grooming</span>
                   </div>
                 </div>
-              </div>
-          <div class="pixel-card space-y-2">
-            <h3 class="font-semibold text-xs mb-2 flex items-center gap-2">
-              <i class="fas fa-cog text-primary"></i>Settings
-            </h3>
-            <button id="btn-edit-profile" class="pixel-button w-full flex items-center justify-center gap-2 text-[11px]">
-              <i class="fas fa-edit"></i><span>Edit Profile</span>
-            </button>
-            <button class="pixel-button w-full flex items-center justify-center gap-2 text-[11px] bg-red-500 hover:bg-red-600 text-white" data-action="logout">
-              <i class="fas fa-sign-out-alt"></i><span>Log out</span>
-            </button>
-          </div>
-          <div class="pixel-card space-y-2 text-xs">
-            <h3 class="font-semibold flex items-center gap-2">
-              <i class="fas fa-dog text-primary"></i>Manage My Pets
-            </h3>
-            <p class="text-[11px] text-gray-600">All pets you add appear here. Remove any that are no longer active.</p>
-            <div id="profile-pet-manager" class="space-y-2 pr-1 custom-scrollbar"></div>
-          </div>
-          <div class="pixel-card space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-xs flex items-center gap-2">
-                <i class="fas fa-moon text-primary"></i>Pet Behavior Insight
-              </h3>
-              <button id="btn-refresh-pet-insight" class="text-[10px] text-primary underline" type="button">
-                Ask AI
-              </button>
+                <div class="behaviour-upload-actions">
+                  <button id="behaviour-upload-trigger" type="button" class="pixel-button text-xs flex items-center gap-2">
+                    <i class="fas fa-upload"></i><span>Choose Video</span>
+                  </button>
+                  <button id="behaviour-demo-run" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-white/70 flex items-center gap-2">
+                    <i class="fas fa-wand-magic-sparkles"></i><span>Start YOLO Check</span>
+                  </button>
+                </div>
+                <div class="behaviour-detection-grid">
+                  <div>
+                    <span>Detected pet</span>
+                    <strong id="behaviour-detected-pet">Dog · 92%</strong>
+                  </div>
+                  <div>
+                    <span>Duration</span>
+                    <strong id="behaviour-video-duration">60 min</strong>
+                  </div>
+                  <div>
+                    <span>Detection rate</span>
+                    <strong id="behaviour-detection-rate">92%</strong>
+                  </div>
+                  <div>
+                    <span>Movement score</span>
+                    <strong id="behaviour-movement-score">42</strong>
+                  </div>
+                  <div>
+                    <span>Abnormal events</span>
+                    <strong id="behaviour-event-count">6</strong>
+                  </div>
+                </div>
+              </section>
+
+              <section class="pixel-card behaviour-timeline-card">
+                <div class="behaviour-card-head">
+                  <div>
+                    <p class="behaviour-kicker">Behaviour Timeline</p>
+                    <h3>60min activity scan</h3>
+                  </div>
+                  <div class="behaviour-legend">
+                    <span><i class="behaviour-dot behaviour-dot--rest"></i>Rest</span>
+                    <span><i class="behaviour-dot behaviour-dot--walk"></i>Walk</span>
+                    <span><i class="behaviour-dot behaviour-dot--groom"></i>Groom</span>
+                    <span><i class="behaviour-dot behaviour-dot--alert"></i>Alert</span>
+                  </div>
+                </div>
+                <div id="behaviour-timeline" class="behaviour-timeline" aria-label="Behaviour timeline"></div>
+                <div class="behaviour-time-axis">
+                  <span>0</span><span>15</span><span>30</span><span>45</span><span>60</span>
+                </div>
+                <div id="behaviour-alert-markers" class="behaviour-alert-markers"></div>
+              </section>
+
+              <section class="pixel-card behaviour-events-card">
+                <div class="behaviour-card-head">
+                  <div>
+                    <p class="behaviour-kicker">Abnormal Motion</p>
+                    <h3>Observation prompts</h3>
+                  </div>
+                  <span class="behaviour-status-chip behaviour-status-chip--high">Needs review</span>
+                </div>
+                <div id="behaviour-event-list" class="behaviour-event-list"></div>
+              </section>
+
+              <section class="pixel-card behaviour-risk-card">
+                <div class="behaviour-card-head">
+                  <div>
+                    <p class="behaviour-kicker">Risk Level</p>
+                    <h3 id="behaviour-risk-title">Medium risk</h3>
+                  </div>
+                  <span id="behaviour-risk-badge" class="behaviour-risk-badge behaviour-risk-badge--medium">Medium</span>
+                </div>
+                <div class="behaviour-risk-meter" aria-hidden="true">
+                  <span class="active">Low</span>
+                  <span class="active">Medium</span>
+                  <span>High</span>
+                </div>
+                <p id="behaviour-risk-copy" class="text-[11px] text-gray-600">
+                  Behaviour changes are observation signals only. Record frequency and context before drawing conclusions.
+                </p>
+              </section>
+
+              <section class="pixel-card behaviour-advice-card">
+                <div class="behaviour-card-head">
+                  <div>
+                    <p class="behaviour-kicker">Observation Advice</p>
+                    <h3>What to record next</h3>
+                  </div>
+                </div>
+                <div id="behaviour-advice-list" class="behaviour-advice-list"></div>
+              </section>
+
+              <section class="pixel-card behaviour-history-card">
+                <div class="behaviour-card-head">
+                  <div>
+                    <p class="behaviour-kicker">History Compare</p>
+                    <h3>This week vs last week</h3>
+                  </div>
+                  <span class="behaviour-status-chip">7-day view</span>
+                </div>
+                <div id="behaviour-history-bars" class="behaviour-history-bars"></div>
+              </section>
             </div>
-            <p id="pet-insight-text" class="text-[11px] text-gray-700">
-              Save your profile to generate personalized behavior tips.
-            </p>
-          </div>
           </div>
         </div>
 
@@ -730,12 +897,7 @@
                   <i class="fas fa-heart-pulse text-primary"></i>
                   Health Monitoring
                 </h2>
-                <p class="text-xs text-gray-600">
-                  Track temperature and heart rate in one place, with the full history visible in the page instead of nested scroll blocks.
-                </p>
-              </div>
-              <div class="pixel-card px-4 py-3 text-[11px] text-gray-600">
-                Live vitals follow the pet you select below.
+                <p class="text-xs text-gray-600">Latest vitals, trend charts, and manual readings.</p>
               </div>
             </div>
 
@@ -747,32 +909,32 @@
                       <h3 class="font-semibold text-base flex items-center gap-2">
                         <i class="fas fa-heart-pulse text-primary"></i>Vitals Overview
                       </h3>
-                      <p class="text-[11px] text-gray-600">Record manual readings and keep the latest summary visible without mixing it into AI tools.</p>
+                      <p class="text-[11px] text-gray-600">Manual readings feed the summary and trend cards.</p>
                     </div>
                     <div class="flex items-center gap-2 health-pet-select-row">
                       <label for="health-pet-select" class="text-[11px] text-gray-500">Pet</label>
                       <select id="health-pet-select" class="pixel-input text-xs health-pet-select"></select>
                     </div>
                   </div>
-                  <div class="grid sm:grid-cols-3 gap-3">
-                    <div class="pixel-card space-y-1">
+                  <div class="grid sm:grid-cols-3 gap-3 health-summary-grid">
+                    <div class="metric-tile space-y-1">
                       <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Temperature</p>
                       <p id="health-latest-temp" class="text-2xl font-semibold text-dark">--</p>
                       <p id="health-temp-status" class="text-[11px] text-gray-500">No reading yet</p>
                     </div>
-                    <div class="pixel-card space-y-1">
+                    <div class="metric-tile space-y-1">
                       <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Heart Rate</p>
                       <p id="health-latest-heart" class="text-2xl font-semibold text-dark">--</p>
                       <p id="health-heart-status" class="text-[11px] text-gray-500">No reading yet</p>
                     </div>
-                    <div class="pixel-card space-y-1">
+                    <div class="metric-tile space-y-1">
                       <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">AI Status</p>
                       <p id="health-vitals-state" class="text-lg font-semibold text-dark">Waiting</p>
                       <p id="health-vitals-summary" class="text-[11px] text-gray-500">Add a reading to generate a quick status.</p>
                     </div>
                   </div>
-                  <div class="grid lg:grid-cols-2 gap-3">
-                    <div class="pixel-card health-chart-card space-y-3">
+                  <div class="grid lg:grid-cols-2 gap-3 health-trend-card-grid">
+                    <div class="metric-panel health-chart-card space-y-3">
                       <div class="flex items-start justify-between gap-3">
                         <div>
                           <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Temperature Trend</p>
@@ -796,7 +958,7 @@
                         </div>
                       </div>
                     </div>
-                    <div class="pixel-card health-chart-card space-y-3">
+                    <div class="metric-panel health-chart-card space-y-3">
                       <div class="flex items-start justify-between gap-3">
                         <div>
                           <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Heart Rate Trend</p>
@@ -823,21 +985,35 @@
                   </div>
                 </div>
 
+              </div>
+
+              <div class="space-y-4">
+                <div class="pixel-card space-y-3">
+                  <div class="flex items-center justify-between">
+                    <h4 class="font-semibold text-sm">Recent Vitals</h4>
+                    <span id="health-history-count" class="text-[10px] text-gray-500">0 records</span>
+                  </div>
+                  <div id="health-history-scroll" class="pr-1 custom-scrollbar">
+                    <div id="health-history-list" class="space-y-2 text-[11px] text-gray-700"></div>
+                    <p id="health-history-empty" class="text-[11px] text-gray-400 italic">No temperature or heart-rate records yet.</p>
+                  </div>
+                </div>
+
                 <div class="pixel-card space-y-3">
                   <div class="flex items-center justify-between">
                     <h4 class="font-semibold text-sm">Record New Reading</h4>
                     <span class="text-[10px] text-gray-500">Manual input</span>
                   </div>
-                  <div class="grid sm:grid-cols-2 gap-3">
+                  <div class="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
                     <div>
-                      <label class="block text-[10px] uppercase tracking-[0.25em] text-gray-500 mb-2">Temperature</label>
+                      <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">Temperature</label>
                       <div class="relative">
                         <input id="health-input-temp" type="number" step="0.1" min="34" max="43" class="pixel-input text-xs pr-14" placeholder="38.5" />
                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">°C</span>
                       </div>
                     </div>
                     <div>
-                      <label class="block text-[10px] uppercase tracking-[0.25em] text-gray-500 mb-2">Heart Rate</label>
+                      <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">Heart Rate</label>
                       <div class="relative">
                         <input id="health-input-heart" type="number" min="40" max="240" class="pixel-input text-xs pr-16" placeholder="118" />
                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">bpm</span>
@@ -853,17 +1029,6 @@
                     </button>
                   </div>
                   <p id="health-form-status" class="text-[11px] text-primary hidden"></p>
-                </div>
-              </div>
-
-              <div class="pixel-card space-y-3">
-                <div class="flex items-center justify-between">
-                  <h4 class="font-semibold text-sm">Recent Vitals</h4>
-                  <span id="health-history-count" class="text-[10px] text-gray-500">0 records</span>
-                </div>
-                <div id="health-history-scroll" class="pr-1 custom-scrollbar">
-                  <div id="health-history-list" class="space-y-2 text-[11px] text-gray-700"></div>
-                  <p id="health-history-empty" class="text-[11px] text-gray-400 italic">No temperature or heart-rate records yet.</p>
                 </div>
               </div>
             </div>
@@ -884,10 +1049,7 @@
                 </button>
               </div>
               <div id="ai-intro-body" class="space-y-2">
-                <p class="text-sm text-gray-600 max-w-3xl">
-                  Use <strong>Visual Diagnosis</strong> to upload a photo (or open the camera) and let Qwen Vision scan posture, skin, or injury issues.
-                  Text services generate health, behavior, and diet reports from your pet profile, while manual vitals now live in the dedicated Health page.
-                </p>
+                <p class="text-sm text-gray-600 max-w-3xl">AI API photo checks and text reports stay separated from vitals.</p>
               </div>
               </div>
             </div>
@@ -895,14 +1057,14 @@
             <!-- Service Grid -->
             <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-[10px] sm:text-[11px]">
               <button type="button" class="ai-service-card ai-service-card-mobile text-left relative group ring-1 ring-primary/40 bg-white" data-ai-service="diagnosis" id="card-diagnosis">
-                <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm z-10">NEW</span>
+                <span class="absolute top-2 right-2 bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm z-10">NEW</span>
                 <div class="flex items-center gap-2 text-sm font-semibold text-dark">
                   <div class="ai-card-icon w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-primary text-white shadow-md">
                     <i class="fas fa-microscope text-sm"></i>
                   </div>
                   <span>Visual Diagnosis</span>
                 </div>
-                <p class="ai-card-desc text-gray-600 leading-snug">Photo + symptoms for Qwen Vision to flag posture, skin, or injury signs.</p>
+                <p class="ai-card-desc text-gray-600 leading-snug">Photo + symptoms.</p>
               </button>
               <button type="button" class="ai-service-card ai-service-card-mobile text-left" data-ai-service="health">
                 <div class="flex items-center gap-2 text-sm font-semibold text-dark">
@@ -911,7 +1073,7 @@
                   </div>
                   <span>Health Report</span>
                 </div>
-                <p class="ai-card-desc text-gray-600 leading-snug">Weight, vaccines, milestones, and next steps in one report.</p>
+                <p class="ai-card-desc text-gray-600 leading-snug">Weight, vaccines, next steps.</p>
               </button>
               <button type="button" class="ai-service-card ai-service-card-mobile text-left" data-ai-service="behavior">
                 <div class="flex items-center gap-2 text-sm font-semibold text-dark">
@@ -920,7 +1082,7 @@
                   </div>
                   <span>Behavior Insight</span>
                 </div>
-                <p class="ai-card-desc text-gray-600 leading-snug">Spot behavior shifts and get targeted training nudges.</p>
+                <p class="ai-card-desc text-gray-600 leading-snug">Behavior shifts and training cues.</p>
               </button>
               <button type="button" class="ai-service-card ai-service-card-mobile text-left" data-ai-service="diet">
                 <div class="flex items-center gap-2 text-sm font-semibold text-dark">
@@ -929,12 +1091,12 @@
                   </div>
                   <span>Diet Recommendation</span>
                 </div>
-                <p class="ai-card-desc text-gray-600 leading-snug">Weekly menu tuned to body condition and activity level.</p>
+                <p class="ai-card-desc text-gray-600 leading-snug">Menu tuned to activity level.</p>
               </button>
             </div>
 
             <!-- Visual Diagnosis Layout -->
-            <div id="diag-panel" class="glass-panel bg-white/60 border-white/60 flex flex-col gap-4">
+            <div id="diag-panel" class="ai-workbench bg-white/60 border-white/60 flex flex-col gap-4">
               <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                   <div class="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center shadow-md">
@@ -1072,6 +1234,8 @@
         </div>
         </section>
         </main>
+        </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1095,15 +1259,26 @@
         <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-heart"></use></svg>
         <span>Health</span>
       </button>
-      <button type="button" class="app-tab tab-shimmer" data-tab="ai" aria-label="Open AI assist tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-ai"></use></svg>
-        <span>AI</span>
-      </button>
-      <button type="button" class="app-tab tab-shimmer" data-tab="profile" aria-label="Open profile tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-user"></use></svg>
-        <span>Profile</span>
+      <button id="mobile-more-button" type="button" class="mobile-more-trigger tab-shimmer" aria-label="Open more PawTrace tools" aria-expanded="false" aria-controls="mobile-more-sheet">
+        <i class="fas fa-ellipsis text-primary"></i>
+        <span>More</span>
       </button>
     </div>
+  </div>
+
+  <div id="mobile-more-sheet" class="mobile-more-sheet hidden fixed z-50 lg:hidden" aria-hidden="true">
+    <button type="button" class="mobile-more-item" data-mobile-tab="behaviour">
+      <i class="fas fa-video text-primary"></i>
+      <span>Video Check</span>
+    </button>
+    <button type="button" class="mobile-more-item" data-mobile-tab="ai">
+      <svg class="w-4 h-4 text-primary" aria-hidden="true"><use href="#ico-ai"></use></svg>
+      <span>AI Assist</span>
+    </button>
+    <button type="button" class="mobile-more-item" data-mobile-tab="profile">
+      <svg class="w-4 h-4 text-primary" aria-hidden="true"><use href="#ico-user"></use></svg>
+      <span>Profile</span>
+    </button>
   </div>
 
   <!-- PROFILE EDIT MODAL -->
@@ -1250,7 +1425,7 @@
       document.documentElement.style.colorScheme=dark?'dark':'light';
       if(themeMeta){themeMeta.setAttribute('content',dark?'#081217':'#fff3f8');}
       var icon=dark?'☀️':'🌙';
-      var title=dark?'切换到亮色模式':'切换到暗色模式';
+      var title=dark?'Switch to light mode':'Switch to dark mode';
       document.querySelectorAll('.dark-toggle-inline').forEach(function(b){b.textContent=icon;b.title=title;b.setAttribute('aria-pressed',dark?'true':'false');});
       try{localStorage.setItem(KEY,dark?'1':'0');}catch(e){}
     }

@@ -5,6 +5,9 @@ import { config } from '../config.js';
 export function requireMonitorAuth(req: Request, res: Response, next: NextFunction) {
   const expected = config.MONITOR_API_TOKEN;
   if (!expected) {
+    if (config.NODE_ENV !== 'production') {
+      return next();
+    }
     return res.status(503).json({ error: 'Monitor API token is not configured' });
   }
 

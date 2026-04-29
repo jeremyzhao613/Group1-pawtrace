@@ -34,6 +34,8 @@ export const config = {
 
   MONITOR_MAX: Number(process.env.MONITOR_MAX || 500),
   MONITOR_API_TOKEN: String(process.env.MONITOR_API_TOKEN || '').trim(),
+  DEVICE_INGEST_TOKEN: String(process.env.DEVICE_INGEST_TOKEN || '').trim(),
+  DEVICE_DEFAULT_USER: String(process.env.DEVICE_DEFAULT_USER || 'demo').trim(),
 
   repoRoot,
   backendRoot,

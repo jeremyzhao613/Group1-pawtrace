@@ -137,9 +137,26 @@ Important variables:
 - `VIDEO_AI_URL`: Python YOLO video analysis service URL.
 - `VIDEO_AI_TIMEOUT_MS`: backend timeout for video analysis requests.
 - `MONITOR_API_TOKEN`: optional protection for `/api/monitor/*`.
+- `DEVICE_INGEST_TOKEN`: shared token for M5Stack `/api/device/telemetry` ingest.
 - `SERVE_WEB=0`: default API-only backend.
 - `SERVE_WEB=1`: serve built frontend assets from the backend for single-port deployment.
 - `WEB_APP=frontend | glass`: selects which built web app to serve when `SERVE_WEB=1`.
+
+## M5Stack Telemetry
+
+M5StickC Plus 1.1 with GPS v1.1 and Heart Rate HAT can POST JSON telemetry to:
+
+```text
+POST /api/device/telemetry
+```
+
+The frontend polls:
+
+```text
+GET /api/device/telemetry/latest
+```
+
+and merges the latest device data into the map, health panel, and pet cards. The backend persists telemetry to PostgreSQL and keeps a temporary latest-value cache for fast display. See `docs/pawtrace-m5stack-telemetry.md`.
 
 ## Pet Video Behavior Analysis
 

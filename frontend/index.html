@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>PawTrace · Pet Map & Social</title>
+  <title>PawTrace · Campus Pet Care</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta id="theme-color-meta" name="theme-color" content="#fff3f8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -43,30 +43,20 @@
   <!-- LOGIN SCREEN -->
   <div id="login-screen" class="relative min-h-screen flex items-center justify-center">
     <div class="login-shell relative z-10">
-      <div class="app-browser-toolbar login-browser-toolbar" aria-hidden="true">
-        <div class="app-window-controls">
-          <span></span><span></span><span></span>
-        </div>
-        <div class="app-address-bar">
-          <strong>PawTrace</strong>
-          <span>/ campus pet map</span>
-        </div>
-        <div class="app-toolbar-status">Live</div>
-      </div>
       <div class="login-browser-body grid gap-12 lg:grid-cols-[1.2fr,0.8fr] items-center">
       <div class="login-intro space-y-8 scroll-section order-1">
         <div class="space-y-5 login-animate" style="--delay:0.08s">
           <span class="inline-flex px-4 py-1 rounded-full bg-white/60 border border-white/70 hero-badge text-[11px] uppercase tracking-[0.35em] text-gray-500">PawTrace</span>
           <h1 class="text-4xl md:text-5xl font-semibold leading-tight text-slate-900 tracking-tight">
-            Campus pet map
+            Campus pet care hub
           </h1>
           <p class="text-base md:text-lg text-gray-600 max-w-xl">
-            Live pet locations, owner contacts, and care notes in one calm workspace.
+            Track pet locations, care notes, and owner contacts in one workspace.
           </p>
           <div class="flex flex-wrap gap-2">
-            <span class="login-chip">12 pets nearby</span>
-            <span class="login-chip">5 open spots</span>
-            <span class="login-chip">3 care alerts</span>
+            <span class="login-chip">Campus map</span>
+            <span class="login-chip">Emergency cards</span>
+            <span class="login-chip">Care notes</span>
           </div>
         </div>
         <div class="login-preview-panel login-animate" style="--delay:0.2s" aria-hidden="true">
@@ -78,16 +68,16 @@
           </div>
           <div class="login-preview-strip">
             <div>
-              <p>Mocha</p>
-              <span>Central Ring · 38.2°C</span>
+              <p>Pet location</p>
+              <span>Saved card · latest care note</span>
             </div>
             <div>
-              <p>Canal Paw Cafe</p>
-              <span>Open · water bowls</span>
+              <p>Care spot</p>
+              <span>Water refill · rest area</span>
             </div>
             <div>
-              <p>Pixel</p>
-              <span>Track Edge · owner online</span>
+              <p>Owner contact</p>
+              <span>Emergency details in one place</span>
             </div>
           </div>
         </div>
@@ -98,19 +88,19 @@
           <div class="relative">
             <div class="flex items-center justify-between mb-6">
               <div>
-                <p class="text-xs uppercase tracking-[0.35em] text-gray-500">Pet Map</p>
-                <h2 class="text-2xl font-semibold text-slate-900">Welcome back</h2>
+                <p class="text-xs uppercase tracking-[0.35em] text-gray-500">PawTrace</p>
+                <h2 class="text-2xl font-semibold text-slate-900">Sign in</h2>
               </div>
               <div class="text-right text-xs text-gray-500">
-                <p class="font-semibold text-primary">Live nearby</p>
-                <p>Map · Pets · Chat</p>
+                <p class="font-semibold text-primary">Care workspace</p>
+                <p>Map · Pets · Health</p>
               </div>
             </div>
             <div class="flex text-xs mb-6 bg-white/50 rounded-full p-1">
-              <button id="tab-login" class="flex-1 py-2 text-center rounded-full bg-primary text-dark font-semibold tab-shimmer">
+              <button id="tab-login" class="flex-1 py-2 text-center rounded-full bg-primary text-dark font-semibold">
                 Log in
               </button>
-              <button id="tab-register" class="flex-1 py-2 text-center rounded-full text-gray-600 hover:bg-white/70 tab-shimmer">
+              <button id="tab-register" class="flex-1 py-2 text-center rounded-full text-gray-600 hover:bg-white/70">
                 Create account
               </button>
             </div>
@@ -151,9 +141,9 @@
             <p id="auth-message" class="text-xs text-red-500 mt-4 h-4"></p>
             <div class="mt-6 space-y-2 text-center">
               <button id="btn-guest-access" type="button" class="pixel-button w-full flex items-center justify-center gap-2 bg-white/70 text-dark hover:bg-white">
-                <i class="fas fa-compass"></i><span>Explore as guest</span>
+                <i class="fas fa-compass"></i><span>Continue as guest</span>
               </button>
-              <p class="text-[11px] text-gray-500">Jump into the pet map instantly.</p>
+              <p class="text-[11px] text-gray-500">Open PawTrace without creating an account.</p>
             </div>
           </div>
         </div>
@@ -181,40 +171,38 @@
           <div class="mt-8 rounded-3xl bg-white/70 border border-white/60 p-5 backdrop-blur-2xl">
             <p class="text-[10px] uppercase tracking-[0.4em] text-gray-500 mb-3">Navigate</p>
           <div class="flex flex-col gap-2">
-            <button class="app-nav-button app-tab active tab-shimmer" data-tab="map" aria-label="Map">
+            <button class="app-nav-button app-tab active" data-tab="map" aria-label="Map">
               <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-map"></use></svg>
               <span>Map</span>
             </button>
-              <button class="app-nav-button app-tab tab-shimmer" data-tab="pets" aria-label="Pets">
+              <button class="app-nav-button app-tab" data-tab="pets" aria-label="Pets">
                 <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-paw"></use></svg>
                 <span>Pets</span>
               </button>
-              <button class="app-nav-button app-tab tab-shimmer" data-tab="chat" aria-label="Chat">
+              <button class="app-nav-button app-tab" data-tab="chat" aria-label="Chat">
                 <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-chat"></use></svg>
                 <span>Chat</span>
               </button>
-            <button class="app-nav-button app-tab tab-shimmer" data-tab="health" aria-label="Health Monitoring">
+            <button class="app-nav-button app-tab" data-tab="health" aria-label="Health Monitoring">
               <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-heart"></use></svg>
               <span>Health</span>
             </button>
-            <button class="app-nav-button app-tab tab-shimmer" data-tab="behaviour" aria-label="Video Behaviour Health Check">
+            <button class="app-nav-button app-tab" data-tab="behaviour" aria-label="Video Behavior Check">
               <i class="fas fa-video text-primary text-lg"></i>
               <span>Video Check</span>
             </button>
-            <button class="app-nav-button app-tab tab-shimmer" data-tab="ai" aria-label="AI Assist">
+            <button class="app-nav-button app-tab" data-tab="ai" aria-label="AI Assist">
               <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-ai"></use></svg>
               <span>AI Assist</span>
             </button>
-            <button class="app-nav-button app-tab tab-shimmer" data-tab="profile" aria-label="Profile">
+            <button class="app-nav-button app-tab" data-tab="profile" aria-label="Profile">
               <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-user"></use></svg>
               <span>Profile</span>
             </button>
           </div>
         </div>
-          <div class="mt-auto rounded-3xl bg-white/70 border border-white/60 p-5">
-            <p class="text-[10px] uppercase tracking-[0.4em] text-gray-500">Now</p>
-            <p class="text-lg font-semibold text-slate-900" id="sidebar-user-name">User</p>
-            <p class="text-sm text-gray-500 mb-3">Taicang Campus</p>
+          <div class="mt-auto rounded-3xl bg-white/70 border border-white/60 p-5 space-y-3">
+            <p class="text-[10px] uppercase tracking-[0.4em] text-gray-500">Account</p>
             <div class="flex flex-col gap-2">
               <button class="px-4 py-2 rounded-full bg-primary/70 text-dark text-sm font-semibold shadow-lg shadow-primary/30" onclick="openProfileEditModal()">
                 Edit profile card
@@ -255,9 +243,9 @@
               <div class="page-copy">
                 <h2 class="text-xl font-bold flex items-center gap-2">
                   <i class="fas fa-map-marked-alt text-primary"></i>
-                  Taicang Pet Map
+                  Live GPS Pet Map
                 </h2>
-                <p class="text-xs text-gray-600">Campus spots, live pet pins, and owner context.</p>
+                <p class="text-xs text-gray-600">Real-map pet location from M5StickC Wi-Fi telemetry.</p>
               </div>
             </div>
             <div class="grid map-layout gap-4 items-start">
@@ -265,7 +253,7 @@
                 <div class="pixel-card shadow-sm map-search-card">
                   <label for="map-search" class="flex items-center gap-2 text-[11px] text-gray-500">
                     <i class="fas fa-search text-primary"></i>
-                    <span>Filter campus spots</span>
+                    <span>Filter pet-friendly spots</span>
                   </label>
                   <input id="map-search" class="pixel-input mt-3 text-xs w-full" placeholder="Cafe, lawn, supplies..." />
                 </div>
@@ -280,6 +268,17 @@
                       loading="eager"
                       decoding="async"
                     />
+                    <div id="real-map-tiles" class="real-map-tiles hidden" aria-hidden="true"></div>
+                    <iframe
+                      id="real-map-frame"
+                      class="real-map-frame hidden"
+                      title="PawTrace live GPS map"
+                      loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                    ></iframe>
+                    <a id="real-map-link" class="real-map-link hidden" href="#" target="_blank" rel="noreferrer">
+                      Open real map
+                    </a>
                     <div id="map-markers-layer" class="absolute inset-0 map-frame-layer"></div>
                     <div id="map-pets-layer" class="absolute inset-0 map-frame-layer"></div>
                   </div>
@@ -312,24 +311,13 @@
                       </p>
                     </div>
                     <p id="loc-status" class="text-[10px] text-gray-600 italic mb-2"></p>
-                    <button id="loc-link" class="pixel-button w-full text-[11px] mt-1 opacity-40" type="button" disabled>
-                      <i class="fas fa-directions mr-1"></i>Visit this spot
+                    <button id="loc-link" class="pixel-button w-full text-[11px] mt-1 opacity-40 hidden" type="button" disabled>
+                      <i class="fas fa-directions mr-1"></i>Open spot details
                     </button>
                   </div>
                 </div>
               </div>
               <div class="map-sidebar">
-                <div class="pixel-card space-y-2">
-                  <h3 class="font-semibold text-sm">Pet Reminders</h3>
-                  <div class="flex items-center gap-2 text-[11px]">
-                    <span>🗓️</span>
-                    Xiao Hei needs vaccination
-                  </div>
-                  <div class="flex items-center gap-2 text-[11px]">
-                    <span>🎂</span>
-                    Xiao Bai's birthday in 3 days
-                  </div>
-                </div>
                 <div class="pixel-card space-y-3">
                   <div class="flex items-center justify-between">
                     <h3 class="font-semibold text-sm flex items-center gap-2">
@@ -337,7 +325,7 @@
                     </h3>
                     <span id="tracked-pet-count" class="text-[10px] text-gray-500">0 tracked</span>
                   </div>
-                  <p class="text-[11px] text-gray-500">Live pins from saved pet cards.</p>
+                  <p class="text-[11px] text-gray-500">Live GPS, geofence, battery, Wi-Fi, and upload status from the device packet.</p>
                   <div id="pet-location-feed" class="space-y-2 text-[11px] text-gray-700 pr-1 custom-scrollbar"></div>
                 </div>
                 <div class="pixel-card space-y-2 map-location-card">
@@ -381,7 +369,7 @@
                     </h3>
                     <p class="text-[11px] text-gray-500">Owner chat is one tap away.</p>
                   </div>
-                  <span class="text-[10px] text-gray-500">6 pals online</span>
+                  <span class="text-[10px] text-gray-500">Updated list</span>
                 </div>
                 <div class="pet-scroll-body">
                   <div id="community-pet-feed" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
@@ -401,7 +389,7 @@
                     </h3>
                     <p class="text-[11px] text-gray-500">Private list</p>
                   </div>
-                  <span class="text-[10px] text-gray-500">NFC ready</span>
+                  <span class="text-[10px] text-gray-500">Emergency card</span>
                 </div>
                 <div class="pet-scroll-body space-y-3">
                   <div id="pet-list" class="grid gap-3 text-xs">
@@ -460,9 +448,9 @@
                           </div>
                           <div class="grid md:grid-cols-2 gap-2">
                             <input id="new-pet-location" class="pixel-input text-xs" placeholder="Current location (e.g. North Lawn)" />
-                            <input id="new-pet-nfc-contact" class="pixel-input text-xs" placeholder="NFC emergency contact" />
+                            <input id="new-pet-nfc-contact" class="pixel-input text-xs" placeholder="Emergency contact" />
                           </div>
-                          <textarea id="new-pet-nfc-note" class="pixel-input text-xs h-20 resize-none" placeholder="NFC care notes (allergies, temperament, pickup note)"></textarea>
+                          <textarea id="new-pet-nfc-note" class="pixel-input text-xs h-20 resize-none" placeholder="Emergency care notes (allergies, temperament, pickup note)"></textarea>
                           <input id="new-pet-traits" class="pixel-input text-xs" placeholder="Traits (comma separated)" />
                         </div>
                       </div>
@@ -697,20 +685,20 @@
             </div>
           </div>
 
-        <!-- VIDEO BEHAVIOUR TAB -->
+        <!-- VIDEO BEHAVIOR TAB -->
         <div id="tab-behaviour" class="tab-page hidden scroll-section page-section">
           <div class="page-stack">
             <div class="page-head">
               <div class="page-copy">
                 <h2 class="text-xl font-bold flex items-center gap-2">
                   <i class="fas fa-video text-primary"></i>
-                  Video Behaviour Health Check
+                  Video Behavior Check
                 </h2>
-                <p class="text-xs text-gray-600">Upload a pet video, review behaviour segments, and show observation prompts without judging the cause.</p>
+                <p class="text-xs text-gray-600">Upload a pet video and review movement notes for follow-up observation.</p>
               </div>
-              <div id="behaviour-risk-summary" class="behaviour-risk-summary behaviour-risk-summary--medium">
+              <div id="behaviour-risk-summary" class="behaviour-risk-summary behaviour-risk-summary--low">
                 <span>Risk</span>
-                <strong>Medium</strong>
+                <strong>--</strong>
               </div>
             </div>
 
@@ -721,7 +709,7 @@
                     <p class="behaviour-kicker">Video Upload</p>
                     <h3>Daily pet clip</h3>
                   </div>
-                  <span id="behaviour-analysis-status" class="behaviour-status-chip">YOLO ready</span>
+                  <span id="behaviour-analysis-status" class="behaviour-status-chip">Ready</span>
                 </div>
                 <div id="behaviour-dropzone" class="behaviour-dropzone" role="button" tabindex="0" aria-label="Upload pet video">
                   <input id="behaviour-video-input" type="file" accept=".mp4,.mov,.avi,.webm,video/mp4,video/quicktime,video/x-msvideo,video/webm" class="hidden" />
@@ -737,29 +725,29 @@
                     <i class="fas fa-upload"></i><span>Choose Video</span>
                   </button>
                   <button id="behaviour-demo-run" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-white/70 flex items-center gap-2">
-                    <i class="fas fa-wand-magic-sparkles"></i><span>Start YOLO Check</span>
+                    <i class="fas fa-wand-magic-sparkles"></i><span>Start Video Check</span>
                   </button>
                 </div>
                 <div class="behaviour-detection-grid">
                   <div>
                     <span>Detected pet</span>
-                    <strong id="behaviour-detected-pet">Dog · 92%</strong>
+                    <strong id="behaviour-detected-pet">--</strong>
                   </div>
                   <div>
                     <span>Duration</span>
-                    <strong id="behaviour-video-duration">60 min</strong>
+                    <strong id="behaviour-video-duration">--</strong>
                   </div>
                   <div>
                     <span>Detection rate</span>
-                    <strong id="behaviour-detection-rate">92%</strong>
+                    <strong id="behaviour-detection-rate">--</strong>
                   </div>
                   <div>
                     <span>Movement score</span>
-                    <strong id="behaviour-movement-score">42</strong>
+                    <strong id="behaviour-movement-score">--</strong>
                   </div>
                   <div>
                     <span>Abnormal events</span>
-                    <strong id="behaviour-event-count">6</strong>
+                    <strong id="behaviour-event-count">0</strong>
                   </div>
                 </div>
               </section>
@@ -767,8 +755,8 @@
               <section class="pixel-card behaviour-timeline-card">
                 <div class="behaviour-card-head">
                   <div>
-                    <p class="behaviour-kicker">Behaviour Timeline</p>
-                    <h3>60min activity scan</h3>
+                    <p class="behaviour-kicker">Behavior Timeline</p>
+                    <h3>Waiting for video</h3>
                   </div>
                   <div class="behaviour-legend">
                     <span><i class="behaviour-dot behaviour-dot--rest"></i>Rest</span>
@@ -777,7 +765,7 @@
                     <span><i class="behaviour-dot behaviour-dot--alert"></i>Alert</span>
                   </div>
                 </div>
-                <div id="behaviour-timeline" class="behaviour-timeline" aria-label="Behaviour timeline"></div>
+                <div id="behaviour-timeline" class="behaviour-timeline" aria-label="Behavior timeline"></div>
                 <div class="behaviour-time-axis">
                   <span>0</span><span>15</span><span>30</span><span>45</span><span>60</span>
                 </div>
@@ -790,7 +778,7 @@
                     <p class="behaviour-kicker">Abnormal Motion</p>
                     <h3>Observation prompts</h3>
                   </div>
-                  <span class="behaviour-status-chip behaviour-status-chip--high">Needs review</span>
+                  <span id="behaviour-event-status" class="behaviour-status-chip">Pending video</span>
                 </div>
                 <div id="behaviour-event-list" class="behaviour-event-list"></div>
               </section>
@@ -799,17 +787,17 @@
                 <div class="behaviour-card-head">
                   <div>
                     <p class="behaviour-kicker">Risk Level</p>
-                    <h3 id="behaviour-risk-title">Medium risk</h3>
+                    <h3 id="behaviour-risk-title">Ready for upload</h3>
                   </div>
-                  <span id="behaviour-risk-badge" class="behaviour-risk-badge behaviour-risk-badge--medium">Medium</span>
+                  <span id="behaviour-risk-badge" class="behaviour-risk-badge behaviour-risk-badge--low">Not checked</span>
                 </div>
                 <div class="behaviour-risk-meter" aria-hidden="true">
-                  <span class="active">Low</span>
-                  <span class="active">Medium</span>
+                  <span>Low</span>
+                  <span>Medium</span>
                   <span>High</span>
                 </div>
                 <p id="behaviour-risk-copy" class="text-[11px] text-gray-600">
-                  Behaviour changes are observation signals only. Record frequency and context before drawing conclusions.
+                  Upload a clip to generate behavior observation prompts.
                 </p>
               </section>
 
@@ -827,9 +815,9 @@
                 <div class="behaviour-card-head">
                   <div>
                     <p class="behaviour-kicker">History Compare</p>
-                    <h3>This week vs last week</h3>
+                    <h3>After first check</h3>
                   </div>
-                  <span class="behaviour-status-chip">7-day view</span>
+                  <span class="behaviour-status-chip">No data yet</span>
                 </div>
                 <div id="behaviour-history-bars" class="behaviour-history-bars"></div>
               </section>
@@ -844,42 +832,80 @@
               <div class="page-copy">
                 <h2 class="text-xl font-bold flex items-center gap-2">
                   <i class="fas fa-heart-pulse text-primary"></i>
-                  Health Monitoring
+                  Health Monitor
                 </h2>
-                <p class="text-xs text-gray-600">Latest vitals, trend charts, and manual readings.</p>
+                <p class="text-xs text-gray-600">Temperature, heart rate, SpO2, activity, status, and recent health trends.</p>
               </div>
             </div>
 
-            <div id="health-monitor-panel" class="grid lg:grid-cols-[1.02fr,0.98fr] gap-4 items-stretch">
+            <div id="health-monitor-panel" class="health-monitor-grid health-monitor-grid--compact">
               <div class="space-y-4">
-                <div class="pixel-card space-y-4">
+                <div class="pixel-card health-packet-card health-overview-card space-y-4">
                   <div class="flex items-center justify-between gap-3 flex-wrap">
                     <div>
                       <h3 class="font-semibold text-base flex items-center gap-2">
-                        <i class="fas fa-heart-pulse text-primary"></i>Vitals Overview
+                        <i class="fas fa-notes-medical text-primary"></i>Current Health
                       </h3>
-                      <p class="text-[11px] text-gray-600">Manual readings feed the summary and trend cards.</p>
+                      <p class="text-[11px] text-gray-600">Only the care signals that affect the pet health view.</p>
                     </div>
                     <div class="flex items-center gap-2 health-pet-select-row">
                       <label for="health-pet-select" class="text-[11px] text-gray-500">Pet</label>
                       <select id="health-pet-select" class="pixel-input text-xs health-pet-select"></select>
                     </div>
                   </div>
-                  <div class="grid sm:grid-cols-3 gap-3 health-summary-grid">
-                    <div class="metric-tile space-y-1">
-                      <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Temperature</p>
+
+                  <div class="health-summary-callout">
+                    <div class="health-summary-icon" aria-hidden="true">
+                      <i class="fas fa-heart-circle-check"></i>
+                    </div>
+                    <div>
+                      <p class="health-data-label">Health status</p>
+                      <h3 id="health-vitals-state" class="text-lg font-semibold text-dark">Waiting</h3>
+                      <p id="health-vitals-summary" class="text-[11px] text-gray-600">Add a reading to generate a quick status.</p>
+                    </div>
+                  </div>
+
+                  <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 health-summary-grid">
+                    <div class="metric-tile health-metric-tile space-y-1">
+                      <div class="health-metric-head">
+                        <i class="fas fa-temperature-half text-primary"></i>
+                        <p>Temperature</p>
+                      </div>
                       <p id="health-latest-temp" class="text-2xl font-semibold text-dark">--</p>
                       <p id="health-temp-status" class="text-[11px] text-gray-500">No reading yet</p>
                     </div>
-                    <div class="metric-tile space-y-1">
-                      <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Heart Rate</p>
+                    <div class="metric-tile health-metric-tile space-y-1">
+                      <div class="health-metric-head">
+                        <i class="fas fa-heart-pulse text-primary"></i>
+                        <p>Heart Rate</p>
+                      </div>
                       <p id="health-latest-heart" class="text-2xl font-semibold text-dark">--</p>
                       <p id="health-heart-status" class="text-[11px] text-gray-500">No reading yet</p>
                     </div>
-                    <div class="metric-tile space-y-1">
-                      <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">AI Status</p>
-                      <p id="health-vitals-state" class="text-lg font-semibold text-dark">Waiting</p>
-                      <p id="health-vitals-summary" class="text-[11px] text-gray-500">Add a reading to generate a quick status.</p>
+                    <div class="metric-tile health-metric-tile space-y-1">
+                      <div class="health-metric-head">
+                        <i class="fas fa-droplet text-primary"></i>
+                        <p>SpO2</p>
+                      </div>
+                      <p id="health-latest-spo2" class="text-2xl font-semibold text-dark">--</p>
+                      <p id="health-spo2-status" class="text-[11px] text-gray-500">No reading yet</p>
+                    </div>
+                    <div class="metric-tile health-metric-tile space-y-1">
+                      <div class="health-metric-head">
+                        <i class="fas fa-person-running text-primary"></i>
+                        <p>Activity</p>
+                      </div>
+                      <p id="health-activity-state" class="text-lg font-semibold text-dark">Waiting</p>
+                      <p id="health-activity-score" class="text-[11px] text-gray-500">No activity data</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pixel-card space-y-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 class="font-semibold text-sm">Vitals Trend</h4>
+                      <p class="text-[11px] text-gray-600">Temperature and heart rate history.</p>
                     </div>
                   </div>
                   <div class="grid lg:grid-cols-2 gap-3 health-trend-card-grid">
@@ -939,18 +965,22 @@
               <div class="space-y-4">
                 <div class="pixel-card space-y-3">
                   <div class="flex items-center justify-between">
-                    <h4 class="font-semibold text-sm">Recent Vitals</h4>
+                    <h4 class="font-semibold text-sm flex items-center gap-2">
+                      <i class="fas fa-clock-rotate-left text-primary"></i>Recent Health Records
+                    </h4>
                     <span id="health-history-count" class="text-[10px] text-gray-500">0 records</span>
                   </div>
                   <div id="health-history-scroll" class="pr-1 custom-scrollbar">
                     <div id="health-history-list" class="space-y-2 text-[11px] text-gray-700"></div>
-                    <p id="health-history-empty" class="text-[11px] text-gray-400 italic">No temperature or heart-rate records yet.</p>
+                    <p id="health-history-empty" class="text-[11px] text-gray-400 italic">No health records yet.</p>
                   </div>
                 </div>
 
                 <div class="pixel-card space-y-3">
                   <div class="flex items-center justify-between">
-                    <h4 class="font-semibold text-sm">Record New Reading</h4>
+                    <h4 class="font-semibold text-sm flex items-center gap-2">
+                      <i class="fas fa-pen-to-square text-primary"></i>Manual Reading
+                    </h4>
                     <span class="text-[10px] text-gray-500">Manual input</span>
                   </div>
                   <div class="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
@@ -973,9 +1003,6 @@
                     <button id="health-save-reading" type="button" class="pixel-button text-xs flex items-center gap-2">
                       <i class="fas fa-wave-square"></i><span>Save Reading</span>
                     </button>
-                    <button id="health-fill-demo" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-white/70 flex items-center gap-2">
-                      <i class="fas fa-sparkles"></i><span>Use Demo Data</span>
-                    </button>
                   </div>
                   <p id="health-form-status" class="text-[11px] text-primary hidden"></p>
                 </div>
@@ -989,7 +1016,7 @@
         <div class="pixel-card ai-panel space-y-4">
             <div class="page-head page-head--compact">
               <div class="page-copy">
-              <span class="ai-ribbon uppercase text-dark">AI Care Engine · Qwen Vision + Text</span>
+              <span class="ai-ribbon uppercase text-dark">AI Care Assistant · Photo + Text</span>
               <div class="flex flex-wrap items-baseline gap-3">
                 <h2 class="text-2xl md:text-3xl font-semibold text-dark">AI Assist</h2>
                 <span class="px-3 py-1 rounded-full bg-primary/15 text-xs font-semibold text-primary">Visual + Text</span>
@@ -998,7 +1025,7 @@
                 </button>
               </div>
               <div id="ai-intro-body" class="space-y-2">
-                <p class="text-sm text-gray-600 max-w-3xl">AI API photo checks and text reports stay separated from vitals.</p>
+                <p class="text-sm text-gray-600 max-w-3xl">Use photo checks and written notes to organize care observations.</p>
               </div>
               </div>
             </div>
@@ -1006,12 +1033,11 @@
             <!-- Service Grid -->
             <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-[10px] sm:text-[11px]">
               <button type="button" class="ai-service-card ai-service-card-mobile text-left relative group ring-1 ring-primary/40 bg-white" data-ai-service="diagnosis" id="card-diagnosis">
-                <span class="absolute top-2 right-2 bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm z-10">NEW</span>
                 <div class="flex items-center gap-2 text-sm font-semibold text-dark">
                   <div class="ai-card-icon w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-primary text-white shadow-md">
                     <i class="fas fa-microscope text-sm"></i>
                   </div>
-                  <span>Visual Diagnosis</span>
+                  <span>Photo Check</span>
                 </div>
                 <p class="ai-card-desc text-gray-600 leading-snug">Photo + symptoms.</p>
               </button>
@@ -1038,13 +1064,13 @@
                   <div class="ai-card-icon w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-primary/10 text-primary shadow-sm">
                     <i class="fas fa-carrot"></i>
                   </div>
-                  <span>Diet Recommendation</span>
+                  <span>Diet Guide</span>
                 </div>
                 <p class="ai-card-desc text-gray-600 leading-snug">Menu tuned to activity level.</p>
               </button>
             </div>
 
-            <!-- Visual Diagnosis Layout -->
+            <!-- Photo check layout -->
             <div id="diag-panel" class="ai-workbench bg-white/60 border-white/60 flex flex-col gap-4">
               <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2">
@@ -1052,12 +1078,12 @@
                     <i class="fas fa-camera-retro"></i>
                   </div>
                   <div>
-                    <p class="text-xs uppercase tracking-[0.3em] text-gray-500 font-semibold">Visual Diagnosis</p>
-                    <p class="text-sm text-gray-700">Qwen Vision · photo + symptoms</p>
+                    <p class="text-xs uppercase tracking-[0.3em] text-gray-500 font-semibold">Photo Check</p>
+                    <p class="text-sm text-gray-700">Photo + symptoms</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-2 text-[11px] text-gray-500">
-                  <i class="fas fa-circle text-green-500 text-[8px]"></i>Camera ready · microphone not used
+                  <i class="fas fa-circle text-green-500 text-[8px]"></i>Photo input ready
                 </div>
               </div>
               <div class="grid lg:grid-cols-2 gap-4">
@@ -1073,7 +1099,7 @@
                       </div>
                       <div>
                         <p class="text-sm font-semibold text-dark">Upload or take a photo</p>
-                        <p class="text-[10px] text-gray-400 mt-1">Tap to browse or open the camera</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Choose a clear photo of your pet</p>
                       </div>
                     </div>
                   </div>
@@ -1083,7 +1109,7 @@
                   </div>
                   <div class="flex flex-wrap gap-2">
                     <button id="diag-run" type="button" class="pixel-button flex items-center gap-2 text-sm">
-                      <i class="fas fa-wand-magic-sparkles"></i><span>Start AI Diagnosis</span>
+                      <i class="fas fa-wand-magic-sparkles"></i><span>Start Photo Check</span>
                     </button>
                     <button id="diag-reset" type="button" class="pixel-button bg-white/80 text-dark border border-white/70 flex items-center gap-2 text-sm">
                       <i class="fas fa-trash-alt"></i><span>Reset</span>
@@ -1101,7 +1127,7 @@
                     </div>
                     <div class="space-y-1">
                       <p class="text-sm font-semibold text-dark">Analyzing pet photo</p>
-                      <p class="text-[11px] text-gray-500">Qwen Vision is reviewing posture, skin, and fur details...</p>
+                      <p class="text-[11px] text-gray-500">Reviewing visible posture, skin, and fur details...</p>
                     </div>
                   </div>
                   <div id="diag-result" class="diag-result-content text-[12px] text-gray-700 space-y-2 leading-relaxed">
@@ -1145,7 +1171,7 @@
               <p id="ai-service-status" class="text-[10px] text-primary hidden"></p>
               <div class="ai-service-card ai-output-panel">
                 <p id="ai-service-output" class="text-[11px] text-gray-700">
-                  Select a text AI service and generate a tailored report. Visual Diagnosis uses Qwen Vision above.
+                  Choose a care topic and add context to generate a draft note.
                 </p>
               </div>
             </div>
@@ -1153,29 +1179,29 @@
             <div class="flex flex-wrap gap-4 text-[11px] text-gray-600">
               <div class="ai-service-card ai-summary-card flex-1 min-w-[220px]">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-semibold text-sm text-dark">Plan Details</span>
-                  <span class="text-primary font-semibold">¥29/month</span>
+                  <span class="font-semibold text-sm text-dark">Use AI Responsibly</span>
+                  <span class="text-primary font-semibold">Care notes</span>
                 </div>
                 <ul class="space-y-1 list-disc list-inside">
-                  <li>Visual + text health insights</li>
-                  <li>Automatic archiving with PDF exports</li>
-                  <li>Veterinarian collaboration coming soon</li>
+                  <li>Use AI output as a care note draft</li>
+                  <li>Record symptoms, time, and recent changes</li>
+                  <li>Contact a vet for urgent or worsening signs</li>
                 </ul>
                 <button type="button" class="pixel-button w-full mt-3 text-[11px]" id="btn-ai-upgrade">
-                  <i class="fas fa-crown"></i><span>View Plan</span>
+                  <i class="fas fa-circle-info"></i><span>Care Tips</span>
                 </button>
               </div>
               <div class="ai-service-card ai-summary-card flex-1 min-w-[220px]">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-semibold text-sm text-dark">Connection Status</span>
+                  <span class="font-semibold text-sm text-dark">Service Notes</span>
                   <span class="text-green-600 text-xs flex items-center gap-1"><i class="fas fa-circle text-[6px]"></i>Online</span>
                 </div>
                 <p class="text-[11px] text-gray-600 mb-3">
-                  Current models: <strong>Qwen-VL</strong> for images, <strong>Qwen-Plus</strong> for text. Inference usually completes in 2-4 seconds.
+                  AI responses depend on the available backend service. If the service is offline, PawTrace shows a local example so the page remains usable.
                 </p>
                 <div class="flex items-center gap-2 text-[10px] text-gray-500">
                   <i class="fas fa-info-circle"></i>
-                  <span>Enable camera when prompted to capture a pet photo directly.</span>
+                  <span>For photo checks, upload a clear image with good lighting.</span>
                 </div>
               </div>
             </div>
@@ -1192,23 +1218,23 @@
 
   <div id="mobile-tabbar" class="hidden fixed inset-x-0 bottom-4 px-4 z-40 lg:hidden">
     <div class="mobile-tabbar">
-      <button type="button" class="app-tab active tab-shimmer" data-tab="map" aria-label="Open map tab">
+      <button type="button" class="app-tab active" data-tab="map" aria-label="Open map tab">
         <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-map"></use></svg>
         <span>Map</span>
       </button>
-      <button type="button" class="app-tab tab-shimmer" data-tab="pets" aria-label="Open pets tab">
+      <button type="button" class="app-tab" data-tab="pets" aria-label="Open pets tab">
         <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-paw"></use></svg>
         <span>Pets</span>
       </button>
-      <button type="button" class="app-tab tab-shimmer" data-tab="chat" aria-label="Open chat tab">
+      <button type="button" class="app-tab" data-tab="chat" aria-label="Open chat tab">
         <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-chat"></use></svg>
         <span>Chat</span>
       </button>
-      <button type="button" class="app-tab tab-shimmer" data-tab="health" aria-label="Open health monitoring tab">
+      <button type="button" class="app-tab" data-tab="health" aria-label="Open health monitoring tab">
         <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-heart"></use></svg>
         <span>Health</span>
       </button>
-      <button id="mobile-more-button" type="button" class="mobile-more-trigger tab-shimmer" aria-label="Open more PawTrace tools" aria-expanded="false" aria-controls="mobile-more-sheet">
+      <button id="mobile-more-button" type="button" class="mobile-more-trigger" aria-label="Open more PawTrace tools" aria-expanded="false" aria-controls="mobile-more-sheet">
         <i class="fas fa-ellipsis text-primary"></i>
         <span>More</span>
       </button>
@@ -1269,8 +1295,8 @@
           <input id="edit-contact" type="text" class="pixel-input" placeholder="Your contact info" />
         </div>
         <div>
-          <label class="block font-semibold mb-1">Star Sign</label>
-          <input id="edit-star-sign" type="text" class="pixel-input" placeholder="e.g., Libra" />
+          <label class="block font-semibold mb-1">Care Focus</label>
+          <input id="edit-star-sign" type="text" class="pixel-input" placeholder="e.g., senior care, training, diet" />
         </div>
         <div class="grid md:grid-cols-2 gap-2">
           <div>

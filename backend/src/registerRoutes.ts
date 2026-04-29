@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import multer from 'multer';
 import type { Express, Request, Response, NextFunction } from 'express';
-import type { Prisma, Pet as PetRow, User as UserRow } from '@prisma/client';
+import type { Prisma, HealthMeasurement as HealthMeasurementRow, Pet as PetRow, User as UserRow } from '@prisma/client';
 import { prisma } from './lib/prisma.js';
 import { config } from './config.js';
 import * as ai from './services/aiService.js';
@@ -114,9 +114,237 @@ function jsonList(value: Record<string, unknown>[]): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
+function compactRecord(record: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(record).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
+}
+
 function normalizeRecordList(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value.filter(isRecord);
   return isRecord(value) ? [value] : [];
+}
+
+function numericField(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  if (value === undefined || value === null || value === '') return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function firstNumericField(record: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = numericField(record, key);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+function firstTextField(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = textField(record, key);
+    if (value) return value;
+  }
+  return '';
+}
+
+function optionalBooleanField(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key];
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'ok'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'invalid'].includes(normalized)) return false;
+  }
+  if (typeof value === 'number') return value !== 0;
+  return undefined;
+}
+
+function firstBooleanField(record: Record<string, unknown>, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = optionalBooleanField(record, key);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+function headerValue(req: Request, name: string): string {
+  const value = req.headers[name.toLowerCase()];
+  return Array.isArray(value) ? String(value[0] || '').trim() : String(value || '').trim();
+}
+
+function safeTokenEquals(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function requireDeviceIngestAuth(req: Request, res: Response, next: NextFunction) {
+  if (req.authUser) return next();
+
+  const configuredToken = config.DEVICE_INGEST_TOKEN;
+  const deviceToken = headerValue(req, 'x-device-token');
+  const authHeader = headerValue(req, 'authorization');
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
+
+  if (configuredToken && (safeTokenEquals(deviceToken, configuredToken) || safeTokenEquals(bearerToken, configuredToken))) {
+    return next();
+  }
+
+  if (!configuredToken) {
+    return res.status(401).json({ error: 'Device ingest token is not configured; use a user JWT or set DEVICE_INGEST_TOKEN.' });
+  }
+  return res.status(401).json({ error: 'Unauthorized device telemetry request' });
+}
+
+function telemetryMetadata(payload: Record<string, unknown>, source: string): Record<string, unknown> {
+  const rawMetadata = isRecord(payload.metadata) ? payload.metadata : {};
+  const mapCoordSource = isRecord(payload.mapCoords) ? payload.mapCoords : payload;
+  const mapCoords = compactRecord({
+    x: isRecord(payload.mapCoords) ? numericField(mapCoordSource, 'x') : firstNumericField(mapCoordSource, ['mapX', 'x']),
+    y: isRecord(payload.mapCoords) ? numericField(mapCoordSource, 'y') : firstNumericField(mapCoordSource, ['mapY', 'y']),
+  });
+
+  return compactRecord({
+    ...rawMetadata,
+    source,
+    petId: firstTextField(payload, ['petId', 'petID', 'pet_id']),
+    gpsValid: firstBooleanField(payload, ['gpsValid', 'gps_valid', 'location_valid']),
+    gpsFix: firstNumericField(payload, ['gpsFix', 'gps_fix']),
+    gpsSatsUsed: firstNumericField(payload, ['gpsSatsUsed', 'gps_sats_used']),
+    gpsVisible: firstNumericField(payload, ['gpsVisible', 'gps_visible']),
+    gpsHdop: firstNumericField(payload, ['gpsHdop', 'gps_hdop']),
+    locationValid: firstBooleanField(payload, ['locationValid', 'location_valid']),
+    lastLocationValid: firstBooleanField(payload, ['lastLocationValid', 'last_location_valid']),
+    trackSamples: firstNumericField(payload, ['trackSamples', 'track_samples']),
+    geofenceEnabled: firstBooleanField(payload, ['geofenceEnabled', 'geofence_enabled']),
+    distanceM: firstNumericField(payload, ['distanceM', 'distance_m']),
+    lostAlert: firstBooleanField(payload, ['lostAlert', 'lost_alert']),
+    heartFound: firstBooleanField(payload, ['heartFound', 'heart_found']),
+    finger: firstBooleanField(payload, ['finger']),
+    spo2Valid: firstBooleanField(payload, ['spo2Valid', 'spo2_valid']),
+    batteryMv: firstNumericField(payload, ['batteryMv', 'battery_mv']),
+    activityScore: firstNumericField(payload, ['activityScore', 'activity_score']),
+    wifiConnected: firstBooleanField(payload, ['wifiConnected', 'wifi_connected']),
+    wifiRssi: firstNumericField(payload, ['wifiRssi', 'wifi_rssi']),
+    uploadEnabled: firstBooleanField(payload, ['uploadEnabled', 'upload_enabled']),
+    uploadOk: firstBooleanField(payload, ['uploadOk', 'upload_ok']),
+    uploadCode: firstNumericField(payload, ['uploadCode', 'upload_code']),
+    ir: firstNumericField(payload, ['ir', 'irValue', 'irRaw']),
+    red: firstNumericField(payload, ['red', 'redValue', 'redRaw']),
+    spo2Pct: firstNumericField(payload, ['spo2Pct', 'spo2', 'bloodOxygenPct']),
+    firmwareVersion: firstTextField(payload, ['firmwareVersion', 'firmware']),
+    board: firstTextField(payload, ['board', 'hardware']),
+    gpsModule: firstTextField(payload, ['gpsModule']),
+    heartRateHat: firstTextField(payload, ['heartRateHat']),
+    mapCoords: Object.keys(mapCoords).length ? mapCoords : undefined,
+  });
+}
+
+function mapTelemetryRow(row: HealthMeasurementRow) {
+  const metadata = isRecord(row.metadata) ? row.metadata : {};
+  const mapCoords = isRecord(metadata.mapCoords) ? metadata.mapCoords : {};
+  const mapX = numericField(mapCoords, 'x');
+  const mapY = numericField(mapCoords, 'y');
+  return {
+    id: row.id,
+    deviceId: row.deviceId,
+    userId: row.userId,
+    tagId: row.tagId,
+    petId: typeof metadata.petId === 'string' ? metadata.petId : null,
+    timestamp: row.timestamp,
+    receivedAt: row.receivedAt,
+    heartRateBpm: row.heartRateBpm,
+    soundLevelDb: row.soundLevelDb,
+    batteryPct: row.batteryPct,
+    steps: row.steps,
+    tempC: row.tempC,
+    temperature: row.tempC,
+    accelPeak: row.accelPeak,
+    activity: row.activity,
+    lat: row.lat,
+    lon: row.lon,
+    locationAccuracy: row.locationAccuracy,
+    locationTimestamp: row.locationTimestamp,
+    quality: row.quality,
+    gpsValid: typeof metadata.gpsValid === 'boolean' ? metadata.gpsValid : null,
+    gpsFix: numericField(metadata, 'gpsFix'),
+    gpsSatsUsed: numericField(metadata, 'gpsSatsUsed'),
+    gpsVisible: numericField(metadata, 'gpsVisible'),
+    gpsHdop: numericField(metadata, 'gpsHdop'),
+    locationValid: typeof metadata.locationValid === 'boolean' ? metadata.locationValid : null,
+    lastLocationValid: typeof metadata.lastLocationValid === 'boolean' ? metadata.lastLocationValid : null,
+    trackSamples: numericField(metadata, 'trackSamples'),
+    geofenceEnabled: typeof metadata.geofenceEnabled === 'boolean' ? metadata.geofenceEnabled : null,
+    distanceM: numericField(metadata, 'distanceM'),
+    lostAlert: typeof metadata.lostAlert === 'boolean' ? metadata.lostAlert : null,
+    heartFound: typeof metadata.heartFound === 'boolean' ? metadata.heartFound : null,
+    finger: typeof metadata.finger === 'boolean' ? metadata.finger : null,
+    ir: numericField(metadata, 'ir'),
+    red: numericField(metadata, 'red'),
+    spo2Pct: numericField(metadata, 'spo2Pct'),
+    spo2Valid: typeof metadata.spo2Valid === 'boolean' ? metadata.spo2Valid : null,
+    batteryMv: numericField(metadata, 'batteryMv'),
+    activityScore: numericField(metadata, 'activityScore'),
+    wifiConnected: typeof metadata.wifiConnected === 'boolean' ? metadata.wifiConnected : null,
+    wifiRssi: numericField(metadata, 'wifiRssi'),
+    uploadEnabled: typeof metadata.uploadEnabled === 'boolean' ? metadata.uploadEnabled : null,
+    uploadOk: typeof metadata.uploadOk === 'boolean' ? metadata.uploadOk : null,
+    uploadCode: numericField(metadata, 'uploadCode'),
+    mapCoords: mapX !== undefined && mapY !== undefined ? { x: mapX, y: mapY } : undefined,
+    metadata,
+  };
+}
+
+type DeviceTelemetry = ReturnType<typeof mapTelemetryRow>;
+
+const DEVICE_TELEMETRY_CACHE_MAX = 100;
+const latestDeviceTelemetry = new Map<string, DeviceTelemetry>();
+
+function telemetryTimeMs(row: DeviceTelemetry): number {
+  const receivedAtMs = Date.parse(String(row.receivedAt || ''));
+  if (Number.isFinite(receivedAtMs)) return receivedAtMs;
+  const timestampMs = Date.parse(String(row.timestamp || ''));
+  return Number.isFinite(timestampMs) ? timestampMs : 0;
+}
+
+function telemetryCacheKey(row: DeviceTelemetry): string {
+  return [
+    row.userId || 'anonymous',
+    row.deviceId || row.tagId || row.id,
+  ].join(':');
+}
+
+function cacheLatestTelemetry(row: DeviceTelemetry) {
+  latestDeviceTelemetry.set(telemetryCacheKey(row), row);
+  if (latestDeviceTelemetry.size <= DEVICE_TELEMETRY_CACHE_MAX) return;
+
+  const oldest = [...latestDeviceTelemetry.entries()]
+    .sort((a, b) => telemetryTimeMs(a[1]) - telemetryTimeMs(b[1]))
+    .slice(0, latestDeviceTelemetry.size - DEVICE_TELEMETRY_CACHE_MAX);
+  oldest.forEach(([key]) => latestDeviceTelemetry.delete(key));
+}
+
+function getCachedTelemetry(userId: string, deviceId: string, limit: number): DeviceTelemetry[] {
+  return [...latestDeviceTelemetry.values()]
+    .filter((row) => row.userId === userId)
+    .filter((row) => !deviceId || row.deviceId === deviceId)
+    .sort((a, b) => telemetryTimeMs(b) - telemetryTimeMs(a))
+    .slice(0, limit);
+}
+
+function uniqueLatestTelemetry(rows: DeviceTelemetry[], limit: number): DeviceTelemetry[] {
+  const seen = new Set<string>();
+  const latest: DeviceTelemetry[] = [];
+  for (const row of rows.sort((a, b) => telemetryTimeMs(b) - telemetryTimeMs(a))) {
+    const key = telemetryCacheKey(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    latest.push(row);
+    if (latest.length >= limit) break;
+  }
+  return latest;
 }
 
 function ownerLabelFrom(payload: Record<string, unknown>): string {
@@ -354,6 +582,154 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
       update: { lat, lon, timestamp: toIsoTimestamp(payload.timestamp), source: 'app-gps' },
     });
     res.json({ success: true, userId });
+  }));
+
+  // ─── M5Stack Device Telemetry ───
+  app.post('/api/device/telemetry', requireDeviceIngestAuth, asyncHandler(async (req, res) => {
+    const payload = isRecord(req.body) ? req.body : {};
+    const deviceId = firstTextField(payload, ['deviceId', 'deviceID', 'device_id', 'device']);
+    if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
+
+    const payloadUserId = await resolveUserId(firstTextField(payload, ['userId', 'user_id', 'username', 'ownerId', 'owner_id']));
+    if (req.authUser && payloadUserId && payloadUserId !== req.authUser.sub) {
+      return res.status(403).json({ error: 'Authenticated users can only write telemetry to their own account.' });
+    }
+    const defaultUserId = req.authUser || payloadUserId ? null : await resolveUserId(config.DEVICE_DEFAULT_USER);
+    const userId = req.authUser?.sub || payloadUserId || defaultUserId || null;
+
+    const tagId = firstTextField(payload, ['tagId', 'tagID', 'tag_id', 'nfcId', 'nfc_id']);
+    const source = firstTextField(payload, ['source']) || 'm5stack-http';
+    const timestamp = toIsoTimestamp(firstTextField(payload, ['timestamp', 'capturedAt', 'time']));
+    const receivedAt = new Date().toISOString();
+    const heartRateBpm = firstNumericField(payload, ['heartRateBpm', 'heart_rate_bpm', 'heartRate', 'pet_bpm', 'bpm']);
+    const tempC = firstNumericField(payload, ['tempC', 'temp_c', 'temperatureC', 'temperature']);
+    const lat = firstNumericField(payload, ['lat', 'latitude']);
+    const lon = firstNumericField(payload, ['lon', 'lng', 'longitude']);
+    const locationValid = firstBooleanField(payload, ['locationValid', 'location_valid', 'gpsValid', 'gps_valid']);
+    const gpsFix = firstNumericField(payload, ['gpsFix', 'gps_fix']);
+    const shouldStoreLocation = lat !== undefined
+      && lon !== undefined
+      && lat !== 0
+      && lon !== 0
+      && locationValid !== false
+      && gpsFix !== 0;
+    const storedLat = shouldStoreLocation ? lat : undefined;
+    const storedLon = shouldStoreLocation ? lon : undefined;
+    const locationAccuracy = firstNumericField(payload, ['locationAccuracy', 'location_accuracy', 'accuracy', 'gpsAccuracy']);
+    const altitude = firstNumericField(payload, ['altitude', 'alt']);
+    const locationTimestamp = firstTextField(payload, ['locationTimestamp', 'location_timestamp', 'gpsTimestamp', 'gps_timestamp']);
+    const quality = payload.quality === undefined || payload.quality === null || payload.quality === ''
+      ? undefined
+      : String(payload.quality);
+    const metadata = telemetryMetadata(payload, source);
+
+    const health = await prisma.healthMeasurement.create({
+      data: {
+        id: `health-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+        deviceId,
+        userId,
+        tagId: tagId || null,
+        timestamp,
+        heartRateBpm,
+        soundLevelDb: firstNumericField(payload, ['soundLevelDb', 'soundDb', 'soundLevel']),
+        batteryPct: firstNumericField(payload, ['batteryPct', 'battery_pct', 'batteryPercent', 'battery']),
+        steps: firstNumericField(payload, ['steps', 'stepCount']),
+        tempC,
+        accelPeak: firstNumericField(payload, ['accelPeak', 'accelerationPeak']),
+        activity: firstTextField(payload, ['activity', 'activityState', 'motionState']),
+        lat: storedLat,
+        lon: storedLon,
+        locationAccuracy,
+        locationTimestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : undefined,
+        quality,
+        metadata: Object.keys(metadata).length ? jsonObject(metadata) : undefined,
+        receivedAt,
+      },
+    });
+
+    let locationPointId: string | null = null;
+    if (storedLat !== undefined && storedLon !== undefined) {
+      const point = await prisma.locationPoint.create({
+        data: {
+          id: `loc-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+          source,
+          tagId: tagId || null,
+          deviceId,
+          userId,
+          timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
+          lat: storedLat,
+          lon: storedLon,
+          accuracy: locationAccuracy,
+          altitude,
+        },
+      });
+      locationPointId = point.id;
+
+      if (userId) {
+        const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        if (userExists) {
+          await prisma.lastLocation.upsert({
+            where: { userId },
+            create: {
+              userId,
+              lat: storedLat,
+              lon: storedLon,
+              accuracy: locationAccuracy,
+              timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
+              source,
+            },
+            update: {
+              lat: storedLat,
+              lon: storedLon,
+              accuracy: locationAccuracy,
+              timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
+              source,
+            },
+          });
+        }
+      }
+    }
+
+    const telemetry = mapTelemetryRow(health);
+    cacheLatestTelemetry(telemetry);
+
+    res.json({
+      success: true,
+      telemetry,
+      locationPointId,
+    });
+  }));
+
+  app.get('/api/device/telemetry/latest', requireAuth, asyncHandler(async (req, res) => {
+    const deviceId = String(req.query.deviceId || '').trim();
+    const max = Math.min(Math.max(Number(req.query.limit || 6), 1), 25);
+    const cachedTelemetry = getCachedTelemetry(req.authUser!.sub, deviceId, max);
+    const rows = await prisma.healthMeasurement.findMany({
+      where: {
+        userId: req.authUser!.sub,
+        ...(deviceId ? { deviceId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    const telemetry = uniqueLatestTelemetry([...cachedTelemetry, ...rows.map(mapTelemetryRow)], max);
+    res.json({ telemetry, latest: telemetry[0] || null, cacheSize: cachedTelemetry.length });
+  }));
+
+  app.get('/api/device/telemetry/history', requireAuth, asyncHandler(async (req, res) => {
+    const deviceId = String(req.query.deviceId || '').trim();
+    const max = Math.min(Math.max(Number(req.query.limit || 50), 1), 200);
+    const rows = await prisma.healthMeasurement.findMany({
+      where: {
+        userId: req.authUser!.sub,
+        ...(deviceId ? { deviceId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: max,
+    });
+
+    res.json({ telemetry: rows.map(mapTelemetryRow) });
   }));
 
   // ─── AI (Qwen only) ───

@@ -34,6 +34,7 @@
     let rerenderChat = null;
     let chatHoverCard = null;
     let petCheckInInitialized = false;
+    let deviceTelemetryPollTimer = null;
     let activeTabName = 'map';
     let activateAppTab = null;
     let modalSystemInitialized = false;
@@ -43,7 +44,7 @@
       map: {
         eyebrow: 'PawTrace',
         title: 'Campus Map',
-        subtitle: '12 pets nearby · 5 campus spots',
+        subtitle: 'Campus spots · Pet locations',
         path: 'campus-map'
       },
       pets: {
@@ -66,8 +67,8 @@
       },
       behaviour: {
         eyebrow: 'PawTrace',
-        title: 'Video Behaviour Check',
-        subtitle: 'Video upload · Behaviour timeline · Risk review',
+        title: 'Video Behavior Check',
+        subtitle: 'Video upload · Movement notes · Follow-up review',
         path: 'video-behaviour-check'
       },
       ai: {
@@ -398,12 +399,14 @@
       const timelineEl = document.getElementById('behaviour-timeline');
       const markersEl = document.getElementById('behaviour-alert-markers');
       const eventListEl = document.getElementById('behaviour-event-list');
+      const eventStatusEl = document.getElementById('behaviour-event-status');
       const adviceListEl = document.getElementById('behaviour-advice-list');
       const historyBarsEl = document.getElementById('behaviour-history-bars');
       const riskSummaryEl = document.getElementById('behaviour-risk-summary');
       const riskTitleEl = document.getElementById('behaviour-risk-title');
       const riskBadgeEl = document.getElementById('behaviour-risk-badge');
       const riskCopyEl = document.getElementById('behaviour-risk-copy');
+      const riskMeterSteps = Array.from(document.querySelectorAll('#tab-behaviour .behaviour-risk-meter span'));
       const timeAxisEl = document.querySelector('#tab-behaviour .behaviour-time-axis');
       const timelineTitleEl = document.querySelector('#tab-behaviour .behaviour-timeline-card h3');
       if (!fileInput || !dropzone || !timelineEl) return;
@@ -411,38 +414,6 @@
       let previewUrl = '';
       let selectedVideoFile = null;
       const behaviorDisclaimer = 'This result is only a behavior-risk hint and does not constitute veterinary diagnosis.';
-      const timeline = [
-        { label: 'Resting', type: 'rest', width: 18, color: '#60a5fa' },
-        { label: 'Walking', type: 'walk', width: 14, color: '#10b981' },
-        { label: 'Repeated paw licking', type: 'alert', width: 7, color: '#ec4899' },
-        { label: 'Grooming', type: 'groom', width: 13, color: '#f59e0b' },
-        { label: 'Resting', type: 'rest', width: 16, color: '#60a5fa' },
-        { label: 'Frequent ear scratching', type: 'alert', width: 6, color: '#ec4899' },
-        { label: 'Walking', type: 'walk', width: 18, color: '#10b981' },
-        { label: 'Frequent head shaking', type: 'alert', width: 8, color: '#ec4899' }
-      ];
-      const demoEvents = [
-        { time: '08:20', action: 'Frequent head shaking', hint: 'May indicate ear discomfort. Record frequency and duration.', risk: 'medium' },
-        { time: '14:45', action: 'Frequent ear scratching', hint: 'Check whether the ear has odor, redness, or discharge.', risk: 'high' },
-        { time: '22:10', action: 'One-sided limping', hint: 'May indicate joint, paw, or muscle discomfort. Reduce intense activity and record gait changes.', risk: 'high' },
-        { time: '31:40', action: 'Long low-activity period', hint: 'Activity is below the usual baseline. Continue observing appetite, water intake, and energy.', risk: 'medium' },
-        { time: '42:30', action: 'Repeated paw licking', hint: 'May indicate skin irritation, anxiety, or a foreign object. Check paw pads and between toes.', risk: 'medium' },
-        { time: '53:05', action: 'Arched back or tucked abdomen', hint: 'May indicate pain or discomfort. Record posture duration and watch appetite or stool changes.', risk: 'medium' }
-      ];
-      const advice = [
-        { title: 'Ear observation', detail: 'Record head-shaking and ear-scratching frequency. Check for odor, redness, or discharge.' },
-        { title: 'Paw observation', detail: 'Record paw-licking frequency. Check paw pads, between toes, skin irritation, or foreign objects.' },
-        { title: 'Gait observation', detail: 'If one-sided limping appears, capture a short side-view walking video and avoid intense activity.' },
-        { title: 'Daily context', detail: 'Track appetite, water intake, stool, sleep, and energy changes alongside the video.' },
-        { title: 'Safety boundary', detail: behaviorDisclaimer }
-      ];
-      const history = [
-        { label: 'Head shaking', value: 44, delta: '+18%', color: '#ec4899' },
-        { label: 'Ear scratching', value: 52, delta: '+24%', color: '#f59e0b' },
-        { label: 'Paw licking', value: 48, delta: '+16%', color: '#ec4899' },
-        { label: 'Limping signal', value: 22, delta: '+9%', color: '#ef4444' },
-        { label: 'Normal walking', value: 68, delta: '-7%', color: '#10b981' }
-      ];
 
       function setRisk(level = 'medium') {
         const normalized = level.toLowerCase();
@@ -454,6 +425,10 @@
         riskBadgeEl?.classList.add(`behaviour-risk-badge--${normalized}`);
         if (riskBadgeEl) riskBadgeEl.textContent = label;
         if (riskTitleEl) riskTitleEl.textContent = `${label} risk`;
+        const activeCount = normalized === 'high' ? 3 : normalized === 'medium' ? 2 : 1;
+        riskMeterSteps.forEach((step, index) => {
+          step.classList.toggle('active', index < activeCount);
+        });
         if (riskCopyEl) {
           riskCopyEl.textContent = normalized === 'high'
             ? 'Multiple behavior signals appeared in the same clip. Record frequency, duration, and context, and consult a veterinarian if needed.'
@@ -502,8 +477,8 @@
         timeAxisEl.innerHTML = steps.map((value) => `<span>${value}${unit === 'sec' && value === duration ? 's' : ''}</span>`).join('');
       }
 
-      function renderTimeline(segments = timeline, events = demoEvents, duration = 60, unit = 'min') {
-        if (timelineTitleEl) timelineTitleEl.textContent = unit === 'sec' ? `${Math.round(duration)}s YOLO scan` : '60min activity scan';
+      function renderTimeline(segments = [], events = [], duration = 60, unit = 'min') {
+        if (timelineTitleEl) timelineTitleEl.textContent = unit === 'sec' ? `${Math.round(duration)}s video scan` : '60min activity scan';
         renderAxis(duration, unit);
         timelineEl.innerHTML = segments.map((segment) => `
           <span class="behaviour-segment" title="${escapeHtml(segment.label)}" style="--width:${segment.width}%; --segment-color:${segment.color};"></span>
@@ -517,7 +492,7 @@
         }
       }
 
-      function renderEvents(events = demoEvents) {
+      function renderEvents(events = []) {
         if (!eventListEl) return;
         eventListEl.innerHTML = events.map((event) => `
           <div class="behaviour-event-row">
@@ -530,9 +505,14 @@
           </div>
         `).join('');
         if (eventCountEl) eventCountEl.textContent = String(events.length);
+        if (eventStatusEl) {
+          const hasHighRisk = events.some((event) => String(event.risk || '').toLowerCase() === 'high');
+          eventStatusEl.textContent = events.length ? 'Needs review' : 'No events';
+          eventStatusEl.classList.toggle('behaviour-status-chip--high', hasHighRisk);
+        }
       }
 
-      function renderAdvice(items = advice) {
+      function renderAdvice(items = []) {
         if (!adviceListEl) return;
         adviceListEl.innerHTML = items.map((item) => `
           <div class="behaviour-advice-row">
@@ -547,28 +527,82 @@
 
       function renderHistory() {
         if (!historyBarsEl) return;
-        historyBarsEl.innerHTML = history.map((item) => `
-          <div class="behaviour-history-row">
-            <strong>${escapeHtml(item.label)}</strong>
-            <div class="behaviour-history-track" aria-hidden="true">
-              <span style="--value:${item.value}%; --segment-color:${item.color};"></span>
+        historyBarsEl.innerHTML = `
+          <div class="behaviour-advice-row">
+            <i class="fas fa-chart-simple"></i>
+            <div>
+              <strong>No comparison yet</strong>
+              <span>History appears after multiple video checks.</span>
             </div>
-            <span>${escapeHtml(item.delta)}</span>
           </div>
-        `).join('');
+        `;
+      }
+
+      function renderEmptyVideoState() {
+        if (detectedPetEl) detectedPetEl.textContent = '--';
+        if (durationEl) durationEl.textContent = '--';
+        if (detectionRateEl) detectionRateEl.textContent = '--';
+        if (movementScoreEl) movementScoreEl.textContent = '--';
+        if (eventCountEl) eventCountEl.textContent = '0';
+        setStatus('Ready');
+        riskSummaryEl?.classList.remove('behaviour-risk-summary--low', 'behaviour-risk-summary--medium', 'behaviour-risk-summary--high');
+        riskSummaryEl?.classList.add('behaviour-risk-summary--low');
+        if (riskSummaryEl) riskSummaryEl.innerHTML = '<span>Risk</span><strong>--</strong>';
+        riskBadgeEl?.classList.remove('behaviour-risk-badge--low', 'behaviour-risk-badge--medium', 'behaviour-risk-badge--high');
+        riskBadgeEl?.classList.add('behaviour-risk-badge--low');
+        if (riskBadgeEl) riskBadgeEl.textContent = 'Not checked';
+        if (riskTitleEl) riskTitleEl.textContent = 'Ready for upload';
+        riskMeterSteps.forEach((step) => step.classList.remove('active'));
+        if (riskCopyEl) riskCopyEl.textContent = 'Upload a clip to generate behavior observation prompts.';
+        if (timelineTitleEl) timelineTitleEl.textContent = 'Waiting for video';
+        renderAxis(60, 'min');
+        if (timelineEl) {
+          timelineEl.innerHTML = '<div style="width:100%;display:grid;place-items:center;color:#64748b;font-size:0.75rem;">No video selected</div>';
+        }
+        if (markersEl) markersEl.innerHTML = '';
+        if (eventStatusEl) {
+          eventStatusEl.textContent = 'Pending video';
+          eventStatusEl.classList.remove('behaviour-status-chip--high');
+        }
+        if (eventListEl) {
+          eventListEl.innerHTML = `
+            <div class="behaviour-advice-row">
+              <i class="fas fa-video"></i>
+              <div>
+                <strong>No clip uploaded</strong>
+                <span>Choose a pet video to review movement and observation prompts.</span>
+              </div>
+            </div>
+          `;
+        }
+        if (adviceListEl) {
+          adviceListEl.innerHTML = `
+            <div class="behaviour-advice-row">
+              <i class="fas fa-clipboard-list"></i>
+              <div>
+                <strong>Before checking</strong>
+                <span>Use a clear, steady clip that shows the full body and walking or resting behavior.</span>
+              </div>
+            </div>
+          `;
+        }
+        if (historyBarsEl) {
+          historyBarsEl.innerHTML = `
+            <div class="behaviour-advice-row">
+              <i class="fas fa-chart-simple"></i>
+              <div>
+                <strong>No comparison yet</strong>
+                <span>History appears after at least one video check.</span>
+              </div>
+            </div>
+          `;
+        }
       }
 
       function setStatus(text, mode = '') {
         if (!analysisStatus) return;
         analysisStatus.textContent = text;
         analysisStatus.classList.toggle('behaviour-status-chip--high', mode === 'high');
-      }
-
-      function detectPetFromFile(file) {
-        const name = String(file?.name || '').toLowerCase();
-        if (/cat|kitty/.test(name)) return 'Cat · 91%';
-        if (/dog|puppy/.test(name)) return 'Dog · 93%';
-        return 'Cat/Dog · 88%';
       }
 
       function renderYoloResult(data) {
@@ -599,23 +633,23 @@
         renderTimeline(yoloSegments, apiEvents, totalDuration, 'sec');
         renderEvents(apiEvents);
         renderAdvice([
-          { title: 'YOLO activity type', detail: toTitleLabel(summary.activityType || 'normal_movement') },
+          { title: 'Activity type', detail: toTitleLabel(summary.activityType || 'normal_movement') },
           { title: 'Movement score', detail: `${Number.isFinite(Number(summary.movementScore)) ? summary.movementScore : 0} / 100` },
           { title: 'Advice', detail: data?.advice || 'Movement pattern looks generally normal in this short video.' },
           { title: 'Disclaimer', detail: data?.disclaimer || behaviorDisclaimer }
         ]);
         renderHistory();
         if (riskCopyEl) {
-          riskCopyEl.textContent = `YOLO sampled ${summary.analyzedFrames || 0} frames and detected the pet in ${summary.detectedFrames || 0}. ${data?.disclaimer || behaviorDisclaimer}`;
+          riskCopyEl.textContent = `The video check reviewed ${summary.analyzedFrames || 0} frames and detected the pet in ${summary.detectedFrames || 0}. ${data?.disclaimer || behaviorDisclaimer}`;
         }
-        setStatus('YOLO analysis complete', risk === 'high' ? 'high' : '');
+        setStatus('Video check complete', risk === 'high' ? 'high' : '');
       }
 
       async function analyzeUploadedVideo(file) {
         if (!file) return;
         const formData = new FormData();
         formData.append('video', file);
-        setStatus('Running YOLO...');
+        setStatus('Checking video...');
         try {
           const response = await fetch(apiUrl('/api/ai/video-behavior'), {
             method: 'POST',
@@ -625,35 +659,19 @@
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
             if (response.status === 401) {
-              throw new Error('Please sign in before running YOLO analysis.');
+              throw new Error('Please sign in before running the video check.');
             }
             const detail = typeof data?.detail === 'string' ? data.detail : '';
-            throw new Error(detail || data?.error || 'YOLO analysis failed');
+            throw new Error(detail || data?.error || 'Video check failed');
           }
           renderYoloResult(data);
         } catch (err) {
-          console.warn('Standalone YOLO behavior check failed', err);
-          setStatus(err instanceof Error ? err.message : 'YOLO service unavailable', 'high');
+          console.warn('Standalone video behavior check failed', err);
+          setStatus(err instanceof Error ? err.message : 'Video service unavailable', 'high');
           if (riskCopyEl) {
-            riskCopyEl.textContent = 'The YOLO service is unavailable. Start the Python FastAPI service and try again.';
+            riskCopyEl.textContent = 'The video analysis service is unavailable. Check the backend service and try again.';
           }
         }
-      }
-
-      function analyseVideo(file = null) {
-        const detected = file ? detectPetFromFile(file) : 'Dog · 92%';
-        const highSignal = file && /limp|ear|paw|scratch|shake|arched|abdomen/.test(file.name.toLowerCase());
-        const level = highSignal ? 'high' : 'medium';
-        if (detectedPetEl) detectedPetEl.textContent = detected;
-        setRisk(level);
-        renderTimeline();
-        renderEvents();
-        renderAdvice();
-        renderHistory();
-        if (durationEl) durationEl.textContent = '60 min';
-        if (detectionRateEl) detectionRateEl.textContent = '92%';
-        if (movementScoreEl) movementScoreEl.textContent = highSignal ? '68' : '42';
-        setStatus(file ? 'Demo analysis complete' : 'Demo ready', highSignal ? 'high' : '');
       }
 
       function handleVideoFile(file) {
@@ -683,8 +701,8 @@
           }, { once: true });
         }
         uploadEmpty?.classList.add('hidden');
-        setStatus('Ready for YOLO');
-        if (riskCopyEl) riskCopyEl.textContent = 'Click Start YOLO Check to send this video to the backend and Python YOLO service.';
+        setStatus('Ready to check');
+        if (riskCopyEl) riskCopyEl.textContent = 'Click Start Video Check to review this clip.';
       }
 
       uploadTrigger?.addEventListener('click', () => fileInput.click());
@@ -693,7 +711,9 @@
           analyzeUploadedVideo(selectedVideoFile);
           return;
         }
-        analyseVideo();
+        renderEmptyVideoState();
+        setStatus('Choose a video first');
+        fileInput.click();
       });
       dropzone.addEventListener('click', () => fileInput.click());
       dropzone.addEventListener('keydown', (event) => {
@@ -713,7 +733,7 @@
         handleVideoFile(event.dataTransfer?.files?.[0]);
       });
       fileInput.addEventListener('change', () => handleVideoFile(fileInput.files?.[0]));
-      analyseVideo();
+      renderEmptyVideoState();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -766,6 +786,9 @@
       const mapOptions = {
         container: document.getElementById('map-container'),
         background: document.getElementById('map-background'),
+        realMapTiles: document.getElementById('real-map-tiles'),
+        realMapFrame: document.getElementById('real-map-frame'),
+        realMapLink: document.getElementById('real-map-link'),
         markersLayer: document.getElementById('map-markers-layer'),
         petsLayer: document.getElementById('map-pets-layer'),
         petLocationListEl: document.getElementById('pet-location-feed'),
@@ -850,10 +873,10 @@
         });
       }
       aiUpgradeBtn?.addEventListener('click', () => {
-      alert('AI Wellness plan: ¥29/month for unlimited health, behavior, and diet recommendations.');
+      alert('AI tips are drafts for organizing care notes. For urgent or worsening symptoms, contact a veterinarian.');
       });
 
-      // Visual Diagnosis handlers
+      // Photo check handlers
       if (diagDropzone && diagFileInput) {
         const openPicker = () => diagFileInput.click();
         diagDropzone.setAttribute('tabindex', '0');
@@ -882,7 +905,7 @@
           if (diagResult) {
             diagResult.innerHTML = `
               <div class="text-[11px] text-gray-600">
-                Photo ready. Add symptoms (optional) and click Start AI Diagnosis.
+                Photo ready. Add symptoms if helpful, then start the photo check.
               </div>
             `;
           }
@@ -925,21 +948,13 @@
       const editMainPetType = document.getElementById('edit-main-pet-type');
       const editMainPetBirth = document.getElementById('edit-main-pet-birth');
       const editMainPetNotes = document.getElementById('edit-main-pet-notes');
-      editMainPetBirth?.addEventListener('change', () => {
-        const computedSign = computeStarSign(editMainPetBirth.value);
-        if (computedSign) {
-          editStarSign.value = computedSign;
-        }
-      });
-
 
       function updateProfileDetails(user) {
         if (!user) return;
         if (profileStarSignEl) {
-          const tagline = user.starSign ? STAR_SIGN_DESCRIPTIONS[user.starSign] : '';
           profileStarSignEl.textContent = user.starSign
-            ? `Star sign: ${user.starSign}${tagline ? ' · ' + tagline : ''}`
-            : 'Star sign: Not set';
+            ? `Care focus: ${user.starSign}`
+            : 'Care focus: Not set';
         }
         const mainPetLabel = user.mainPetName ? `${user.mainPetName} · ${user.mainPetType || 'Pet'}` : 'Add your main pet to personalize insights.';
         if (profileMainPetEl) profileMainPetEl.textContent = mainPetLabel;
@@ -953,16 +968,8 @@
       async function fetchPetInsight(force = false) {
         const user = getCurrentUser();
         if (!user || !petInsightText) return;
-        if (!user.starSign && user.mainPetBirth) {
-          const derivedSign = computeStarSign(user.mainPetBirth);
-          if (derivedSign) {
-            user.starSign = derivedSign;
-            persistCurrentUser(user);
-            updateProfileDetails(user);
-          }
-        }
         if (!user.starSign && !user.mainPetName) {
-          petInsightText.textContent = 'Add your star sign or main pet info to unlock insights.';
+          petInsightText.textContent = 'Add a care focus or main pet info to unlock insights.';
           return;
         }
         if (!force && user.petInsight) {
@@ -1034,8 +1041,8 @@
               <div class="w-20 h-20 bg-gray-100/50 rounded-full flex items-center justify-center mb-4">
                 <i class="fas fa-file-medical-alt text-3xl opacity-20 text-dark"></i>
               </div>
-              <p class="text-sm font-medium text-gray-600">Results Waiting</p>
-              <p class="text-[11px] mt-1 max-w-[220px] leading-relaxed">Upload a photo and describe symptoms to receive a detailed AI assessment.</p>
+              <p class="text-sm font-medium text-gray-600">Waiting for details</p>
+              <p class="text-[11px] mt-1 max-w-[220px] leading-relaxed">Upload a photo or describe symptoms to create an observation note.</p>
             </div>
           `;
         }
@@ -1064,7 +1071,7 @@
         diagRunBtn?.setAttribute('disabled', 'true');
         diagRunBtn?.classList.add('opacity-60', 'cursor-not-allowed');
         toggleDiagLoading(true);
-        setDiagStatus(file ? 'Analyzing pet health with Qwen Vision...' : 'Analyzing symptoms (no photo)...');
+        setDiagStatus(file ? 'Reviewing the pet photo...' : 'Reviewing symptoms without a photo...');
         try {
           if (diagResult) {
             diagResult.innerHTML = `
@@ -1087,12 +1094,12 @@
             });
             if (!response.ok) {
               const errText = await response.text();
-              throw new Error(errText || 'Qwen Vision request failed');
+              throw new Error(errText || 'Photo check request failed');
             }
             const data = await response.json();
             const text = data?.result || data?.text || 'Unable to generate analysis. Please try a clearer photo.';
             renderDiagnosisResult(text);
-            setDiagStatus('Qwen Vision analysis complete');
+            setDiagStatus('Photo check complete');
           } else {
             const response = await authJsonFetch('/api/ai/qwen-advice', {
               method: 'POST',
@@ -1113,7 +1120,7 @@
             }
           }
         } catch (err) {
-          console.warn('Qwen diagnosis error', err);
+          console.warn('Photo check error', err);
           setDiagStatus('AI request failed', true);
           if (diagResult) {
             const fallback = generateMockAIResponse('health', user) || 'Unable to analyze right now. Please try again.';
@@ -1224,7 +1231,7 @@
         } catch (err) {
           console.warn('Text AI service error', err);
           renderTextResult(generateMockAIResponse(selectedAIService, user));
-          setAIServiceStatus('AI request failed, using mock data', true);
+          setAIServiceStatus('AI service unavailable, showing a local example', true);
         } finally {
           setAIButtonsDisabled(false);
         }
@@ -1258,33 +1265,32 @@
 
       function generateMockAIResponse(serviceKey, user) {
         const petName = user?.mainPetName || 'your pet';
-        const campus = user?.campus || 'Taicang Campus';
         const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
         switch (serviceKey) {
           case 'health':
             return `
-              <strong>${petName} · Health Report</strong><br>
-              • ${rand(['Weight and body fat are steady', 'Weight trending up 0.1kg, monitor treats', 'Body score 4/9, lean and active'])}; keep ${rand(['2-3 weekly 30-minute walks', 'one brisk 20-min walk daily', 'mixed sniff walks + short jogs'])}.<br>
-              • Vaccine reminder: ${rand(['rabies next month', 'DHPP in 6 weeks', 'annual boosters due in 2 months'])}.<br>
-              • ${rand(['Add dental chews twice a week', 'Check ears after outdoor play', 'Moisturize paw pads in dry weather'])}.
+              **${petName} · Health Report**
+              - ${rand(['Weight and body condition look steady', 'Weight has changed slightly; monitor treats and meals', 'Activity looks normal for a routine check-in'])}; keep ${rand(['2-3 calm walks each week', 'one short walk daily', 'mixed sniff walks and light play'])}.
+              - Reminder: ${rand(['check vaccine dates in the profile', 'record the next vet visit date', 'update the latest health note after the next checkup'])}.
+              - ${rand(['Add dental care notes twice a week', 'Check ears after outdoor play', 'Check paw pads in dry weather'])}.
             `;
           case 'behavior':
             return `
-              <strong>Behavior Insight</strong><br>
-              1. ${rand(['Restless sniffing = searching for outlets; add nosework mats 10 min/day', 'Low tail + pacing suggests uncertainty; use short approach/retreat games', 'Extra zoomies indoors; rotate puzzle toys before bedtime'])}.<br>
-              2. ${rand(['Reward quiet observation on walks to reduce reactivity', 'Use 3-step settle cue before guests arrive', 'Short clicker sessions to channel energy'])}.<br>
-              3. ${rand(['Schedule decompression walk on soft surfaces', 'Increase chew time to lower stress hormones', 'Keep greetings short and predictable this week'])}.
+              **Behavior Insight**
+              - ${rand(['Restless sniffing may mean your pet needs more structured enrichment', 'Pacing or a low tail can be a sign to slow the interaction down', 'Extra indoor energy may improve with shorter play sessions before bedtime'])}.
+              - ${rand(['Reward calm observation on walks', 'Use a simple settle cue before guests arrive', 'Keep training sessions short and predictable'])}.
+              - ${rand(['Record when the behavior appears', 'Compare behavior before and after meals or walks', 'Keep greetings calm this week'])}.
             `;
           case 'diet':
             return `
-              <strong>Diet Recommendation</strong><br>
-              • Breakfast: ${rand(['60g low-fat kibble + 20g pumpkin', 'lean turkey 50g + oat topper', 'salmon kibble 55g + carrot shreds'])}.<br>
-              • Dinner: ${rand(['70g wet food + 30g yam', '65g kibble + 1 boiled egg white', '70g chicken wet + green bean mix'])}.<br>
-              • Snacks: ${rand(['freeze-dried chicken 1-2 cubes', 'blueberries 6-8 pcs', 'dental chew after dinner'])}.<br>
-              • Hydration: ${rand(['target 50-60ml/kg/day', 'add goat milk cube after play', 'use broths if appetite dips'])}.
+              **Diet Guide**
+              - Meals: keep portions consistent and record any appetite changes.
+              - Snacks: ${rand(['use small training treats only', 'avoid adding new snacks during stomach upset', 'track treats separately from meals'])}.
+              - Hydration: ${rand(['refresh water twice daily', 'watch water intake after walks', 'note any sudden increase or decrease in drinking'])}.
+              - Follow-up: adjust the diet with a vet if vomiting, diarrhea, or weight loss appears.
             `;
           default:
-            return 'AI services are evolving; stay tuned.';
+            return 'Choose a care topic and add pet details to create a draft note.';
         }
       }
 
@@ -1341,6 +1347,7 @@
         initChat();
         handleScrollReveal();
         fetchPetInsight();
+        startDeviceTelemetrySync();
       }
 
       function switchAuthTab(mode) {
@@ -1440,11 +1447,7 @@
         currentUser.bio = document.getElementById('edit-bio').value;
         currentUser.campus = document.getElementById('edit-campus').value;
         currentUser.contact = document.getElementById('edit-contact').value;
-        const derivedStarSign = editStarSign.value.trim() || computeStarSign(editMainPetBirth.value);
-        if (!editStarSign.value && derivedStarSign) {
-          editStarSign.value = derivedStarSign;
-        }
-        currentUser.starSign = derivedStarSign || '';
+        currentUser.starSign = editStarSign.value.trim();
         currentUser.mainPetName = editMainPetName.value;
         currentUser.mainPetType = editMainPetType.value;
         currentUser.mainPetBirth = editMainPetBirth.value;
@@ -1489,6 +1492,7 @@
       document.querySelectorAll('[data-action="logout"]').forEach(btn => {
         btn.addEventListener('click', () => {
           closeAllModals();
+          stopDeviceTelemetrySync();
           setAuthToken('');
           setCurrentUser(null);
           appRoot.classList.add('hidden');
@@ -1611,25 +1615,13 @@
     // --- Pet data & UI ---
     const PETS_DATA_KEY = 'pawtrace_pets';
     const MONITORING_API = '/api/monitor/collect';
+    const DEVICE_TELEMETRY_LATEST_API = '/api/device/telemetry/latest';
+    const DEVICE_TELEMETRY_POLL_MS = 8000;
     const DEFAULT_PET_AVATAR = '/assets/1.png';
     const MY_PETS_KEY = 'pawtrace_my_pets';
-    const STAR_SIGN_DESCRIPTIONS = {
-      Aries: 'Bold bursts of energy – plan active play.',
-      Taurus: 'Calm, food-loving companion – keep snacks ready.',
-      Gemini: 'Curious chatterbox – rotate toys often.',
-      Cancer: 'Homebody cuddler – give extra comfort corners.',
-      Leo: 'Attention seeker – celebrate with applause and selfies.',
-      Virgo: 'Detail-focused buddy – loves tidy routines.',
-      Libra: 'Balance seeker – mix social walks and quiet time.',
-      Scorpio: 'Intense protector – respect their space cues.',
-      Sagittarius: 'Explorer spirit – map new routes weekly.',
-      Capricorn: 'Disciplined pal – thrives on structured training.',
-      Aquarius: 'Inventive friend – introduce puzzle toys.',
-      Pisces: 'Dreamy empath – soft music and water play soothe.'
-    };
     const AI_SERVICE_CONFIG = {
       diagnosis: {
-        label: 'Visual Diagnosis',
+        label: 'Photo Check',
         subtitle: 'Photo + symptoms',
         icon: 'fas fa-microscope'
       },
@@ -1650,7 +1642,7 @@
         subtitle: 'Mood shifts, training cues'
       },
       diet: {
-        label: 'Diet Recommendation',
+        label: 'Diet Guide',
         endpoint: '/api/ai/qwen-advice',
         summary: 'Match breed and activity level to a weekly meal plan and snacks.',
         placeholder: "Pet details (breed/age/weight) + diet needs (e.g., '3-year-old Corgi, 12kg, sensitive stomach, likes chicken').",
@@ -1698,15 +1690,117 @@
       });
     }
 
+    function finiteNumber(value, fallback = null) {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : fallback;
+    }
+
+    function optionalBoolean(value) {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value !== 0;
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (['true', '1', 'yes', 'ok'].includes(normalized)) return true;
+        if (['false', '0', 'no', 'invalid'].includes(normalized)) return false;
+      }
+      return null;
+    }
+
+    function statusLabel(value) {
+      if (value === true) return 'YES';
+      if (value === false) return 'NO';
+      return '--';
+    }
+
+    function hasTelemetryValue(value) {
+      if (value === null || value === undefined || value === '') return false;
+      return !(typeof value === 'number' && Number.isNaN(value));
+    }
+
+    function firstTelemetryValue(...values) {
+      return values.find((value) => hasTelemetryValue(value));
+    }
+
+    function hasTelemetryNumber(value) {
+      return hasTelemetryValue(value) && Number.isFinite(Number(value));
+    }
+
+    function telemetryNumberLabel(value, options = {}) {
+      const { unit = '', digits = 0, empty = '--' } = options;
+      if (!hasTelemetryNumber(value)) return empty;
+      return `${Number(value).toFixed(digits)}${unit}`;
+    }
+
+    function telemetryIntegerLabel(value, unit = '') {
+      if (!hasTelemetryNumber(value)) return '--';
+      return `${Math.round(Number(value))}${unit}`;
+    }
+
+    function telemetryBoolLabel(value) {
+      return statusLabel(optionalBoolean(value));
+    }
+
+    function hasValidCoordinate(lat, lon) {
+      const numericLat = Number(lat);
+      const numericLon = Number(lon);
+      return Number.isFinite(numericLat)
+        && Number.isFinite(numericLon)
+        && numericLat >= -90
+        && numericLat <= 90
+        && numericLon >= -180
+        && numericLon <= 180
+        && !(numericLat === 0 && numericLon === 0);
+    }
+
+    function isTelemetryLocationValid(record = {}) {
+      const fix = finiteNumber(record.gpsFix, null);
+      const validFlag = record.locationValid ?? record.gpsValid;
+      return validFlag === true && fix !== 0 && hasValidCoordinate(record.lat, record.lon);
+    }
+
     function normalizeVitalsHistory(history = []) {
       if (!Array.isArray(history)) return [];
       return history
-        .map((entry) => ({
-          timestamp: entry?.timestamp || new Date().toISOString(),
-          temperature: Number(entry?.temperature),
-          heartRate: Number(entry?.heartRate),
-        }))
-        .filter((entry) => Number.isFinite(entry.temperature) || Number.isFinite(entry.heartRate))
+        .map((entry) => {
+          const temperatureValue = entry?.temperature ?? entry?.tempC ?? entry?.temp_c;
+          const heartRateValue = entry?.heartRate ?? entry?.heartRateBpm ?? entry?.heart_rate_bpm ?? entry?.pet_bpm;
+          const batteryValue = entry?.batteryPct ?? entry?.battery_pct;
+          const stepsValue = entry?.steps;
+          return {
+            timestamp: entry?.timestamp || new Date().toISOString(),
+            temperature: temperatureValue === undefined || temperatureValue === null || temperatureValue === '' ? NaN : Number(temperatureValue),
+            heartRate: heartRateValue === undefined || heartRateValue === null || heartRateValue === '' ? NaN : Number(heartRateValue),
+            batteryPct: batteryValue === undefined || batteryValue === null || batteryValue === '' ? NaN : Number(batteryValue),
+            batteryMv: finiteNumber(entry?.batteryMv ?? entry?.battery_mv, NaN),
+            steps: stepsValue === undefined || stepsValue === null || stepsValue === '' ? NaN : Number(stepsValue),
+            activity: entry?.activity || '',
+            activityScore: finiteNumber(entry?.activityScore ?? entry?.activity_score, NaN),
+            spo2Pct: finiteNumber(entry?.spo2Pct ?? entry?.spo2, NaN),
+            spo2Valid: optionalBoolean(entry?.spo2Valid ?? entry?.spo2_valid),
+            heartFound: optionalBoolean(entry?.heartFound ?? entry?.heart_found),
+            finger: optionalBoolean(entry?.finger),
+            gpsFix: finiteNumber(entry?.gpsFix ?? entry?.gps_fix, NaN),
+            gpsSatsUsed: finiteNumber(entry?.gpsSatsUsed ?? entry?.gps_sats_used, NaN),
+            gpsVisible: finiteNumber(entry?.gpsVisible ?? entry?.gps_visible, NaN),
+            gpsHdop: finiteNumber(entry?.gpsHdop ?? entry?.gps_hdop, NaN),
+            locationValid: optionalBoolean(entry?.locationValid ?? entry?.location_valid),
+            lastLocationValid: optionalBoolean(entry?.lastLocationValid ?? entry?.last_location_valid),
+            trackSamples: finiteNumber(entry?.trackSamples ?? entry?.track_samples, NaN),
+            geofenceEnabled: optionalBoolean(entry?.geofenceEnabled ?? entry?.geofence_enabled),
+            distanceM: finiteNumber(entry?.distanceM ?? entry?.distance_m, NaN),
+            lostAlert: optionalBoolean(entry?.lostAlert ?? entry?.lost_alert),
+            wifiConnected: optionalBoolean(entry?.wifiConnected ?? entry?.wifi_connected),
+            wifiRssi: finiteNumber(entry?.wifiRssi ?? entry?.wifi_rssi, NaN),
+            uploadEnabled: optionalBoolean(entry?.uploadEnabled ?? entry?.upload_enabled),
+            uploadOk: optionalBoolean(entry?.uploadOk ?? entry?.upload_ok),
+            uploadCode: finiteNumber(entry?.uploadCode ?? entry?.upload_code, NaN),
+            deviceId: entry?.deviceId || entry?.device_id || '',
+            lat: finiteNumber(entry?.lat, NaN),
+            lon: finiteNumber(entry?.lon, NaN),
+            source: entry?.source || '',
+          };
+        })
+        .filter((entry) => Number.isFinite(entry.temperature) || Number.isFinite(entry.heartRate) || Number.isFinite(entry.spo2Pct) || entry.activity)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }
 
@@ -1719,34 +1813,46 @@
       if (!entry) {
         return {
           state: 'Waiting',
-          summary: 'No recent temperature or heart-rate data.',
+          summary: 'No recent M5Stack health packet.',
           tempLabel: 'No reading yet',
           heartLabel: 'No reading yet',
         };
       }
       const temperature = Number(entry.temperature);
       const heartRate = Number(entry.heartRate);
+      const spo2Pct = Number(entry.spo2Pct);
       const tempBand = Number.isFinite(temperature)
         ? (temperature < 37.3 || temperature > 39.6 ? 'alert' : temperature < 37.8 || temperature > 39.2 ? 'watch' : 'stable')
         : 'unknown';
       const heartBand = Number.isFinite(heartRate)
         ? (heartRate < 60 || heartRate > 165 ? 'alert' : heartRate < 75 || heartRate > 145 ? 'watch' : 'stable')
         : 'unknown';
-      const state = tempBand === 'alert' || heartBand === 'alert'
+      const contactMissing = entry.heartFound === false || entry.finger === false;
+      const spo2Band = Number.isFinite(spo2Pct) && entry.spo2Valid === true
+        ? (spo2Pct < 92 ? 'alert' : spo2Pct < 95 ? 'watch' : 'stable')
+        : 'unknown';
+      const state = contactMissing
+        ? 'Check contact'
+        : tempBand === 'alert' || heartBand === 'alert' || spo2Band === 'alert'
         ? 'Needs attention'
-        : tempBand === 'watch' || heartBand === 'watch'
+        : tempBand === 'watch' || heartBand === 'watch' || spo2Band === 'watch'
           ? 'Watch closely'
           : 'Stable';
-      const summary = state === 'Needs attention'
-        ? 'One or more vitals are outside the usual pet-safe demo range.'
+      const summary = state === 'Check contact'
+        ? 'Heart Rate HAT is detected but optical contact is not stable enough for trusted vitals.'
+        : state === 'Needs attention'
+        ? 'One or more vitals are outside the usual pet-safe monitoring range.'
         : state === 'Watch closely'
-          ? 'Vitals are slightly off the comfortable demo range. Recheck soon.'
-          : 'Latest vitals are within the expected demo monitoring range.';
+          ? 'Vitals are slightly off the comfortable monitoring range. Recheck soon.'
+          : 'Latest M5Stack vitals are within the expected prototype monitoring range.';
       return {
         state,
         summary,
         tempLabel: Number.isFinite(temperature) ? `${temperature.toFixed(1)} °C` : 'No reading yet',
         heartLabel: Number.isFinite(heartRate) ? `${Math.round(heartRate)} bpm` : 'No reading yet',
+        tempBand,
+        heartBand,
+        spo2Band,
       };
     }
 
@@ -1935,6 +2041,233 @@
       emitPetsChanged(normalized);
     }
 
+    function normalizeDeviceTelemetryRecord(record = {}) {
+      const lat = Number(record.lat);
+      const lon = Number(record.lon);
+      const temperature = Number(record.tempC ?? record.temp_c ?? record.temperature);
+      const heartRate = Number(record.heartRateBpm ?? record.heart_rate_bpm ?? record.heartRate ?? record.pet_bpm ?? record.bpm);
+      const mapX = Number(record?.mapCoords?.x);
+      const mapY = Number(record?.mapCoords?.y);
+      const gpsFix = finiteNumber(record.gpsFix ?? record.gps_fix, null);
+      const locationValid = optionalBoolean(record.locationValid ?? record.location_valid ?? record.gpsValid ?? record.gps_valid);
+      return {
+        id: record.id || '',
+        deviceId: String(record.deviceId || record.device_id || record.device || '').trim(),
+        tagId: String(record.tagId || record.tag_id || '').trim(),
+        petId: String(record.petId || record.pet_id || '').trim(),
+        timestamp: record.timestamp || record.receivedAt || new Date().toISOString(),
+        temperature: Number.isFinite(temperature) ? temperature : null,
+        heartRate: Number.isFinite(heartRate) ? heartRate : null,
+        batteryPct: Number.isFinite(Number(record.batteryPct ?? record.battery_pct)) ? Number(record.batteryPct ?? record.battery_pct) : null,
+        batteryMv: finiteNumber(record.batteryMv ?? record.battery_mv, null),
+        steps: Number.isFinite(Number(record.steps)) ? Number(record.steps) : null,
+        activity: String(record.activity || record.activityState || '').trim(),
+        activityScore: finiteNumber(record.activityScore ?? record.activity_score, null),
+        lat: Number.isFinite(lat) ? lat : null,
+        lon: Number.isFinite(lon) ? lon : null,
+        gpsValid: optionalBoolean(record.gpsValid ?? record.gps_valid ?? record.locationValid ?? record.location_valid),
+        gpsFix,
+        gpsSatsUsed: finiteNumber(record.gpsSatsUsed ?? record.gps_sats_used, null),
+        gpsVisible: finiteNumber(record.gpsVisible ?? record.gps_visible, null),
+        gpsHdop: finiteNumber(record.gpsHdop ?? record.gps_hdop, null),
+        locationValid,
+        lastLocationValid: optionalBoolean(record.lastLocationValid ?? record.last_location_valid),
+        trackSamples: finiteNumber(record.trackSamples ?? record.track_samples, null),
+        geofenceEnabled: optionalBoolean(record.geofenceEnabled ?? record.geofence_enabled),
+        distanceM: finiteNumber(record.distanceM ?? record.distance_m, null),
+        lostAlert: optionalBoolean(record.lostAlert ?? record.lost_alert),
+        heartFound: optionalBoolean(record.heartFound ?? record.heart_found),
+        finger: optionalBoolean(record.finger),
+        spo2Pct: finiteNumber(record.spo2Pct ?? record.spo2, null),
+        spo2Valid: optionalBoolean(record.spo2Valid ?? record.spo2_valid),
+        wifiConnected: optionalBoolean(record.wifiConnected ?? record.wifi_connected),
+        wifiRssi: finiteNumber(record.wifiRssi ?? record.wifi_rssi, null),
+        uploadEnabled: optionalBoolean(record.uploadEnabled ?? record.upload_enabled),
+        uploadOk: optionalBoolean(record.uploadOk ?? record.upload_ok, null),
+        uploadCode: finiteNumber(record.uploadCode ?? record.upload_code, null),
+        locationAccuracy: Number.isFinite(Number(record.locationAccuracy)) ? Number(record.locationAccuracy) : null,
+        mapCoords: Number.isFinite(mapX) && Number.isFinite(mapY)
+          ? { x: clampNumber(mapX, 8, 92, 50), y: clampNumber(mapY, 8, 92, 50) }
+          : null,
+      };
+    }
+
+    function buildTelemetryLocationLabel(record, fallback = 'Campus live GPS') {
+      if (isTelemetryLocationValid(record)) {
+        return `Live GPS ${record.lat.toFixed(5)}, ${record.lon.toFixed(5)}`;
+      }
+      if (record.lastLocationValid === true) return 'Last valid GPS saved';
+      return fallback;
+    }
+
+    function findTelemetryPetIndex(pets = [], record = {}) {
+      if (!Array.isArray(pets) || !pets.length) return -1;
+      if (record.petId) {
+        const byPetId = pets.findIndex((pet) => pet.id === record.petId);
+        if (byPetId >= 0) return byPetId;
+      }
+      if (record.deviceId) {
+        const byDevice = pets.findIndex((pet) => pet.deviceId === record.deviceId);
+        if (byDevice >= 0) return byDevice;
+      }
+      if (record.tagId) {
+        const byTag = pets.findIndex((pet) => pet.tagId === record.tagId || pet.nfcId === record.tagId);
+        if (byTag >= 0) return byTag;
+      }
+      return 0;
+    }
+
+    function applyTelemetryToPet(pet = {}, record = {}, index = 0) {
+      const existingHistory = normalizeVitalsHistory(pet.vitalsHistory);
+      const hasVitals = record.temperature !== null || record.heartRate !== null || record.spo2Pct !== null || record.activity;
+      const nextVitals = hasVitals
+        ? [
+            {
+              timestamp: record.timestamp,
+              temperature: record.temperature ?? undefined,
+              heartRate: record.heartRate ?? undefined,
+              batteryPct: record.batteryPct ?? undefined,
+              batteryMv: record.batteryMv ?? undefined,
+              steps: record.steps ?? undefined,
+              activity: record.activity,
+              activityScore: record.activityScore ?? undefined,
+              heartFound: record.heartFound,
+              finger: record.finger,
+              spo2Pct: record.spo2Pct ?? undefined,
+              spo2Valid: record.spo2Valid,
+              gpsFix: record.gpsFix ?? undefined,
+              gpsSatsUsed: record.gpsSatsUsed ?? undefined,
+              gpsVisible: record.gpsVisible ?? undefined,
+              gpsHdop: record.gpsHdop ?? undefined,
+              locationValid: record.locationValid,
+              lastLocationValid: record.lastLocationValid,
+              trackSamples: record.trackSamples ?? undefined,
+              geofenceEnabled: record.geofenceEnabled,
+              distanceM: record.distanceM ?? undefined,
+              lostAlert: record.lostAlert,
+              wifiConnected: record.wifiConnected,
+              wifiRssi: record.wifiRssi ?? undefined,
+              uploadEnabled: record.uploadEnabled,
+              uploadOk: record.uploadOk,
+              uploadCode: record.uploadCode ?? undefined,
+              deviceId: record.deviceId,
+              lat: record.lat ?? undefined,
+              lon: record.lon ?? undefined,
+              source: 'm5stack',
+            },
+            ...existingHistory.filter((entry) => entry.timestamp !== record.timestamp),
+          ].slice(0, 12)
+        : existingHistory;
+      const zone = getDefaultTrackedZone(index);
+      const location = buildTelemetryLocationLabel(record, pet.location || zone.label);
+      const statusParts = ['M5Stack live'];
+      if (record.activity) statusParts.push(record.activity);
+      if (record.batteryPct !== null) statusParts.push(`${Math.round(record.batteryPct)}% battery`);
+      if (record.wifiConnected !== null) statusParts.push(`Wi-Fi ${statusLabel(record.wifiConnected)}`);
+      if (record.uploadCode !== null) statusParts.push(`HTTP ${record.uploadCode}`);
+
+      return normalizePetRecord({
+        ...pet,
+        id: pet.id || record.petId || `m5-${record.deviceId || Date.now()}`,
+        name: pet.name || `M5Stack ${record.deviceId || 'Collar'}`,
+        type: pet.type || 'Tracked pet',
+        breed: pet.breed || 'GPS v1.1 + Heart Rate HAT',
+        avatar: pet.avatar || DEFAULT_PET_AVATAR,
+        traits: Array.isArray(pet.traits) && pet.traits.length ? pet.traits : ['Live telemetry', 'M5Stack'],
+        deviceId: record.deviceId || pet.deviceId || '',
+        tagId: record.tagId || pet.tagId || '',
+        status: statusParts.join(' · '),
+        health: pet.health || 'Receiving live M5Stack telemetry.',
+        location,
+        mapCoords: isTelemetryLocationValid(record) ? { x: 50, y: 50 } : (record.mapCoords || pet.mapCoords || zone.coords),
+        vitalsHistory: nextVitals,
+        batteryPct: record.batteryPct,
+        batteryMv: record.batteryMv,
+        steps: record.steps,
+        activity: record.activity,
+        activityScore: record.activityScore,
+        heartFound: record.heartFound,
+        finger: record.finger,
+        spo2Pct: record.spo2Pct,
+        spo2Valid: record.spo2Valid,
+        lat: record.lat,
+        lon: record.lon,
+        gpsValid: record.gpsValid,
+        gpsFix: record.gpsFix,
+        gpsSatsUsed: record.gpsSatsUsed,
+        gpsVisible: record.gpsVisible,
+        gpsHdop: record.gpsHdop,
+        locationValid: record.locationValid,
+        lastLocationValid: record.lastLocationValid,
+        trackSamples: record.trackSamples,
+        geofenceEnabled: record.geofenceEnabled,
+        distanceM: record.distanceM,
+        lostAlert: record.lostAlert,
+        wifiConnected: record.wifiConnected,
+        wifiRssi: record.wifiRssi,
+        uploadEnabled: record.uploadEnabled,
+        uploadOk: record.uploadOk,
+        uploadCode: record.uploadCode,
+        telemetryUpdatedAt: record.timestamp,
+      }, index);
+    }
+
+    function mergeDeviceTelemetry(records = []) {
+      const telemetry = (Array.isArray(records) ? records : [])
+        .map(normalizeDeviceTelemetryRecord)
+        .filter((record) => record.deviceId);
+      if (!telemetry.length) return false;
+
+      let pets = getStoredPets();
+      telemetry.forEach((record) => {
+        const index = findTelemetryPetIndex(pets, record);
+        if (index >= 0) {
+          pets = pets.map((pet, petIndex) => petIndex === index ? applyTelemetryToPet(pet, record, petIndex) : pet);
+          return;
+        }
+        pets.push(applyTelemetryToPet({}, record, pets.length));
+      });
+      setStoredPets(pets);
+      rerenderPets?.();
+      rerenderHealthMonitor?.();
+      mapController?.refreshTrackedPets?.();
+      return true;
+    }
+
+    async function refreshDeviceTelemetry() {
+      if (!getAuthToken()) return;
+      try {
+        const response = await authJsonFetch(`${DEVICE_TELEMETRY_LATEST_API}?limit=6`);
+        if (!response.ok) return;
+        const data = await response.json().catch(() => ({}));
+        mergeDeviceTelemetry(data.telemetry || (data.latest ? [data.latest] : []));
+      } catch (err) {
+        console.warn('Device telemetry refresh failed', err);
+      }
+    }
+
+    function stopDeviceTelemetrySync() {
+      if (deviceTelemetryPollTimer) {
+        window.clearInterval(deviceTelemetryPollTimer);
+        deviceTelemetryPollTimer = null;
+      }
+    }
+
+    function startDeviceTelemetrySync() {
+      stopDeviceTelemetrySync();
+      if (!getAuthToken()) return;
+      refreshDeviceTelemetry();
+      deviceTelemetryPollTimer = window.setInterval(refreshDeviceTelemetry, DEVICE_TELEMETRY_POLL_MS);
+    }
+
+    function isSeededDefaultPetList(list = []) {
+      const seedIds = ['pet-1', 'pet-2', 'pet-3'];
+      const seedNames = ['Xiao Hei', 'Xiao Bai', 'Xiao Huang'];
+      return Array.isArray(list)
+        && list.length === seedIds.length
+        && list.every((pet, index) => pet?.id === seedIds[index] && pet?.name === seedNames[index]);
+    }
+
 
     function sanitizeUserProfile(user) {
       if (!user) return null;
@@ -1983,74 +2316,6 @@
       } catch (err) {
         console.warn('Monitoring payload failed', err);
       }
-    }
-
-    function defaultPets() {
-      return [
-        {
-          id: 'pet-1',
-          name: 'Xiao Hei',
-          type: 'Dog',
-          breed: 'Labrador',
-          age: '2 years',
-          gender: 'Male',
-          avatar: '/assets/1.png',
-          traits: ['Friendly', 'Active', 'Affectionate'],
-          status: 'Needs at least two walks daily and prefers chicken dog food.',
-          health: 'Vaccinations up to date: Rabies, Distemper, Parvovirus. Next vaccination: 2023/12/15.',
-          location: 'North Lawn',
-          mapCoords: { x: 24, y: 61 },
-          nfcId: 'PT-XH01',
-          nfcContact: '+86 138 0000 0001',
-          nfcNote: 'Friendly with students. Offer water first if found.',
-          vitalsHistory: [
-            { timestamp: new Date(Date.now() - 2 * 3600 * 1000).toISOString(), temperature: 38.4, heartRate: 104 },
-            { timestamp: new Date(Date.now() - 26 * 3600 * 1000).toISOString(), temperature: 38.2, heartRate: 108 },
-          ],
-        },
-        {
-          id: 'pet-2',
-          name: 'Xiao Bai',
-          type: 'Cat',
-          breed: 'Ragdoll',
-          age: '1 year',
-          gender: 'Female',
-          avatar: '/assets/2.png',
-          traits: ['Quiet', 'Independent', 'Cuddly'],
-          status: 'Enjoys quiet rooms and feather toys, eats tuna-flavor food.',
-          health: 'Vaccinations up to date: FVRCP, Rabies. Next vaccination: 2024/01/20.',
-          location: 'Library Plaza',
-          mapCoords: { x: 52, y: 37 },
-          nfcId: 'PT-XB02',
-          nfcContact: '+86 138 0000 0002',
-          nfcNote: 'Indoor cat. Please keep in a quiet room and avoid loud dogs.',
-          vitalsHistory: [
-            { timestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString(), temperature: 38.1, heartRate: 142 },
-            { timestamp: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), temperature: 38.0, heartRate: 146 },
-          ],
-        },
-        {
-          id: 'pet-3',
-          name: 'Xiao Huang',
-          type: 'Hamster',
-          breed: 'Syrian Hamster',
-          age: '8 months',
-          gender: 'Male',
-          avatar: '/assets/3.png',
-          traits: ['Active', 'Curious', 'Nocturnal'],
-          status: 'Sleeps during the day, loves sunflower seeds and late-night runs.',
-          health: 'Healthy; housed in 40x30cm cage with wheel and fresh wood shavings.',
-          location: 'Dorm Garden',
-          mapCoords: { x: 66, y: 47 },
-          nfcId: 'PT-XH03',
-          nfcContact: '+86 138 0000 0003',
-          nfcNote: 'Small pet. Keep the carrier level and avoid direct sun.',
-          vitalsHistory: [
-            { timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString(), temperature: 37.8, heartRate: 132 },
-            { timestamp: new Date(Date.now() - 27 * 3600 * 1000).toISOString(), temperature: 37.7, heartRate: 128 },
-          ],
-        }
-      ].map((pet, index) => normalizePetRecord(pet, index));
     }
 
     function loadMyPetsFromStorage() {
@@ -2182,12 +2447,40 @@
 
     function initHealthMonitor() {
       const petSelect = document.getElementById('health-pet-select');
+      const deviceIdEl = document.getElementById('health-device-id');
+      const packetTimeEl = document.getElementById('health-packet-time');
+      const packetSourceEl = document.getElementById('health-packet-source');
       const latestTempEl = document.getElementById('health-latest-temp');
       const latestHeartEl = document.getElementById('health-latest-heart');
+      const latestSpo2El = document.getElementById('health-latest-spo2');
       const tempStatusEl = document.getElementById('health-temp-status');
       const heartStatusEl = document.getElementById('health-heart-status');
+      const spo2StatusEl = document.getElementById('health-spo2-status');
+      const activityStateEl = document.getElementById('health-activity-state');
+      const activityScoreEl = document.getElementById('health-activity-score');
+      const batteryStateEl = document.getElementById('health-battery-state');
+      const batteryMetaEl = document.getElementById('health-battery-meta');
+      const networkStateEl = document.getElementById('health-network-state');
+      const wifiStateEl = document.getElementById('health-wifi-state');
+      const wifiRssiEl = document.getElementById('health-wifi-rssi');
+      const uploadStateEl = document.getElementById('health-upload-state');
+      const uploadEnabledEl = document.getElementById('health-upload-enabled');
+      const uploadCodeEl = document.getElementById('health-upload-code');
       const vitalsStateEl = document.getElementById('health-vitals-state');
       const vitalsSummaryEl = document.getElementById('health-vitals-summary');
+      const locationStateEl = document.getElementById('health-location-state');
+      const gpsStateEl = document.getElementById('health-gps-state');
+      const gpsSatsEl = document.getElementById('health-gps-sats');
+      const gpsHdopEl = document.getElementById('health-gps-hdop');
+      const locationCoordsEl = document.getElementById('health-location-coords');
+      const lastLocationValidEl = document.getElementById('health-last-location-valid');
+      const trackSamplesEl = document.getElementById('health-track-samples');
+      const geofenceEnabledEl = document.getElementById('health-geofence-enabled');
+      const distanceStateEl = document.getElementById('health-distance-state');
+      const lostAlertEl = document.getElementById('health-lost-alert');
+      const heartFoundEl = document.getElementById('health-heart-found');
+      const fingerStateEl = document.getElementById('health-finger-state');
+      const spo2ValidDetailEl = document.getElementById('health-spo2-valid-detail');
       const historyCountEl = document.getElementById('health-history-count');
       const historyListEl = document.getElementById('health-history-list');
       const historyEmptyEl = document.getElementById('health-history-empty');
@@ -2206,7 +2499,6 @@
       const tempInput = document.getElementById('health-input-temp');
       const heartInput = document.getElementById('health-input-heart');
       const saveBtn = document.getElementById('health-save-reading');
-      const demoBtn = document.getElementById('health-fill-demo');
       const formStatus = document.getElementById('health-form-status');
       if (!petSelect) return;
 
@@ -2218,18 +2510,86 @@
         formStatus.classList.toggle('text-primary', Boolean(message) && !isError);
       }
 
+      function setHealthText(element, value = '--') {
+        if (element) element.textContent = value;
+      }
+
+      function toneFromBand(band = 'unknown') {
+        return ['stable', 'watch', 'alert'].includes(band) ? band : 'unknown';
+      }
+
+      function labelFromBand(band = 'unknown', fallback = 'No reading yet') {
+        if (band === 'stable') return 'Stable';
+        if (band === 'watch') return 'Watch';
+        if (band === 'alert') return 'Needs attention';
+        return fallback;
+      }
+
+      function activityTone(activity = '') {
+        const normalized = String(activity || '').toLowerCase();
+        if (!normalized) return 'unknown';
+        if (/(abnormal|shake|impact|alert|lost|risk)/.test(normalized)) return 'alert';
+        if (/(running|high|active)/.test(normalized)) return 'watch';
+        return 'stable';
+      }
+
+      function setHealthTone(element, tone = 'unknown') {
+        if (!element) return;
+        const normalized = toneFromBand(tone);
+        element.dataset.status = normalized;
+        const tile = element.closest('.health-metric-tile, .health-summary-callout, .health-status-pill');
+        if (tile) tile.dataset.status = normalized;
+      }
+
+      function setPacketDetailEmpty(summary = 'Add a health reading to start monitoring.') {
+        setHealthText(deviceIdEl, '--');
+        setHealthText(packetTimeEl, '--');
+        setHealthText(packetSourceEl, '--');
+        setHealthText(latestTempEl, '--');
+        setHealthText(latestHeartEl, '--');
+        setHealthText(latestSpo2El, '--');
+        setHealthText(tempStatusEl, 'No reading yet');
+        setHealthTone(tempStatusEl, 'unknown');
+        setHealthText(heartStatusEl, 'No reading yet');
+        setHealthTone(heartStatusEl, 'unknown');
+        setHealthText(spo2StatusEl, 'No reading yet');
+        setHealthTone(spo2StatusEl, 'unknown');
+        setHealthText(activityStateEl, 'Waiting');
+        setHealthText(activityScoreEl, 'No activity data');
+        setHealthTone(activityScoreEl, 'unknown');
+        setHealthText(batteryStateEl, '--');
+        setHealthText(batteryMetaEl, 'battery_mv --');
+        setHealthText(networkStateEl, '--');
+        setHealthText(wifiStateEl, '--');
+        setHealthText(wifiRssiEl, '--');
+        setHealthText(uploadStateEl, 'upload_ok --');
+        setHealthText(uploadEnabledEl, '--');
+        setHealthText(uploadCodeEl, '--');
+        setHealthText(vitalsStateEl, 'Waiting');
+        setHealthText(vitalsSummaryEl, summary);
+        setHealthTone(vitalsSummaryEl, 'unknown');
+        setHealthText(locationStateEl, 'location_valid --');
+        setHealthText(gpsStateEl, 'gps_fix --');
+        setHealthText(gpsSatsEl, '--');
+        setHealthText(gpsHdopEl, '--');
+        setHealthText(locationCoordsEl, '--');
+        setHealthText(lastLocationValidEl, '--');
+        setHealthText(trackSamplesEl, '--');
+        setHealthText(geofenceEnabledEl, '--');
+        setHealthText(distanceStateEl, '--');
+        setHealthText(lostAlertEl, '--');
+        setHealthText(heartFoundEl, '--');
+        setHealthText(fingerStateEl, '--');
+        setHealthText(spo2ValidDetailEl, 'spo2_valid --');
+      }
+
       function render() {
         const pets = getStoredPets();
         const previousSelection = petSelect.value;
         petSelect.innerHTML = '';
         if (!pets.length) {
           petSelect.innerHTML = '<option value="">No pets available</option>';
-          if (latestTempEl) latestTempEl.textContent = '--';
-          if (latestHeartEl) latestHeartEl.textContent = '--';
-          if (tempStatusEl) tempStatusEl.textContent = 'Add a pet first';
-          if (heartStatusEl) heartStatusEl.textContent = 'Add a pet first';
-          if (vitalsStateEl) vitalsStateEl.textContent = 'Waiting';
-          if (vitalsSummaryEl) vitalsSummaryEl.textContent = 'Create a pet in the Pets page to start health monitoring.';
+          setPacketDetailEmpty();
           if (historyCountEl) historyCountEl.textContent = '0 records';
           if (historyListEl) historyListEl.innerHTML = '';
           updateTrendCard({ metric: 'temperature', history: [], chartEl: tempChartEl, badgeEl: tempBadgeEl, captionEl: tempCaptionEl, minEl: tempMinEl, avgEl: tempAvgEl, maxEl: tempMaxEl });
@@ -2247,12 +2607,93 @@
         const activePet = pets.find((pet) => pet.id === petSelect.value) || pets[0];
         const latestVitals = getLatestVitals(activePet);
         const assessment = getVitalsAssessment(latestVitals);
-        if (latestTempEl) latestTempEl.textContent = assessment.tempLabel;
-        if (latestHeartEl) latestHeartEl.textContent = assessment.heartLabel;
-        if (tempStatusEl) tempStatusEl.textContent = latestVitals ? `Last update · ${formatReadingTimestamp(latestVitals.timestamp)}` : 'No reading yet';
-        if (heartStatusEl) heartStatusEl.textContent = activePet.location ? `Tracking near ${activePet.location}` : 'Location not set';
-        if (vitalsStateEl) vitalsStateEl.textContent = assessment.state;
-        if (vitalsSummaryEl) vitalsSummaryEl.textContent = assessment.summary;
+        const deviceId = firstTelemetryValue(latestVitals?.deviceId, activePet.deviceId);
+        const packetTimestamp = firstTelemetryValue(latestVitals?.timestamp, activePet.telemetryUpdatedAt);
+        const packetSource = firstTelemetryValue(latestVitals?.source, deviceId ? 'm5stack' : latestVitals ? 'manual' : '--');
+        const batteryPct = firstTelemetryValue(latestVitals?.batteryPct, activePet.batteryPct);
+        const batteryMv = firstTelemetryValue(latestVitals?.batteryMv, activePet.batteryMv);
+        const activity = firstTelemetryValue(latestVitals?.activity, activePet.activity);
+        const activityScore = firstTelemetryValue(latestVitals?.activityScore, activePet.activityScore);
+        const heartFound = firstTelemetryValue(latestVitals?.heartFound, activePet.heartFound);
+        const finger = firstTelemetryValue(latestVitals?.finger, activePet.finger);
+        const spo2Valid = firstTelemetryValue(latestVitals?.spo2Valid, activePet.spo2Valid);
+        const gpsFix = firstTelemetryValue(latestVitals?.gpsFix, activePet.gpsFix);
+        const gpsSatsUsed = firstTelemetryValue(latestVitals?.gpsSatsUsed, activePet.gpsSatsUsed);
+        const gpsVisible = firstTelemetryValue(latestVitals?.gpsVisible, activePet.gpsVisible);
+        const gpsHdop = firstTelemetryValue(latestVitals?.gpsHdop, activePet.gpsHdop);
+        const lat = firstTelemetryValue(latestVitals?.lat, activePet.lat);
+        const lon = firstTelemetryValue(latestVitals?.lon, activePet.lon);
+        const locationValid = optionalBoolean(firstTelemetryValue(latestVitals?.locationValid, activePet.locationValid, activePet.gpsValid));
+        const lastLocationValid = firstTelemetryValue(latestVitals?.lastLocationValid, activePet.lastLocationValid);
+        const trackSamples = firstTelemetryValue(latestVitals?.trackSamples, activePet.trackSamples);
+        const geofenceEnabled = firstTelemetryValue(latestVitals?.geofenceEnabled, activePet.geofenceEnabled);
+        const distanceM = firstTelemetryValue(latestVitals?.distanceM, activePet.distanceM);
+        const lostAlert = firstTelemetryValue(latestVitals?.lostAlert, activePet.lostAlert);
+        const wifiConnected = firstTelemetryValue(latestVitals?.wifiConnected, activePet.wifiConnected);
+        const wifiRssi = firstTelemetryValue(latestVitals?.wifiRssi, activePet.wifiRssi);
+        const uploadEnabled = firstTelemetryValue(latestVitals?.uploadEnabled, activePet.uploadEnabled);
+        const uploadOk = firstTelemetryValue(latestVitals?.uploadOk, activePet.uploadOk);
+        const uploadCode = firstTelemetryValue(latestVitals?.uploadCode, activePet.uploadCode);
+        const coordsLabel = hasTelemetryNumber(lat) && hasTelemetryNumber(lon)
+          ? `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}`
+          : '--';
+        const gpsSatsLabel = hasTelemetryNumber(gpsSatsUsed) || hasTelemetryNumber(gpsVisible)
+          ? `${telemetryIntegerLabel(gpsSatsUsed)} used / ${telemetryIntegerLabel(gpsVisible)} visible`
+          : '--';
+        const hasPacketSignals = Boolean(deviceId)
+          || hasTelemetryNumber(gpsFix)
+          || hasTelemetryValue(locationValid)
+          || hasTelemetryValue(wifiConnected)
+          || hasTelemetryValue(uploadOk);
+
+        setHealthText(deviceIdEl, deviceId || '--');
+        setHealthText(packetTimeEl, packetTimestamp ? formatReadingTimestamp(packetTimestamp) : '--');
+        setHealthText(packetSourceEl, packetSource || '--');
+        setHealthText(latestTempEl, assessment.tempLabel);
+        setHealthText(latestHeartEl, assessment.heartLabel);
+        setHealthText(latestSpo2El, hasTelemetryNumber(latestVitals?.spo2Pct) ? `${Math.round(Number(latestVitals.spo2Pct))}%` : '--');
+        setHealthText(tempStatusEl, latestVitals ? labelFromBand(assessment.tempBand) : 'No reading yet');
+        setHealthTone(tempStatusEl, assessment.tempBand);
+        setHealthText(heartStatusEl, latestVitals
+          ? (heartFound === false || finger === false ? 'Check sensor contact' : labelFromBand(assessment.heartBand))
+          : 'No reading yet');
+        setHealthTone(heartStatusEl, heartFound === false || finger === false ? 'watch' : assessment.heartBand);
+        setHealthText(spo2StatusEl, hasTelemetryNumber(latestVitals?.spo2Pct)
+          ? labelFromBand(assessment.spo2Band, spo2Valid === false ? 'Check sensor contact' : 'Reading captured')
+          : 'No reading yet');
+        setHealthTone(spo2StatusEl, spo2Valid === false ? 'watch' : assessment.spo2Band);
+        setHealthText(activityStateEl, activity || 'Waiting');
+        const activityStatusTone = activityTone(activity);
+        setHealthText(activityScoreEl, activity
+          ? (hasTelemetryNumber(activityScore) ? `Activity status · ${Number(activityScore).toFixed(2)}` : 'Activity status')
+          : 'No activity data');
+        setHealthTone(activityScoreEl, activityStatusTone);
+        setHealthText(batteryStateEl, hasTelemetryNumber(batteryPct) ? `${Math.round(Number(batteryPct))}%` : '--');
+        setHealthText(batteryMetaEl, hasTelemetryNumber(batteryMv) ? `battery_mv ${Math.round(Number(batteryMv))} mV` : 'battery_mv --');
+        setHealthText(networkStateEl, `Wi-Fi ${telemetryBoolLabel(wifiConnected)}`);
+        setHealthText(wifiStateEl, telemetryBoolLabel(wifiConnected));
+        setHealthText(wifiRssiEl, hasTelemetryNumber(wifiRssi) ? `${Math.round(Number(wifiRssi))} dBm` : '--');
+        setHealthText(uploadStateEl, `upload_ok ${telemetryBoolLabel(uploadOk)}`);
+        setHealthText(uploadEnabledEl, telemetryBoolLabel(uploadEnabled));
+        setHealthText(uploadCodeEl, telemetryIntegerLabel(uploadCode));
+        setHealthText(vitalsStateEl, assessment.state);
+        setHealthText(locationStateEl, `location_valid ${telemetryBoolLabel(locationValid)}`);
+        setHealthText(gpsStateEl, `gps_fix ${telemetryIntegerLabel(gpsFix)}`);
+        setHealthText(gpsSatsEl, gpsSatsLabel);
+        setHealthText(gpsHdopEl, telemetryNumberLabel(gpsHdop, { digits: 1 }));
+        setHealthText(locationCoordsEl, coordsLabel);
+        setHealthText(lastLocationValidEl, telemetryBoolLabel(lastLocationValid));
+        setHealthText(trackSamplesEl, telemetryIntegerLabel(trackSamples));
+        setHealthText(geofenceEnabledEl, telemetryBoolLabel(geofenceEnabled));
+        setHealthText(distanceStateEl, telemetryNumberLabel(distanceM, { unit: ' m', digits: 1 }));
+        setHealthText(lostAlertEl, telemetryBoolLabel(lostAlert));
+        setHealthText(heartFoundEl, telemetryBoolLabel(heartFound));
+        setHealthText(fingerStateEl, telemetryBoolLabel(finger));
+        setHealthText(spo2ValidDetailEl, `spo2_valid ${telemetryBoolLabel(spo2Valid)}`);
+        if (vitalsSummaryEl) {
+          vitalsSummaryEl.textContent = assessment.summary;
+          setHealthTone(vitalsSummaryEl, assessment.state === 'Stable' ? 'stable' : assessment.state === 'Watch closely' || assessment.state === 'Check contact' ? 'watch' : assessment.state === 'Needs attention' ? 'alert' : 'unknown');
+        }
         const history = normalizeVitalsHistory(activePet.vitalsHistory);
         updateTrendCard({ metric: 'temperature', history, chartEl: tempChartEl, badgeEl: tempBadgeEl, captionEl: tempCaptionEl, minEl: tempMinEl, avgEl: tempAvgEl, maxEl: tempMaxEl });
         updateTrendCard({ metric: 'heartRate', history, chartEl: heartChartEl, badgeEl: heartBadgeEl, captionEl: heartCaptionEl, minEl: heartMinEl, avgEl: heartAvgEl, maxEl: heartMaxEl });
@@ -2267,22 +2708,32 @@
           const row = document.createElement('div');
           row.className = 'health-history-row';
           const petName = escapeHtml(activePet.name || 'Pet');
-          const petLocation = escapeHtml(activePet.location || 'Campus');
+          const entryAssessment = getVitalsAssessment(entry);
+          const entryTone = entryAssessment.state === 'Stable'
+            ? 'stable'
+            : entryAssessment.state === 'Watch closely' || entryAssessment.state === 'Check contact'
+              ? 'watch'
+              : entryAssessment.state === 'Needs attention'
+                ? 'alert'
+                : 'unknown';
           row.innerHTML = `
             <div class="health-history-row__meta">
               <p class="font-semibold text-dark">${formatReadingTimestamp(entry.timestamp)}</p>
-              <p class="text-[10px] text-gray-500">${petName} · ${petLocation}</p>
+              <p class="text-[10px] text-gray-500">${petName} · ${escapeHtml(entryAssessment.state)}</p>
             </div>
             <div class="health-history-row__stats">
               <span class="health-status-pill">Temp ${Number.isFinite(entry.temperature) ? `${entry.temperature.toFixed(1)}°C` : '--'}</span>
               <span class="health-status-pill">HR ${Number.isFinite(entry.heartRate) ? `${Math.round(entry.heartRate)} bpm` : '--'}</span>
+              <span class="health-status-pill">SpO2 ${Number.isFinite(entry.spo2Pct) ? `${Math.round(entry.spo2Pct)}%` : '--'}</span>
+              <span class="health-status-pill">${escapeHtml(entry.activity || 'REST')}</span>
+              <span class="health-status-pill" data-status="${entryTone}">${escapeHtml(entryAssessment.state)}</span>
             </div>
           `;
           historyListEl.appendChild(row);
         });
       }
 
-      function saveReading(useDemo = false) {
+      function saveReading() {
         const pets = getStoredPets();
         const petId = petSelect.value;
         const selectedPet = pets.find((pet) => pet.id === petId);
@@ -2290,12 +2741,8 @@
           setFormStatus('Select a pet first.', true);
           return;
         }
-        const nextTemperature = useDemo
-          ? Number((38 + Math.random() * 1).toFixed(1))
-          : (tempInput && tempInput.value.trim() !== '' ? Number(tempInput.value) : NaN);
-        const nextHeartRate = useDemo
-          ? Math.round(90 + Math.random() * 55)
-          : (heartInput && heartInput.value.trim() !== '' ? Number(heartInput.value) : NaN);
+        const nextTemperature = tempInput && tempInput.value.trim() !== '' ? Number(tempInput.value) : NaN;
+        const nextHeartRate = heartInput && heartInput.value.trim() !== '' ? Number(heartInput.value) : NaN;
         if (!Number.isFinite(nextTemperature) || !Number.isFinite(nextHeartRate)) {
           setFormStatus('Please enter both temperature and heart rate.', true);
           return;
@@ -2327,8 +2774,7 @@
           setFormStatus('');
           render();
         });
-        saveBtn?.addEventListener('click', () => saveReading(false));
-        demoBtn?.addEventListener('click', () => saveReading(true));
+        saveBtn?.addEventListener('click', () => saveReading());
         document.addEventListener(PETS_CHANGED_EVENT, () => render());
       }
       rerenderHealthMonitor = render;
@@ -2394,8 +2840,8 @@
 
       function hydratePets() {
         const stored = getStoredPets();
-        pets = stored && stored.length ? stored : defaultPets();
-        setStoredPets(pets);
+        pets = isSeededDefaultPetList(stored) ? [] : stored;
+        if (stored.length && pets.length === 0) setStoredPets([]);
       }
 
       function resetPetImagePreview() {
@@ -2469,6 +2915,9 @@
           const petNfcId = escapeHtml(p.nfcId || '');
           const petNfcContact = escapeHtml(p.nfcContact || 'Add an emergency contact');
           const petNfcNote = escapeHtml(p.nfcNote || 'No care note added yet.');
+          const telemetryBadge = p.deviceId
+            ? `<p class="text-[10px] text-gray-500 mt-1">Device ${escapeHtml(p.deviceId)}${Number.isFinite(Number(p.batteryPct)) ? ` · ${Math.round(Number(p.batteryPct))}% battery` : ''}</p>`
+            : '';
           const traitMarkup = (p.traits || [])
             .map(t => `<span class="px-2 py-0.5 rounded-full bg-secondary text-dark">${escapeHtml(t)}</span>`)
             .join('');
@@ -2518,6 +2967,7 @@
                     <span class="health-status-pill">${vitalsAssessment.heartLabel}</span>
                   </div>
                   <p class="text-[10px] text-gray-500 mt-1">${vitalsAssessment.state}</p>
+                  ${telemetryBadge}
                 </div>
               </div>
               <div>
@@ -2536,7 +2986,7 @@
               <div class="pet-nfc-card">
                 <div class="flex items-center justify-between gap-2">
                   <div>
-                    <p class="text-[10px] uppercase tracking-[0.28em] text-gray-500">NFC Pet Card</p>
+                    <p class="text-[10px] uppercase tracking-[0.28em] text-gray-500">Emergency Pet Card</p>
                     <p class="font-semibold text-sm text-dark">${petName}</p>
                   </div>
                   <span class="pet-nfc-card__code">${petNfcId}</span>
@@ -2547,7 +2997,7 @@
                 </div>
                 <div class="flex flex-wrap gap-2 pt-1">
                   <button type="button" class="pet-action-link" data-copy-nfc="${petId}">
-                    <i class="fas fa-id-card"></i><span>Copy NFC Card</span>
+                    <i class="fas fa-id-card"></i><span>Copy Emergency Card</span>
                   </button>
                   <button type="button" class="pet-action-link" data-open-map="${petId}">
                     <i class="fas fa-location-arrow"></i><span>Locate on Map</span>
@@ -2582,8 +3032,8 @@
             const pet = pets.find((entry) => entry.id === id);
             if (!pet) return;
             const cardText = [
-              `PawTrace NFC Card · ${pet.name}`,
-              `NFC ID: ${pet.nfcId}`,
+              `PawTrace Emergency Card · ${pet.name}`,
+              `Card ID: ${pet.nfcId}`,
               `Type: ${pet.type} · ${pet.breed}`,
               `Location: ${pet.location || 'Campus'}`,
               `Emergency: ${pet.nfcContact || 'Not set'}`,
@@ -2591,7 +3041,7 @@
             ].join('\n');
             try {
               await navigator.clipboard.writeText(cardText);
-              alert(`Copied ${pet.name}'s NFC card.`);
+              alert(`Copied ${pet.name}'s emergency card.`);
             } catch (err) {
               console.warn('Clipboard copy failed', err);
               alert(cardText);
@@ -2819,27 +3269,6 @@
       }
     }
 
-    function computeStarSign(dateStr) {
-      if (!dateStr) return '';
-      const parts = dateStr.split('-');
-      if (parts.length < 3) return '';
-      const month = Number(parts[1]);
-      const day = Number(parts[2]);
-      if (!month || !day) return '';
-      if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return 'Aquarius';
-      if ((month === 2 && day >= 19) || (month === 3 && day <= 20)) return 'Pisces';
-      if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return 'Aries';
-      if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return 'Taurus';
-      if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return 'Gemini';
-      if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return 'Cancer';
-      if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return 'Leo';
-      if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return 'Virgo';
-      if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return 'Libra';
-      if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return 'Scorpio';
-      if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return 'Sagittarius';
-      return 'Capricorn';
-    }
-
     // --- Chat assistant integration ---
     let CHAT_STATE = {
       contacts: [
@@ -2975,7 +3404,7 @@
       const { type, contact, contactId, messages = [], fallback } = payload;
       if (type === 'owner-pet-summary' && contact) {
         const generator = LOCAL_PET_SUMMARIES[Math.floor(Math.random() * LOCAL_PET_SUMMARIES.length)];
-        return (generator ? generator(contact) : fallback) || 'Pet update coming soon.';
+        return (generator ? generator(contact) : fallback) || 'No recent pet update yet.';
       }
       if (!contactId) return fallback || 'Message received.';
       const sanitizedHistory = messages

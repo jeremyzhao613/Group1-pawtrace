@@ -16,6 +16,7 @@ status: local-draft
 ## 新增
 
 - 新增 `docs/pawtrace-m5stack-telemetry.md`，记录 M5StickC Plus 原型定位、硬件结构、数据路径、后端配置、payload 示例、真实地图显示和本地 curl 测试。
+- 新增 `plans/plans/pawtrace-8.2.0-8.9.0.md`，将 8.2.0 到 8.9.0 的设备遥测、实时地图、Glass Dashboard、Monitor、Video Behavior Check 和交付文档更新打包成合并发布说明。
 - README 补充 M5Stack telemetry、`DEVICE_INGEST_TOKEN`、设备上报接口和主 App 数据合并说明。
 - 环境变量样例补充 `DEVICE_INGEST_TOKEN` 和 `DEVICE_DEFAULT_USER`。
 
@@ -31,4 +32,4 @@ status: local-draft
 - `.env.example`
 - `backend/.env.example`
 - `docs/pawtrace-m5stack-telemetry.md`
-- `plans/plans/pawtrace-8.x-changelog/`
+- `plans/plans/pawtrace-8.2.0-8.9.0.md`

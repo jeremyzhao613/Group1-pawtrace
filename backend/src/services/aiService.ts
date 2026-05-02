@@ -1,4 +1,21 @@
+import OpenAI from 'openai';
+import type {
+  ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionMessageParam,
+} from 'openai/resources/chat/completions';
 import { config } from '../config.js';
+
+type ChatMessage = { role: string; content: unknown };
+type DashScopeChatParams = ChatCompletionCreateParamsNonStreaming & {
+  enable_thinking?: boolean;
+};
+
+const DASHSCOPE_BASE_URL = config.DASHSCOPE_BASE_URL;
+
+export const QWEN_TEXT_MODEL = config.QWEN_TEXT_MODEL;
+export const QWEN_VISION_MODEL = config.QWEN_VISION_MODEL;
+
+let dashScopeClient: OpenAI | null = null;
 
 const SYSTEM_PROMPTS: Record<string, string> = {
   c1: 'You are Lily, a friendly student at XJTLU Taicang who owns a corgi named Mocha. You love easy walks, coffee near campus, and short English chat messages.',
@@ -40,6 +57,113 @@ export function getLocalPetPrediction(profile: Record<string, string> = {}): str
   ];
   const focus = moods[Math.floor(Math.random() * moods.length)];
   return `${petName} ${focus} thanks to ${starSign}. Sprinkle in a longer walk and a familiar toy to keep them grounded.`;
+}
+
+export function hasDashScopeKey(): boolean {
+  const key = String(config.DASHSCOPE_API_KEY || '').trim();
+  return Boolean(key) && key !== 'YOUR_DASHSCOPE_API_KEY_HERE';
+}
+
+function getDashScopeClient(): OpenAI {
+  if (!hasDashScopeKey()) {
+    throw new Error('DASHSCOPE_API_KEY missing');
+  }
+  if (!dashScopeClient) {
+    dashScopeClient = new OpenAI({
+      apiKey: config.DASHSCOPE_API_KEY,
+      baseURL: DASHSCOPE_BASE_URL,
+    });
+  }
+  return dashScopeClient;
+}
+
+function normalizeChatMessages(messages: ChatMessage[]): ChatCompletionMessageParam[] {
+  return messages
+    .map((msg) => {
+      const role = msg.role === 'system' || msg.role === 'assistant' ? msg.role : 'user';
+      const content = typeof msg.content === 'string' ? msg.content : msg.content;
+      return { role, content } as ChatCompletionMessageParam;
+    })
+    .filter((msg) => {
+      if (typeof msg.content === 'string') return msg.content.trim().length > 0;
+      return Boolean(msg.content);
+    });
+}
+
+export function getLocalAdvice(service: string, profile: Record<string, unknown> = {}): string {
+  const petName = typeof profile.mainPetName === 'string' && profile.mainPetName.trim()
+    ? profile.mainPetName.trim()
+    : 'your pet';
+  switch (service) {
+    case 'behavior':
+      return `
+### Psychological Analysis
+- ${petName} may be reacting to routine, environment, or attention changes rather than a single fixed cause.
+
+### Training Tips
+- Reward calm behavior quickly and keep practice sessions short.
+- Record when the behavior appears, what happened before it, and how long it lasts.
+
+### Environmental Changes
+- Reduce sudden noise, crowding, or unfamiliar handling during the next few days.
+
+### Practice Routine
+- Try two 5-minute sessions daily with one simple cue and a high-value reward.
+`;
+    case 'diet':
+      return `
+### Recommended Nutrition
+- Keep meals consistent and avoid changing multiple foods at once.
+
+### Daily Meal Plan (Morning/Evening)
+- Morning: regular portion plus fresh water.
+- Evening: regular portion after activity, with treats counted separately.
+
+### Foods to Avoid
+- Avoid chocolate, grapes, onions, alcohol, and high-fat leftovers.
+
+### Hydration & Supplements
+- Track water intake and ask a veterinarian before adding supplements.
+`;
+    case 'health':
+    default:
+      return `
+### Health Checklist
+- Check appetite, water intake, stool, energy, breathing, skin, ears, eyes, and gait.
+
+### Vaccination & Care Status
+- Keep vaccine, deworming, flea/tick, and recent visit notes updated.
+
+### Flags to Watch
+- Contact a veterinarian if symptoms worsen, repeat, or include pain, breathing trouble, vomiting, collapse, or refusal to eat.
+
+### Next Steps
+- Save photos, times, and behavior notes so changes are easier to compare.
+`;
+  }
+}
+
+export function getLocalDiagnosis(symptoms = ''): string {
+  const symptomText = symptoms.trim()
+    ? `The reported symptoms were: ${symptoms.trim()}`
+    : 'No symptoms were provided, so this is a general visual-care checklist.';
+  return `
+### Visual Analysis
+- ${symptomText}
+- Use this as an observation note only; image quality and angle can hide important details.
+
+### Potential Causes
+- Common causes can include irritation, minor injury, stress, diet change, parasites, infection, or environmental exposure.
+
+### Severity Assessment
+- Monitor mild, short-lived signs closely.
+- Treat breathing issues, collapse, severe pain, repeated vomiting, bleeding, or fast deterioration as urgent.
+
+### Recommended Actions
+- Take clear follow-up photos, record timing and behavior, and contact a veterinarian if signs persist or worsen.
+
+**Disclaimer:** This is not a veterinary diagnosis.
+`;
 }
 
 export function buildAdvicePrompt(
@@ -120,31 +244,29 @@ export function buildAdviceMessages(
   ];
 }
 
-export async function callQwen(messages: { role: string; content: unknown }[]): Promise<string | undefined> {
-  if (!config.DASHSCOPE_API_KEY || config.DASHSCOPE_API_KEY === 'YOUR_DASHSCOPE_API_KEY_HERE') {
-    throw new Error('DASHSCOPE_API_KEY missing');
-  }
-  const payload = { model: 'qwen-plus', messages };
+async function callDashScopeChat(model: string, messages: ChatMessage[]): Promise<string | undefined> {
+  const client = getDashScopeClient();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.AI_TIMEOUT_MS);
-  const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.DASHSCOPE_API_KEY}`,
-    },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  });
-  clearTimeout(timer);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || 'Qwen API error');
+  try {
+    const completion = await client.chat.completions.create(
+      {
+        model,
+        messages: normalizeChatMessages(messages),
+        stream: false,
+        enable_thinking: config.QWEN_ENABLE_THINKING,
+      } as DashScopeChatParams,
+      { signal: controller.signal }
+    );
+    const content = completion.choices?.[0]?.message?.content;
+    return typeof content === 'string' && content.trim() ? content.trim() : undefined;
+  } finally {
+    clearTimeout(timer);
   }
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return data?.choices?.[0]?.message?.content;
+}
+
+export async function callQwen(messages: ChatMessage[]): Promise<string | undefined> {
+  return callDashScopeChat(QWEN_TEXT_MODEL, messages);
 }
 
 export async function callQwenVision(opts: {
@@ -152,7 +274,7 @@ export async function callQwenVision(opts: {
   mimeType?: string;
   prompt: string;
 }): Promise<string | undefined> {
-  if (!config.DASHSCOPE_API_KEY || config.DASHSCOPE_API_KEY === 'YOUR_DASHSCOPE_API_KEY_HERE') {
+  if (!hasDashScopeKey()) {
     throw new Error('DASHSCOPE_API_KEY missing');
   }
   const dataUrl = `data:${opts.mimeType || 'image/jpeg'};base64,${opts.imageBase64}`;
@@ -165,25 +287,5 @@ export async function callQwenVision(opts: {
       ],
     },
   ];
-  const payload = { model: 'qwen-vl-plus', messages };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.AI_TIMEOUT_MS);
-  const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.DASHSCOPE_API_KEY}`,
-    },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  });
-  clearTimeout(timer);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || 'Qwen-VL API error');
-  }
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return data?.choices?.[0]?.message?.content;
+  return callDashScopeChat(QWEN_VISION_MODEL, messages);
 }

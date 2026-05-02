@@ -3,11 +3,12 @@ name: pawtrace-9-0-0-ble-ai-map-mobile-and-pet-input-technical-release
 version: 9.0.0
 type: major-technical-release
 status: local-commit-ready
+languages: zh-CN,en-US
 source_commit: b212ebe
 base_commit: bce4e0d
 ---
 
-# PawTrace 9.0.0 技术更新文档
+# PawTrace 9.0.0 技术更新文档 / Technical Update Document
 
 ## 版本定位
 
@@ -566,3 +567,568 @@ git diff --check -- frontend/index.html frontend/public/app/app.js frontend/publ
 ## 结论
 
 9.0.0 是 PawTrace 的硬件与产品可用性收口版本。它把 BLE 近场同步、Wi-Fi 远程上传、后端 telemetry 标准化、地图围栏路线、Health BLE Bridge、AI fallback、NFC emergency card、My Pets 输入校验和移动端直接导航整合到同一个可演示技术包中。当前代码已在本地构建通过，下一步是完成 GitHub 认证并推送本地提交。
+
+---
+
+# PawTrace 9.0.0 Technical Update Document
+
+## Release Positioning
+
+- **Version**: 9.0.0
+- **Release type**: Major technical release covering hardware telemetry, Bluetooth bridge, AI availability, map tools, mobile navigation, and logical pet-profile input.
+- **Local commit**: `b212ebe Upload latest PawTrace changes`
+- **Current branch**: `codex/8.1.0-security-packaging-release`
+- **Publish state**: committed locally; GitHub upload is still blocked until HTTPS token, SSH key, or `gh auth login` is restored.
+- **Primary goal**: make PawTrace immediately demoable even when external AI services or long-range hardware links are unavailable, while preserving real integration paths for Wi-Fi, BLE, GPS, Health, AI, Map, and Pet Cards.
+
+## One-Sentence Summary
+
+PawTrace 9.0.0 moves the project beyond the 8.x hardware telemetry and dashboard phase into a more complete demo-ready technical package: the main app supports near-field Web Bluetooth sync and message writes, the backend accepts Wi-Fi JSON, BLE JSON, and BLE CSV telemetry, the map supports zoom, geofences, and route overlays, AI Assist has local fallback when DashScope is not configured, the mobile bottom navigation exposes every major feature directly, and My Pets now uses validated logical pet-profile input.
+
+## Major Technical Changes
+
+### 1. Backend AI Service Upgrade
+
+- Added the `openai` dependency and now use the OpenAI-compatible SDK for DashScope requests.
+- Added backend config keys:
+  - `DASHSCOPE_BASE_URL`
+  - `QWEN_TEXT_MODEL`
+  - `QWEN_VISION_MODEL`
+  - `QWEN_ENABLE_THINKING`
+- The default Qwen text and vision model is now `qwen3.6-plus`.
+- Example AI timeout is increased to `60000ms`.
+- `backend/src/services/aiService.ts` now uses an SDK client instead of handwritten `fetch` calls.
+- Added `hasDashScopeKey()` so both backend and frontend can determine whether real Qwen service is available.
+- Added local fallback functions:
+  - `getLocalAdvice()` for health, behavior, and diet advice.
+  - `getLocalDiagnosis()` for photo-care diagnosis fallback.
+  - Existing pet-prediction fallback remains available.
+- AI responses now include a `source` field such as `qwen`, `qwen-vl`, `qwen-text-fallback`, or `local`.
+- Qwen failures now return readable fallback content and a `warning` instead of leaving the UI in a hard failure state.
+
+### 2. AI API Availability and Status
+
+- Added `GET /api/ai/status`, returning:
+  - whether DashScope is configured
+  - text model
+  - vision model
+  - thinking mode
+  - AI timeout
+- Extended `GET /api/status` with AI and Video AI status.
+- These routes now support an immediately usable demo path:
+  - `POST /api/pet-prediction`
+  - `POST /api/ai/qwen-advice`
+  - `POST /api/ai/qwen-diagnosis`
+  - `POST /api/ai/video-behavior`
+- When external AI is available, PawTrace calls Qwen or Video AI.
+- When external AI is unavailable, PawTrace returns local fallback or a readable service state.
+- Chat backend now has local reply fallback and returns `source` plus `saved`, preventing a failed AI request from breaking the chat flow.
+
+### 3. Device Telemetry Backend: BLE and CSV Compatibility
+
+- `POST /api/device/telemetry` now accepts:
+  - standard JSON telemetry
+  - BLE compact JSON
+  - `text/csv` / `text/plain` compact CSV
+- CSV parsing supports:
+  - header + value format
+  - fixed order: `device_id,battery_pct,pet_bpm,lat,lon,lost_alert`
+- BLE detection now checks:
+  - `source` / `transport` containing `ble`
+  - compact fields such as `bat`, `alert`, `bleRssi`, `ble_rssi`, `bleName`
+- Device ID parsing now supports:
+  - `deviceId`
+  - `deviceID`
+  - `device_id`
+  - `device`
+  - `bleDeviceId`
+  - `ble_device_id`
+  - BLE compact `id`
+- Battery percentage accepts `bat`.
+- Lost alert accepts `alert`.
+- Telemetry metadata now includes:
+  - `transport`
+  - `bleConnected`
+  - `bleRssi`
+  - `bleMtu`
+  - `bleName`
+  - `bleServiceUuid`
+  - `bleTelemetryUuid`
+  - `bleMessageUuid`
+  - `bleLastMessage`
+  - `bleMessageSeq`
+  - `bleBridgeReceivedAt`
+  - `bleBridgeStoredBy`
+  - `notifySeq`
+- Telemetry rows returned to the frontend and Glass Dashboard now include BLE metadata.
+
+### 4. Map Tile Proxy and Map Control Tools
+
+- Added backend route `GET /api/map/tile/:z/:x/:y.png`.
+- The tile proxy supports:
+  - primary OpenStreetMap source
+  - OpenStreetMap `a` subdomain fallback
+  - CARTO light fallback
+  - coordinate validation
+  - `8000ms` upstream timeout
+  - cache headers
+- `frontend/public/map.js` now has a richer real-map control layer:
+  - frontend first requests `/api/map/tile/{z}/{x}/{y}.png`
+  - falls back to OSM and CARTO external tiles
+  - supports map zoom from `-2` to `3`
+  - supports double-click zoom
+  - reprojects markers, pets, and overlays on resize
+- Added electronic fence tools:
+  - show/hide fence overlay
+  - enable/disable fence per pet
+  - radius range from `60m` to `650m`
+  - use the current pet location as fence center
+  - click the map to set fence center
+  - calculate pet distance from center and alert state
+- Added route tools:
+  - active route or all routes
+  - route generation from vitals / telemetry history
+  - manual GPS sample placement by clicking the map
+  - clear and restore route per pet
+  - preferences stored in `pawtrace_map_controls_v2`
+- Map page now includes direct actions for `My Pets` and `Health`.
+
+### 5. Main App Web Bluetooth Bridge
+
+- Health page now includes a `Bluetooth Bridge` card.
+- Frontend BLE GATT contract:
+  - Service UUID: `7b9f0001-6f3a-4f8a-9f4d-111111111111`
+  - Telemetry UUID: `7b9f0002-6f3a-4f8a-9f4d-222222222222`
+  - Message UUID: `7b9f0003-6f3a-4f8a-9f4d-333333333333`
+- Supported browsers:
+  - Chrome or Edge
+  - `localhost` or HTTPS
+- Capabilities:
+  - scan `PawTrace-*` devices
+  - connect to BLE GATT service
+  - subscribe to telemetry notifications
+  - read initial telemetry value
+  - normalize BLE JSON / compact payload and POST it to `/api/device/telemetry`
+  - write frontend messages to `Message UUID`
+  - store the most recent sent message as `bleLastMessage`
+  - show connection state, device name, stored packet count, latest JSON payload, and storage status
+- When the user is not signed in, BLE packets can still be received locally but are not stored to the backend.
+
+### 6. M5Stack Hardware Example Code
+
+New directory:
+
+```text
+hardware/m5stack/
+```
+
+New Wi-Fi HTTP sketch:
+
+```text
+hardware/m5stack/pawtrace_wifi_telemetry.ino
+```
+
+Capabilities:
+
+- Uses `M5StickCPlus`, `WiFi`, and `HTTPClient`.
+- Configurable Wi-Fi SSID and password.
+- Sends telemetry to the Mac LAN IP `/api/device/telemetry`.
+- Uses `x-device-token`.
+- Uploads JSON every `5000ms`.
+- Sends demo GPS, battery, GPS fix, satellite, HDOP, PPG placeholder, temperature, IMU activity, Wi-Fi RSSI, and upload state.
+
+New BLE GATT sketch:
+
+```text
+hardware/m5stack/pawtrace_ble_telemetry.ino
+```
+
+Capabilities:
+
+- Device name `PawTrace-001`.
+- Creates BLE GATT Server.
+- Telemetry characteristic supports `READ + NOTIFY`.
+- Message characteristic supports `READ + WRITE + WRITE_WITHOUT_RESPONSE`.
+- Uses `BLEDevice::setMTU(512)`.
+- Updates telemetry JSON every `2000ms`.
+- Uses IMU acceleration to estimate `REST / WALK / RUN`.
+- Maps `BtnA` to lost alert.
+- Supports frontend text or JSON writes and returns a message ack.
+- Telemetry JSON includes BLE UUIDs, last message, message sequence, notify sequence, and message age.
+- LCD displays connection state, sequence, last message, and payload summary.
+
+### 7. M5Stack Technical Documentation Update
+
+`docs/pawtrace-m5stack-telemetry.md` is expanded into a Wi-Fi + BLE dual-link document:
+
+- BLE is defined as near-field sync / provisioning, not long-range tracking.
+- Wi-Fi HTTP is defined as the remote upload / live map path.
+- Added BLE interface contract.
+- Added canonical BLE notify JSON.
+- Added compact BLE JSON.
+- Added compact CSV.
+- Added Web Bluetooth usage instructions.
+- Added both Arduino sketch paths.
+- Standardized local device token examples as `pawtrace-m5-dev-token`.
+- Updated local test URL example to `http://10.13.180.141:3000/api/device/telemetry`, with a note to replace the LAN IP when it changes.
+
+### 8. My Pets Layout and Logical Input
+
+- `Pets` page order is now:
+  - `Community Pets`
+  - `My Pets`
+- My Pets is placed below Community Pets using the previous vertical layout.
+- `pets-workspace` is now a vertical flex layout; the sticky My Pets side panel was removed.
+- The My Pets form is now label-driven instead of placeholder-driven.
+- The form uses `novalidate` and a custom `pet-form-error` alert area.
+- Required fields:
+  - `Pet name`
+  - `Species`
+  - `Emergency contact`
+- Input constraints:
+  - pet name max `40`
+  - species max `32` with datalist options: Dog, Cat, Rabbit, Bird, Reptile, Small pet, Other
+  - breed max `50`
+  - birthday / adoption date has `max=today`
+  - status max `80`
+  - health notes max `120`
+  - location max `80`
+  - emergency contact max `80`, accepting phone / email / WeChat ID
+  - emergency care note max `220`
+  - personality traits max `100`
+- Submit-time normalization:
+  - collapses whitespace
+  - traits support English comma, Chinese comma, English semicolon, and Chinese semicolon
+  - traits are deduplicated and capped at `6`
+- Validation:
+  - pet name must include a letter, number, or Chinese character
+  - species must describe the pet type and cannot be only symbols or numbers
+  - birthday / adoption date cannot be in the future
+  - emergency contact is required and must be at least `3` characters
+  - image must be an image file
+  - image size must be under `5MB`
+- Save defaults are now more logical:
+  - breed defaults to `Mixed / Unknown`
+  - status defaults to `{name} is ready for care tracking.`
+  - health defaults to `No known health notes.`
+  - traits are inferred from species: cat -> `Curious`, dog -> `Friendly`, other -> `Care profile`
+- Pet card label changed to `Birth/adoption`.
+- Monitor pet payload now includes birthday, traits, nfcContact, and nfcNote.
+
+### 9. NFC Emergency Pet Card
+
+- Frontend now parses NFC deep links:
+  - query parameters: `nfc`, `pet`, `nfcId`
+  - hash parameters such as `#pets?nfc=...`
+- NFC payload uses base64url JSON.
+- In deep-link scenarios, the login page is hidden and guest session can view the emergency pet card directly.
+- Supports copying:
+  - Emergency Card text
+  - NFC Link
+  - current NFC deep link
+  - owner contact
+- Contact conversion:
+  - URL -> direct link
+  - email -> `mailto:`
+  - phone-like value -> `tel:`
+- Public NFC card shows owner, contact, care note, location, and NFC code.
+
+### 10. Mobile Bottom Navigation
+
+- Mobile bottom nav now has 6 directly visible entries:
+  - Map
+  - Pets
+  - Chat
+  - Health
+  - AI
+  - Profile
+- Removed the old hidden More-tab set.
+- AI and Profile are no longer hidden behind More.
+- Labels are always visible on mobile.
+- Active tab no longer expands horizontally, reducing narrow-screen crowding.
+- Bottom padding was increased so the fixed navigation does not cover page content.
+
+### 11. AI Assist Information Architecture
+
+- The standalone `Video Behavior Check` tab was removed from the main navigation.
+- Video Behavior Check now lives inside `AI Assist` as `Video` mode.
+- AI Assist now has a Photo / Video segmented mode switch.
+- Legacy `#behaviour` hash redirects to the AI tab and switches to video mode.
+- AI Assist header now includes an AI status badge.
+- Photo mode includes photo checks, health reports, and diet guidance.
+- Video mode keeps upload, detection result, risk level, timeline, events, advice, and history compare.
+- Image preview logic was improved:
+  - uses shared `setPreviewImageSource()`
+  - shows JPG / PNG guidance when preview fails
+  - loading state explicitly hides results to prevent overlap
+- AI output status now shows source labels such as Qwen3.6, Qwen3.6 Vision, or Local fallback.
+
+### 12. Login, Privacy, and Guest Session
+
+- Login and register pages now include a `Data & Privacy Agreement` consent checkbox.
+- Login, register, and guest mode all require privacy agreement consent.
+- Added `privacy-agreement-modal`.
+- Profile page includes a `Data & Privacy Agreement` button.
+- Auth inputs now include autocomplete:
+  - `username`
+  - `current-password`
+  - `new-password`
+  - `name`
+- Guest session no longer writes a persistent auth token.
+- Guest pet store, guest My Pets store, and guest check-in store are isolated in memory.
+- Guest session does not send monitor collect events.
+- `setCurrentUser(null)` clears guest memory state.
+
+### 13. Profile, Chat, and Image Handling Fixes
+
+- Profile header now has quick actions:
+  - `Edit Profile`
+  - `Pets`
+- Profile side actions still include Edit Profile and now include Privacy Agreement.
+- `Pet Behavior Insight` was renamed to `Care Insight`.
+- Chat mobile contacts toggle now keeps its icon and span structure instead of replacing the whole button text.
+- Chat avatar no longer uses an empty `src`, preventing unnecessary browser requests.
+- Image preview and avatar updates now use `setPreviewImageSource()` consistently.
+- Share Image modal now clears the camera input as well.
+
+### 14. Health Page Telemetry Expansion
+
+- Health page now has quick actions:
+  - `Add Reading`
+  - `Map`
+- Health metric grid uses a fixed two-column mobile layout.
+- Added `health-manual-card` so the quick action can scroll to manual input.
+- Health now reads and displays BLE telemetry:
+  - BLE connected
+  - BLE RSSI
+  - BLE MTU
+  - notify sequence
+  - BLE source / transport
+- Health status distinguishes `BLE sync`, `Wi-Fi HTTP`, `M5Stack`, and `Manual`.
+- BLE packets enter vitals history, pet status, battery, activity, GPS, and Health Monitor views.
+
+### 15. Glass Dashboard BLE Extension
+
+- `pawtrace-glass/src/App.tsx` added BLE telemetry fields:
+  - `source`
+  - `transport`
+  - `bleConnected`
+  - `bleRssi`
+  - `bleMtu`
+  - `notifySeq`
+- Added `demoBlePacket`.
+- Dashboard top actions now include:
+  - `Send demo Wi-Fi packet`
+  - `Send demo BLE packet`
+- GPS logic now supports BLE:
+  - Wi-Fi telemetry still respects GPS fix.
+  - BLE telemetry can show live coordinate lock when coordinates are valid and location flag is not explicitly false.
+- Device status now shows link source:
+  - `BLE sync`
+  - `Wi-Fi HTTP`
+  - `M5Stack`
+- History table column changed from `Wi-Fi / upload` to `Link / upload`.
+- BLE rows show RSSI; Wi-Fi rows show HTTP upload code.
+- Raw packet title switches between `BLE JSON payload` and `Wi-Fi JSON payload`.
+
+### 16. Monitor Fixes
+
+- `monitor/index.html` now has an inline SVG favicon.
+- `hero-grid` and `section-grid` use `align-items: start`.
+- `.chart-frame[hidden]` explicitly uses `display: none`.
+- `.chart-frame > canvas` explicitly uses block layout and 100% width / height for more stable chart rendering.
+
+### 17. iOS, Vite, and Branding
+
+- Page title and primary brand copy are standardized as `PAWTRACE`.
+- iOS `CFBundleDisplayName` is now `PAWTRACE`.
+- Frontend Vite dev server allows:
+  - `.ngrok-free.dev`
+  - `.ngrok-free.app`
+- Main site now has favicon `/assets/1.png`.
+
+### 18. Documentation and Repository Cleanup
+
+- Removed old individual 8.2.0 through 8.9.0 documents:
+  - `plans/plans/pawtrace-8.2.0.md`
+  - `plans/plans/pawtrace-8.3.0.md`
+  - `plans/plans/pawtrace-8.4.0.md`
+  - `plans/plans/pawtrace-8.5.0.md`
+  - `plans/plans/pawtrace-8.6.0.md`
+  - `plans/plans/pawtrace-8.7.0.md`
+  - `plans/plans/pawtrace-8.8.0.md`
+  - `plans/plans/pawtrace-8.9.0.md`
+- The 8.2.0 - 8.9.0 release narrative remains in:
+  - `plans/plans/pawtrace-8.2.0-8.9.0.md`
+- Removed old 6.0.0 Glass Dashboard image artifacts:
+  - `plans/images/6.0.0/pawtrace-glass-dashboard-desktop-crop.png`
+  - `plans/images/6.0.0/pawtrace-glass-dashboard-desktop.png`
+  - `plans/images/6.0.0/pawtrace-glass-dashboard-detail.png`
+  - `plans/images/6.0.0/pawtrace-glass-dashboard-mobile.png`
+
+## API Change Summary
+
+| API | Change |
+| --- | --- |
+| `GET /api/status` | Adds AI and Video AI status |
+| `GET /api/ai/status` | New AI configuration status endpoint |
+| `POST /api/pet-prediction` | Supports Qwen or local fallback and returns source |
+| `POST /api/ai/qwen-advice` | Supports Qwen or local fallback and returns source / warning |
+| `POST /api/ai/gemini-advice` | Compatibility route using the same advice logic |
+| `POST /api/ai/qwen-diagnosis` | Supports Qwen Vision, Qwen text fallback, or local fallback |
+| `POST /api/ai/gemini-diagnosis` | Compatibility route using the same diagnosis logic |
+| `POST /api/ai/video-behavior` | Keeps upload analysis path with readable demo failure states |
+| `POST /api/chat` | Returns local fallback instead of hard 500 when AI fails |
+| `GET /api/map/tile/:z/:x/:y.png` | New map tile proxy |
+| `POST /api/device/telemetry` | Supports Wi-Fi JSON, BLE JSON, compact JSON, and compact CSV |
+| `GET /api/device/telemetry/latest` | Returns BLE metadata fields |
+| `GET /api/device/telemetry/history` | Returns BLE metadata fields |
+
+## Environment Variable Changes
+
+| Variable | 9.0.0 State |
+| --- | --- |
+| `DASHSCOPE_API_KEY` | Kept; AI uses local fallback when absent |
+| `DASHSCOPE_BASE_URL` | New, default `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| `QWEN_TEXT_MODEL` | New, default `qwen3.6-plus` |
+| `QWEN_VISION_MODEL` | New, default `qwen3.6-plus` |
+| `QWEN_ENABLE_THINKING` | New; when `true`, passes `enable_thinking` to DashScope |
+| `AI_TIMEOUT_MS` | Example value updated to `60000` |
+| `DEVICE_INGEST_TOKEN` | Example value updated to `pawtrace-m5-dev-token` |
+| `DEVICE_DEFAULT_USER` | Kept, default `demo` |
+| `VIDEO_AI_URL` | Kept for Video Behavior Check |
+
+## BLE GATT Contract
+
+```text
+Device name:         PawTrace-001
+Service UUID:        7b9f0001-6f3a-4f8a-9f4d-111111111111
+Telemetry UUID:      7b9f0002-6f3a-4f8a-9f4d-222222222222
+Telemetry property:  READ + NOTIFY
+Message UUID:        7b9f0003-6f3a-4f8a-9f4d-333333333333
+Message property:    READ + WRITE + WRITE_WITHOUT_RESPONSE
+```
+
+Recommended BLE notify JSON:
+
+```json
+{
+  "device_id": "pawtrace_001",
+  "source": "m5stickc-plus-ble",
+  "transport": "ble",
+  "battery_pct": 82,
+  "pet_bpm": 92,
+  "lat": 31.2983,
+  "lon": 120.5853,
+  "location_valid": true,
+  "gps_fix": 1,
+  "lost_alert": false,
+  "ble_rssi": -58,
+  "ble_mtu": 185,
+  "ble_message_uuid": "7b9f0003-6f3a-4f8a-9f4d-333333333333",
+  "ble_last_message": "hello from web bridge",
+  "ble_message_seq": 1
+}
+```
+
+Compact CSV:
+
+```text
+pawtrace_001,82,92,31.2983,120.5853,0
+```
+
+## Key Impacted Files
+
+### Backend
+
+- `backend/package.json`
+- `backend/package-lock.json`
+- `backend/src/config.ts`
+- `backend/src/registerRoutes.ts`
+- `backend/src/services/aiService.ts`
+- `.env.example`
+- `backend/.env.example`
+
+### Main App
+
+- `frontend/index.html`
+- `frontend/public/app/app.js`
+- `frontend/public/app/style.tailwind.css`
+- `frontend/public/app/app.css`
+- `frontend/public/map.js`
+- `frontend/vite.config.ts`
+- `frontend/ios/App/App/Info.plist`
+
+### Hardware
+
+- `hardware/m5stack/pawtrace_wifi_telemetry.ino`
+- `hardware/m5stack/pawtrace_ble_telemetry.ino`
+
+### Dashboard / Monitor
+
+- `pawtrace-glass/src/App.tsx`
+- `monitor/index.html`
+
+### Documentation and Plans
+
+- `docs/pawtrace-m5stack-telemetry.md`
+- `plans/plans/pawtrace-9.0.0.md`
+- `plans/plans/pawtrace-8.2.0-8.9.0.md`
+
+## Verification Status
+
+Passed:
+
+```bash
+npm run build
+```
+
+This covers:
+
+- `npm run build --prefix frontend`
+- `npm run build --prefix pawtrace-glass`
+- `npm run build --prefix backend`
+
+Previous targeted checks also passed:
+
+```bash
+node --check frontend/public/app/app.js
+npm run build --prefix frontend
+git diff --check -- frontend/index.html frontend/public/app/app.js frontend/public/app/style.tailwind.css frontend/public/app/app.css
+```
+
+Manual / scripted verification:
+
+- My Pets form validation markers exist.
+- Mobile bottom nav contains six direct entries: `map,pets,chat,health,ai,profile`.
+- Local Vite service at `http://127.0.0.1:5173/` returns `200 OK`.
+- Backend accepted a simulated BLE/GPS telemetry packet, verified LocationPoint and BLE metadata storage, then test data was cleaned up.
+
+## Known Limitations and Remaining Risks
+
+- GitHub push is not complete: local commit `b212ebe` exists, but remote push was blocked by GitHub HTTPS token and SSH public key authentication.
+- Web Bluetooth only works in Chrome / Edge on localhost or HTTPS; Safari does not support this path.
+- BLE is near-field sync and should not replace remote tracking; remote location should still use Wi-Fi HTTP or mobile-network upload.
+- Arduino examples still contain demo / placeholder GPS, BPM, SpO2, and temperature values until real GPS v1.1 and Heart Rate HAT parsing is wired in.
+- `DEVICE_INGEST_TOKEN=pawtrace-m5-dev-token` is a development example and must be replaced in production.
+- AI local fallback is for demo and resilience; it is not equivalent to real Qwen output.
+- Image and video health / behavior analysis remains observation support only and is not veterinary diagnosis.
+- The map tile proxy depends on external OSM / CARTO services; production deployment must follow the tile usage policies.
+
+## Pre-Release Checklist
+
+- Restore GitHub authentication and push the current branch.
+- Replace production `JWT_SECRET`, `DEVICE_INGEST_TOKEN`, `DASHSCOPE_API_KEY`, `CORS_ORIGIN`, and Video AI URL as needed.
+- Send one Wi-Fi packet using `hardware/m5stack/pawtrace_wifi_telemetry.ino`.
+- Connect `hardware/m5stack/pawtrace_ble_telemetry.ino` to Web Bluetooth, send a message, and receive notify packets.
+- Open main App `Health -> Bluetooth Bridge` and confirm BLE connection, message write, payload display, and backend storage.
+- Open main App `Map` and confirm zoom, fence, route, manual GPS sample, clear, and restore.
+- Open main App `Pets` and confirm Community Pets appears above My Pets and form validation works.
+- Open mobile viewport and confirm the six-entry bottom navigation does not cover content.
+- Open `pawtrace-glass` and send both Wi-Fi and BLE demo packets.
+- Open Monitor and confirm chart canvas rendering.
+- Run `npm run build` again.
+
+## Conclusion
+
+PawTrace 9.0.0 is the hardware and product-availability consolidation release. It combines BLE near-field sync, Wi-Fi remote upload, backend telemetry normalization, map geofence and route tooling, Health BLE Bridge, AI fallback, NFC emergency cards, My Pets input validation, and direct mobile navigation into one demo-ready technical package. The code builds locally; the next operational step is restoring GitHub authentication and pushing the local commits.

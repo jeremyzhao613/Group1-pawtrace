@@ -28,6 +28,8 @@
     let textServiceRunBtn = null;
     let textServiceClearBtn = null;
     let selectedAIService = 'diagnosis';
+    let selectedAIMode = 'photo';
+    let setAIAssistMode = null;
     let petsInitialized = false;
     let rerenderPets = null;
     let chatInitialized = false;
@@ -35,50 +37,58 @@
     let chatHoverCard = null;
     let petCheckInInitialized = false;
     let deviceTelemetryPollTimer = null;
+    let bluetoothBridgeInitialized = false;
+    const bluetoothBridgeState = {
+      device: null,
+      telemetryChar: null,
+      messageChar: null,
+      storedCount: 0,
+      lastMessage: '',
+    };
     let activeTabName = 'map';
     let activateAppTab = null;
     let modalSystemInitialized = false;
     let activeModalId = null;
     let lastModalTrigger = null;
+    let currentGuestUser = null;
+    let guestPetStore = [];
+    let guestMyPetStore = [];
+    let guestCheckInStore = {};
+    let activeNfcPetCard = null;
+    let activeNfcTargetId = '';
     const TAB_HEADER_META = {
       map: {
-        eyebrow: 'PawTrace',
+        eyebrow: 'PAWTRACE',
         title: 'Campus Map',
         subtitle: 'Campus spots · Pet locations',
         path: 'campus-map'
       },
       pets: {
-        eyebrow: 'PawTrace',
+        eyebrow: 'PAWTRACE',
         title: 'Pet Cards',
         subtitle: 'Community feed · My pets',
         path: 'pet-cards'
       },
       chat: {
-        eyebrow: 'PawTrace',
+        eyebrow: 'PAWTRACE',
         title: 'Friends Chat',
         subtitle: 'Friends · Care context',
         path: 'friends-chat'
       },
       health: {
-        eyebrow: 'PawTrace',
+        eyebrow: 'PAWTRACE',
         title: 'Health Monitoring',
         subtitle: 'Latest vitals · Trend history',
         path: 'health-monitoring'
       },
-      behaviour: {
-        eyebrow: 'PawTrace',
-        title: 'Video Behavior Check',
-        subtitle: 'Video upload · Movement notes · Follow-up review',
-        path: 'video-behaviour-check'
-      },
       ai: {
-        eyebrow: 'PawTrace',
+        eyebrow: 'PAWTRACE',
         title: 'AI Assist',
-        subtitle: 'Photo diagnosis · Care reports',
+        subtitle: 'Photo checks · Video behavior review',
         path: 'ai-assist'
       },
       profile: {
-        eyebrow: 'PawTrace',
+        eyebrow: 'PAWTRACE',
         title: 'Profile Center',
         subtitle: 'Owner card · Settings',
         path: 'profile-center'
@@ -154,6 +164,12 @@
           if (modalId) setModalState(modalId, false);
           return;
         }
+        const openButton = target.closest('[data-modal-open]');
+        if (openButton) {
+          const modalId = openButton.getAttribute('data-modal-open');
+          if (modalId) setModalState(modalId, true);
+          return;
+        }
         const modalRoot = target.closest('.app-modal');
         if (modalRoot && target === modalRoot) {
           setModalState(modalRoot.id, false);
@@ -175,7 +191,7 @@
       pendingAvatarData = null;
       if (editAvatarFileInput) editAvatarFileInput.value = '';
       if (profileAvatarPreviewImg) {
-        profileAvatarPreviewImg.src = currentUser.avatar || DEFAULT_PET_AVATAR;
+        setPreviewImageSource(profileAvatarPreviewImg, currentUser.avatar || DEFAULT_PET_AVATAR);
       }
       document.getElementById('edit-display-name').value = currentUser.displayName || '';
       document.getElementById('edit-bio').value = currentUser.bio || '';
@@ -200,13 +216,15 @@
       const urlInput = document.getElementById('share-image-url');
       const captionInput = document.getElementById('share-image-caption');
       const fileInput = document.getElementById('share-image-file');
+      const cameraInput = document.getElementById('share-camera-file');
       shareImageSource = '';
       shareImageIsUpload = false;
       if (urlInput) urlInput.value = '';
       if (captionInput) captionInput.value = '';
       if (fileInput) fileInput.value = '';
+      if (cameraInput) cameraInput.value = '';
       if (preview) preview.classList.add('hidden');
-      if (previewImg) previewImg.src = '';
+      setPreviewImageSource(previewImg, '');
       if (modal) setModalState('share-image-modal', true);
     }
 
@@ -216,14 +234,16 @@
       const urlInput = document.getElementById('share-image-url');
       const captionInput = document.getElementById('share-image-caption');
       const fileInput = document.getElementById('share-image-file');
+      const cameraInput = document.getElementById('share-camera-file');
       shareImageSource = '';
       shareImageIsUpload = false;
       setModalState('share-image-modal', false);
       if (preview) preview.classList.add('hidden');
-      if (previewImg) previewImg.src = '';
+      setPreviewImageSource(previewImg, '');
       if (urlInput) urlInput.value = '';
       if (captionInput) captionInput.value = '';
       if (fileInput) fileInput.value = '';
+      if (cameraInput) cameraInput.value = '';
     }
 
     // --- Simple scroll reveal ---
@@ -288,20 +308,47 @@
       if (!user) return;
       const safeUser = normalizeSessionUser(user);
       setCurrentUser(safeUser);
+      if (safeUser.username === 'guest') {
+        return;
+      }
       let users = loadUsers();
       users = users.map(u => u.username === safeUser.username ? safeUser : u);
       saveUsers(users);
     }
     function setCurrentUser(user) {
-      if (user) localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(normalizeSessionUser(user)));
-      else localStorage.removeItem(LS_CURRENT_USER_KEY);
+      if (user) {
+        const normalized = normalizeSessionUser(user);
+        if (normalized.username === 'guest') {
+          currentGuestUser = normalized;
+          localStorage.removeItem(LS_CURRENT_USER_KEY);
+          localStorage.removeItem(LS_AUTH_TOKEN_KEY);
+          return;
+        }
+        currentGuestUser = null;
+        localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(normalized));
+        return;
+      }
+      currentGuestUser = null;
+      guestPetStore = [];
+      guestMyPetStore = [];
+      guestCheckInStore = {};
+      localStorage.removeItem(LS_CURRENT_USER_KEY);
     }
     function getCurrentUser() {
+      if (currentGuestUser) return currentGuestUser;
       try {
         const user = sanitizeStoredUser(JSON.parse(localStorage.getItem(LS_CURRENT_USER_KEY)));
+        if (user?.username === 'guest') {
+          localStorage.removeItem(LS_CURRENT_USER_KEY);
+          return null;
+        }
         if (user) localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(user));
         return user;
       } catch { return null; }
+    }
+
+    function isGuestSession(user = getCurrentUser()) {
+      return !getAuthToken() && user?.username === 'guest';
     }
 
     function setAuthToken(token) {
@@ -362,12 +409,114 @@
       return fallback;
     }
 
+    function base64UrlEncode(value = '') {
+      const bytes = new TextEncoder().encode(String(value));
+      let binary = '';
+      bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function base64UrlDecode(value = '') {
+      const normalized = String(value).replace(/-/g, '+').replace(/_/g, '/');
+      const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+      const binary = atob(padded);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+
+    function getHashPathAndParams() {
+      const raw = window.location.hash.replace(/^#/, '');
+      const [path = '', query = ''] = raw.split('?');
+      return {
+        path: path.split('/')[0],
+        params: new URLSearchParams(query)
+      };
+    }
+
+    function normalizeNfcPetPayload(payload = {}) {
+      const raw = payload && typeof payload === 'object' ? payload : {};
+      const id = String(raw.id || raw.i || raw.petId || raw.nfcId || raw.nid || `nfc-${Date.now()}`).trim();
+      const contact = String(raw.nfcContact || raw.c || raw.ownerContact || raw.contact || '').trim();
+      return {
+        id,
+        nfcId: String(raw.nfcId || raw.nid || buildPetNfcId({ id }, 0)).trim(),
+        name: String(raw.name || raw.n || 'Found pet').trim(),
+        type: String(raw.type || raw.t || 'Pet').trim(),
+        breed: String(raw.breed || raw.b || 'Unknown').trim(),
+        avatar: safeImageSrc(raw.avatar || raw.img || '', DEFAULT_PET_AVATAR),
+        location: String(raw.location || raw.l || 'Campus').trim(),
+        health: String(raw.health || raw.h || 'No health notes provided.').trim(),
+        nfcContact: contact,
+        nfcNote: String(raw.nfcNote || raw.m || 'Please contact the owner if this pet is found.').trim(),
+        ownerName: String(raw.ownerName || raw.o || 'Pet owner').trim(),
+        ownerCampus: String(raw.ownerCampus || raw.campus || 'Taicang').trim(),
+        publicNfc: true
+      };
+    }
+
+    function readNfcDeepLink() {
+      const query = new URLSearchParams(window.location.search);
+      const hash = getHashPathAndParams();
+      const encoded = query.get('nfc') || hash.params.get('nfc');
+      const targetId = query.get('pet') || query.get('nfcId') || hash.params.get('pet') || hash.params.get('nfcId') || '';
+      if (encoded) {
+        try {
+          const parsed = JSON.parse(base64UrlDecode(encoded));
+          return {
+            pet: normalizeNfcPetPayload(parsed),
+            targetId: String(parsed.id || parsed.i || parsed.nfcId || parsed.nid || targetId || '').trim()
+          };
+        } catch (err) {
+          console.warn('Invalid NFC pet link payload', err);
+        }
+      }
+      return { pet: null, targetId: String(targetId).trim() };
+    }
+
+    function contactHref(value = '') {
+      const contact = String(value || '').trim();
+      if (!contact) return '';
+      if (/^https?:\/\//i.test(contact)) return contact;
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) return `mailto:${contact}`;
+      const phone = contact.replace(/[^\d+]/g, '');
+      if (phone.length >= 6) return `tel:${phone}`;
+      return '';
+    }
+
+    function restoreImagePreviewElement(img) {
+      if (!img) return;
+      delete img.dataset.fallback;
+      img.style.display = '';
+      const fallback = img.nextElementSibling;
+      if (fallback?.classList?.contains('img-fallback')) fallback.remove();
+    }
+
+    function setPreviewImageSource(img, src) {
+      if (!img) return;
+      restoreImagePreviewElement(img);
+      if (src) {
+        img.src = src;
+      } else {
+        img.removeAttribute('src');
+      }
+    }
+
+    function setChatToggleLabel(button, label) {
+      if (!button) return;
+      const labelEl = button.querySelector('span');
+      if (labelEl) {
+        labelEl.textContent = label;
+        return;
+      }
+      button.textContent = label;
+    }
+
     function createGuestUser() {
       return {
         username: 'guest',
         displayName: 'Guest Explorer',
         avatar: 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png',
-        bio: 'Exploring PawTrace without logging in.',
+        bio: 'Exploring PAWTRACE without logging in.',
         campus: 'Taicang',
         contact: 'N/A',
         starSign: '',
@@ -406,9 +555,10 @@
       const riskTitleEl = document.getElementById('behaviour-risk-title');
       const riskBadgeEl = document.getElementById('behaviour-risk-badge');
       const riskCopyEl = document.getElementById('behaviour-risk-copy');
-      const riskMeterSteps = Array.from(document.querySelectorAll('#tab-behaviour .behaviour-risk-meter span'));
-      const timeAxisEl = document.querySelector('#tab-behaviour .behaviour-time-axis');
-      const timelineTitleEl = document.querySelector('#tab-behaviour .behaviour-timeline-card h3');
+      const videoPanel = document.getElementById('ai-video-panel');
+      const riskMeterSteps = Array.from((videoPanel || document).querySelectorAll('.behaviour-risk-meter span'));
+      const timeAxisEl = (videoPanel || document).querySelector('.behaviour-time-axis');
+      const timelineTitleEl = (videoPanel || document).querySelector('.behaviour-timeline-card h3');
       if (!fileInput || !dropzone || !timelineEl) return;
 
       let previewUrl = '';
@@ -434,7 +584,7 @@
             ? 'Multiple behavior signals appeared in the same clip. Record frequency, duration, and context, and consult a veterinarian if needed.'
             : normalized === 'low'
               ? 'No strong abnormal movement cluster was detected. Keep short videos for future comparison.'
-              : 'Some behaviors are above the weekly baseline. PawTrace only provides observation hints and does not judge the cause.';
+              : 'Some behaviors are above the weekly baseline. PAWTRACE only provides observation hints and does not judge the cause.';
         }
       }
 
@@ -743,6 +893,11 @@
       const authMsg = document.getElementById('auth-message');
       const mobileTabbar = document.getElementById('mobile-tabbar');
       const guestAccessBtn = document.getElementById('btn-guest-access');
+      const authPrivacyConsent = document.getElementById('auth-privacy-consent');
+      const nfcDeepLink = readNfcDeepLink();
+      activeNfcPetCard = nfcDeepLink.pet;
+      activeNfcTargetId = nfcDeepLink.targetId || nfcDeepLink.pet?.id || nfcDeepLink.pet?.nfcId || '';
+      const hasNfcDeepLink = Boolean(activeNfcPetCard || activeNfcTargetId);
       aiServiceOutputEl = document.getElementById('ai-service-output');
       aiServiceStatusEl = document.getElementById('ai-service-status');
       aiServiceButtons = Array.from(document.querySelectorAll('.ai-service-card[data-ai-service]'));
@@ -752,6 +907,16 @@
       const chatLeftPane = document.getElementById('chat-left-pane');
       const chatBackBtn = document.getElementById('chat-back-btn');
       const chatTabBack = document.getElementById('chat-tab-back');
+      const mapOpenPetsBtn = document.getElementById('map-open-pets');
+      const mapOpenHealthBtn = document.getElementById('map-open-health');
+      const healthJumpManualBtn = document.getElementById('health-jump-manual');
+      const healthOpenMapBtn = document.getElementById('health-open-map');
+      const profileQuickEditBtn = document.getElementById('btn-profile-quick-edit');
+      const profileOpenPetsBtn = document.getElementById('profile-open-pets');
+      const healthManualCard = document.getElementById('health-manual-card');
+      const aiModeButtons = Array.from(document.querySelectorAll('[data-ai-mode]'));
+      const aiPhotoPanel = document.getElementById('ai-photo-panel');
+      const aiVideoPanel = document.getElementById('ai-video-panel');
       diagFileInput = document.getElementById('diag-file');
       diagDropzone = document.getElementById('diag-dropzone');
       diagPreview = document.getElementById('diag-preview');
@@ -772,6 +937,25 @@
       textServiceRunBtn = document.getElementById('text-service-run');
       textServiceClearBtn = document.getElementById('text-service-clear');
       const aiUpgradeBtn = document.getElementById('btn-ai-upgrade');
+      const aiStatusBadge = document.getElementById('ai-status-badge');
+
+      setAIAssistMode = (mode = 'photo') => {
+        selectedAIMode = mode === 'video' ? 'video' : 'photo';
+        const showVideo = selectedAIMode === 'video';
+        aiModeButtons.forEach((button) => {
+          const active = button.getAttribute('data-ai-mode') === selectedAIMode;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        aiPhotoPanel?.classList.toggle('hidden', showVideo);
+        aiPhotoPanel?.setAttribute('aria-hidden', showVideo ? 'true' : 'false');
+        aiVideoPanel?.classList.toggle('hidden', !showVideo);
+        aiVideoPanel?.setAttribute('aria-hidden', showVideo ? 'false' : 'true');
+      };
+      aiModeButtons.forEach((button) => {
+        button.addEventListener('click', () => setAIAssistMode?.(button.getAttribute('data-ai-mode') || 'photo'));
+      });
+      setAIAssistMode('photo');
 
       const tabLogin = document.getElementById('tab-login');
       const tabRegister = document.getElementById('tab-register');
@@ -789,8 +973,29 @@
         realMapTiles: document.getElementById('real-map-tiles'),
         realMapFrame: document.getElementById('real-map-frame'),
         realMapLink: document.getElementById('real-map-link'),
+        overlayLayer: document.getElementById('map-overlay-layer'),
         markersLayer: document.getElementById('map-markers-layer'),
         petsLayer: document.getElementById('map-pets-layer'),
+        controls: {
+          zoomIn: document.getElementById('map-zoom-in'),
+          zoomOut: document.getElementById('map-zoom-out'),
+          reset: document.getElementById('map-reset-view'),
+          zoomLabel: document.getElementById('map-zoom-label'),
+          fenceToggle: document.getElementById('map-toggle-fence'),
+          tracksToggle: document.getElementById('map-toggle-tracks'),
+          toolPetName: document.getElementById('map-tool-pet-name'),
+          fenceStatus: document.getElementById('map-fence-status'),
+          fenceEnabled: document.getElementById('map-fence-enable'),
+          fenceRadius: document.getElementById('map-fence-radius'),
+          fenceRadiusValue: document.getElementById('map-fence-radius-value'),
+          fencePickCenter: document.getElementById('map-fence-pick-center'),
+          fenceCenterCurrent: document.getElementById('map-fence-center-current'),
+          trackActiveOnly: document.getElementById('map-track-active-only'),
+          trackAddPoint: document.getElementById('map-track-add-point'),
+          trackClear: document.getElementById('map-track-clear'),
+          trackRestore: document.getElementById('map-track-restore'),
+          trackStatus: document.getElementById('map-track-status')
+        },
         petLocationListEl: document.getElementById('pet-location-feed'),
         trackedCountEl: document.getElementById('tracked-pet-count'),
         locationListEl: document.getElementById('location-list'),
@@ -858,13 +1063,13 @@
       if (chatToggleContacts && chatLeftPane) {
         chatToggleContacts.addEventListener('click', () => {
           const isOpen = chatLeftPane.classList.toggle('open');
-          chatToggleContacts.textContent = isOpen ? 'Hide friends' : 'Show friends';
+          setChatToggleLabel(chatToggleContacts, isOpen ? 'Hide friends' : 'Show friends');
         });
       }
       if (chatBackBtn && chatLeftPane) {
         chatBackBtn.addEventListener('click', () => {
           chatLeftPane.classList.add('open');
-          if (chatToggleContacts) chatToggleContacts.textContent = 'Hide friends';
+          setChatToggleLabel(chatToggleContacts, 'Hide friends');
         });
       }
       if (chatTabBack) {
@@ -872,6 +1077,15 @@
           document.querySelector('.app-tab[data-tab="pets"]')?.click();
         });
       }
+      mapOpenPetsBtn?.addEventListener('click', () => activateAppTab?.('pets'));
+      mapOpenHealthBtn?.addEventListener('click', () => activateAppTab?.('health'));
+      healthOpenMapBtn?.addEventListener('click', () => activateAppTab?.('map'));
+      profileOpenPetsBtn?.addEventListener('click', () => activateAppTab?.('pets'));
+      profileQuickEditBtn?.addEventListener('click', openProfileEditModal);
+      healthJumpManualBtn?.addEventListener('click', () => {
+        healthManualCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        document.getElementById('health-input-temp')?.focus({ preventScroll: true });
+      });
       aiUpgradeBtn?.addEventListener('click', () => {
       alert('AI tips are drafts for organizing care notes. For urgent or worsening symptoms, contact a veterinarian.');
       });
@@ -899,9 +1113,7 @@
         }
         try {
           const dataUrl = await fileToDataURL(file);
-          if (diagPreviewImg) diagPreviewImg.src = dataUrl;
-          diagPreview?.classList.remove('hidden');
-          diagPlaceholder?.classList.add('hidden');
+          showDiagnosisPreview(dataUrl);
           if (diagResult) {
             diagResult.innerHTML = `
               <div class="text-[11px] text-gray-600">
@@ -961,7 +1173,7 @@
         if (profileSideFocusEl) profileSideFocusEl.textContent = user.mainPetName || 'Not set';
         if (profilePetNotesEl) profilePetNotesEl.textContent = user.mainPetNotes || 'Share habits and quirks to give the AI more context.';
         if (petInsightText) {
-          petInsightText.textContent = user.petInsight || 'Tap "Ask AI" to get a behavior prediction.';
+          petInsightText.textContent = user.petInsight || 'Tap "Ask AI" to get a care insight.';
         }
       }
 
@@ -1017,6 +1229,39 @@
         }
       }
 
+      function aiSourceLabel(source = '') {
+        if (source === 'qwen-vl') return 'Qwen3.6 Vision';
+        if (source === 'qwen' || source === 'qwen-text-fallback') return 'Qwen3.6';
+        if (source === 'local') return 'Local fallback';
+        return 'AI';
+      }
+
+      function setAIStatusBadge(message, mode = 'unknown') {
+        if (!aiStatusBadge) return;
+        aiStatusBadge.textContent = message;
+        aiStatusBadge.classList.toggle('text-green-600', mode === 'ready');
+        aiStatusBadge.classList.toggle('text-amber-600', mode === 'fallback');
+        aiStatusBadge.classList.toggle('text-gray-500', mode !== 'ready' && mode !== 'fallback');
+      }
+
+      async function refreshAIStatus() {
+        try {
+          const response = getAuthToken()
+            ? await authJsonFetch('/api/ai/status')
+            : await fetch(apiUrl('/api/ai/status'));
+          if (!response.ok) throw new Error('AI status unavailable');
+          const data = await response.json();
+          if (data?.dashscopeConfigured) {
+            setAIStatusBadge(`AI status: ${data.textModel || 'qwen3.6-plus'} ready`, 'ready');
+          } else {
+            setAIStatusBadge('AI status: local fallback', 'fallback');
+          }
+        } catch (err) {
+          console.warn('AI status check failed', err);
+          setAIStatusBadge('AI status: unavailable', 'fallback');
+        }
+      }
+
       function setDiagStatus(message, isError = false) {
         if (!diagStatus) return;
         diagStatus.textContent = message;
@@ -1026,13 +1271,28 @@
       }
 
       function toggleDiagLoading(show) {
-        if (diagLoading) diagLoading.classList.toggle('hidden', !show);
+        if (diagLoading) {
+          diagLoading.classList.toggle('hidden', !show);
+          diagLoading.setAttribute('aria-hidden', show ? 'false' : 'true');
+          diagLoading.style.display = show ? '' : 'none';
+        }
+        if (diagResult) {
+          diagResult.classList.toggle('hidden', show);
+          diagResult.setAttribute('aria-hidden', show ? 'true' : 'false');
+          diagResult.style.display = show ? 'none' : '';
+        }
       }
 
       function resetDiagnosisUI() {
+        diagDropzone?.classList.remove('has-preview', 'has-preview-error');
         if (diagPreview) diagPreview.classList.add('hidden');
         if (diagPlaceholder) diagPlaceholder.classList.remove('hidden');
-        if (diagPreviewImg) diagPreviewImg.src = '';
+        if (diagPreviewImg) {
+          diagPreviewImg.removeAttribute('data-loaded');
+          diagPreviewImg.onload = null;
+          diagPreviewImg.onerror = null;
+          setPreviewImageSource(diagPreviewImg, '');
+        }
         if (diagFileInput) diagFileInput.value = '';
         if (diagSymptoms) diagSymptoms.value = '';
         if (diagResult) {
@@ -1050,8 +1310,28 @@
         if (diagStatus) diagStatus.classList.add('hidden');
       }
 
+      function showDiagnosisPreview(dataUrl) {
+        if (!diagPreview || !diagPreviewImg) return;
+        diagDropzone?.classList.remove('has-preview-error');
+        diagDropzone?.classList.add('has-preview');
+        diagPreview.classList.remove('hidden');
+        diagPlaceholder?.classList.add('hidden');
+        diagPreviewImg.removeAttribute('data-loaded');
+        diagPreviewImg.onload = () => {
+          diagPreviewImg.setAttribute('data-loaded', 'true');
+          diagDropzone?.classList.remove('has-preview-error');
+        };
+        diagPreviewImg.onerror = () => {
+          diagPreviewImg.removeAttribute('data-loaded');
+          diagDropzone?.classList.add('has-preview-error');
+          setDiagStatus('Preview unavailable for this image format. Try JPG or PNG for visible preview.', true);
+        };
+        setPreviewImageSource(diagPreviewImg, dataUrl);
+      }
+
       function renderDiagnosisResult(text) {
         if (!diagResult) return;
+        toggleDiagLoading(false);
         const formatted = escapeHtml(text)
           .replace(/\n/g, '<br/>')
           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -1099,7 +1379,7 @@
             const data = await response.json();
             const text = data?.result || data?.text || 'Unable to generate analysis. Please try a clearer photo.';
             renderDiagnosisResult(text);
-            setDiagStatus('Photo check complete');
+            setDiagStatus(`Photo check complete · ${aiSourceLabel(data?.source)}`, data?.source === 'local');
           } else {
             const response = await authJsonFetch('/api/ai/qwen-advice', {
               method: 'POST',
@@ -1114,7 +1394,7 @@
               const data = await response.json();
               const text = data?.result || data?.text || 'No response received.';
               renderDiagnosisResult(text);
-              setDiagStatus('AI analysis complete (text only)');
+              setDiagStatus(`AI analysis complete · ${aiSourceLabel(data?.source)}`, data?.source === 'local');
             } else {
               throw new Error('Text-only AI request failed');
             }
@@ -1154,7 +1434,7 @@
           btn.classList.toggle('ring-2', btn.getAttribute('data-ai-service') === serviceKey);
           btn.classList.toggle('ring-primary', btn.getAttribute('data-ai-service') === serviceKey);
           btn.classList.toggle('bg-white', btn.getAttribute('data-ai-service') === serviceKey);
-          btn.classList.toggle('scale-[1.02]', btn.getAttribute('data-ai-service') === serviceKey);
+          btn.classList.toggle('scale-[1.02]', btn.getAttribute('data-ai-service') === serviceKey && window.innerWidth > 640);
         });
         if (serviceKey === 'diagnosis') {
           diagPanel?.classList.remove('hidden');
@@ -1225,7 +1505,8 @@
           const result = data?.result || data?.text;
           if (result) {
             renderTextResult(result);
-            setAIServiceStatus(`Complete · ${AI_SERVICE_CONFIG[selectedAIService]?.label || 'AI report'}`);
+            const sourceLabel = aiSourceLabel(data?.source);
+            setAIServiceStatus(`Complete · ${AI_SERVICE_CONFIG[selectedAIService]?.label || 'AI report'} · ${sourceLabel}`, data?.source === 'local');
             return;
           }
         } catch (err) {
@@ -1274,13 +1555,6 @@
               - Reminder: ${rand(['check vaccine dates in the profile', 'record the next vet visit date', 'update the latest health note after the next checkup'])}.
               - ${rand(['Add dental care notes twice a week', 'Check ears after outdoor play', 'Check paw pads in dry weather'])}.
             `;
-          case 'behavior':
-            return `
-              **Behavior Insight**
-              - ${rand(['Restless sniffing may mean your pet needs more structured enrichment', 'Pacing or a low tail can be a sign to slow the interaction down', 'Extra indoor energy may improve with shorter play sessions before bedtime'])}.
-              - ${rand(['Reward calm observation on walks', 'Use a simple settle cue before guests arrive', 'Keep training sessions short and predictable'])}.
-              - ${rand(['Record when the behavior appears', 'Compare behavior before and after meals or walks', 'Keep greetings calm this week'])}.
-            `;
           case 'diet':
             return `
               **Diet Guide**
@@ -1302,7 +1576,7 @@
         if (!file) {
           pendingAvatarData = null;
           if (profileAvatarPreviewImg) {
-            profileAvatarPreviewImg.src = (getCurrentUser()?.avatar) || DEFAULT_PET_AVATAR;
+            setPreviewImageSource(profileAvatarPreviewImg, (getCurrentUser()?.avatar) || DEFAULT_PET_AVATAR);
           }
           return;
         }
@@ -1314,7 +1588,7 @@
         try {
           const data = await fileToDataURL(file);
           pendingAvatarData = data;
-          if (profileAvatarPreviewImg) profileAvatarPreviewImg.src = data;
+          setPreviewImageSource(profileAvatarPreviewImg, data);
         } catch (err) {
           console.warn('Avatar load failed', err);
           pendingAvatarData = null;
@@ -1330,22 +1604,25 @@
         const displayName = user.displayName || user.username;
         const avatar = user.avatar || 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png';
         currentUserNameEl.textContent = displayName;
-        currentUserAvatarEl.src = avatar;
+        setPreviewImageSource(currentUserAvatarEl, avatar);
         if (sidebarUserNameEl) sidebarUserNameEl.textContent = displayName;
         if (headerConnectionStatusEl) headerConnectionStatusEl.textContent = `${user.campus || 'Taicang'} · Connected`;
-        profileAvatarEl.src = avatar;
+        setPreviewImageSource(profileAvatarEl, avatar);
         profileNameEl.textContent = displayName;
         profileUsernameEl.textContent = '@' + user.username;
-        profileBioEl.textContent = user.bio || 'Welcome to PawTrace!';
+        profileBioEl.textContent = user.bio || 'Welcome to PAWTRACE!';
         profileCampusEl.textContent = user.campus || 'Taicang';
         profileContactEl.textContent = user.contact || 'Contact: N/A';
         updateProfileDetails(user);
         initTabs();
         initPets();
+        window.openNfcPetDeepLink?.();
         initHealthMonitor();
+        initBluetoothTelemetryBridge();
         mapController?.refreshTrackedPets?.();
         initChat();
         handleScrollReveal();
+        refreshAIStatus();
         fetchPetInsight();
         startDeviceTelemetrySync();
       }
@@ -1367,9 +1644,36 @@
 
       tabLogin.addEventListener('click', () => switchAuthTab('login'));
       tabRegister.addEventListener('click', () => switchAuthTab('register'));
+      authPrivacyConsent?.addEventListener('change', () => {
+        if (authPrivacyConsent.checked && authMsg.textContent.includes('Data & Privacy Agreement')) {
+          authMsg.textContent = '';
+        }
+      });
+
+      function ensurePrivacyConsent() {
+        if (authPrivacyConsent?.checked) return true;
+        authMsg.textContent = 'Please read and agree to the Data & Privacy Agreement before continuing.';
+        authPrivacyConsent?.focus({ preventScroll: true });
+        return false;
+      }
+
+      function applyAuthenticatedSession(data = {}) {
+        if (!data.token || !data.user) {
+          throw new Error('Authenticated session is incomplete.');
+        }
+        const localProfile = loadUsers().find(x => x.username === data.user.username) || {};
+        const sessionUser = normalizeSessionUser({ ...localProfile, ...data.user });
+        setAuthToken(data.token);
+        saveUsers([...loadUsers().filter(x => x.username !== sessionUser.username), sessionUser]);
+        setCurrentUser(sessionUser);
+        authMsg.textContent = '';
+        showApp(sessionUser);
+        return sessionUser;
+      }
 
       loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!ensurePrivacyConsent()) return;
         const username = loginUsername.value.trim();
         const password = loginPassword.value;
         if (!username || !password) {
@@ -1387,13 +1691,7 @@
           if (!response.ok || !data.token || !data.user) {
             throw new Error(data.error || 'Incorrect username or password.');
           }
-          const localProfile = loadUsers().find(x => x.username === data.user.username) || {};
-          const sessionUser = normalizeSessionUser({ ...localProfile, ...data.user });
-          setAuthToken(data.token);
-          saveUsers([...loadUsers().filter(x => x.username !== sessionUser.username), sessionUser]);
-          setCurrentUser(sessionUser);
-          authMsg.textContent = '';
-          showApp(sessionUser);
+          applyAuthenticatedSession(data);
         } catch (err) {
           authMsg.textContent = err instanceof Error ? err.message : 'Login failed.';
         }
@@ -1401,6 +1699,7 @@
 
       registerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!ensurePrivacyConsent()) return;
         const username = regUsername.value.trim();
         if (!username) {
           authMsg.textContent = 'Username is required.';
@@ -1425,12 +1724,7 @@
           if (!response.ok || !data.token || !data.user) {
             throw new Error(data.error || 'Registration failed.');
           }
-          const sessionUser = normalizeSessionUser(data.user);
-          setAuthToken(data.token);
-          saveUsers([...loadUsers().filter(x => x.username !== sessionUser.username), sessionUser]);
-          setCurrentUser(sessionUser);
-          authMsg.textContent = '';
-          showApp(sessionUser);
+          applyAuthenticatedSession(data);
         } catch (err) {
           authMsg.textContent = err instanceof Error ? err.message : 'Registration failed.';
         }
@@ -1469,16 +1763,28 @@
         });
       });
 
-
       guestAccessBtn?.addEventListener('click', () => {
+        if (!ensurePrivacyConsent()) return;
+        authMsg.textContent = '';
         const guestUser = getDefaultUser();
         setAuthToken('');
         setCurrentUser(guestUser);
         showApp(guestUser);
+        setAIStatusBadge('AI status: checking', 'unknown');
+        refreshAIStatus();
       });
 
       const existing = getCurrentUser();
-      if (existing && (existing.username === 'guest' || getAuthToken())) {
+      if (hasNfcDeepLink) {
+        const canUseSignedInSession = Boolean(existing && getAuthToken());
+        const nfcUser = canUseSignedInSession ? existing : getDefaultUser();
+        if (!canUseSignedInSession) {
+          setAuthToken('');
+          setCurrentUser(nfcUser);
+        }
+        showApp(nfcUser);
+        setAIStatusBadge('NFC view: no login required', 'fallback');
+      } else if (existing && (existing.username === 'guest' || getAuthToken())) {
         showApp(existing);
       } else {
         setAuthToken('');
@@ -1512,7 +1818,6 @@
         pets: document.getElementById('tab-pets'),
         chat: document.getElementById('tab-chat'),
         health: document.getElementById('tab-health'),
-        behaviour: document.getElementById('tab-behaviour'),
         profile: document.getElementById('tab-profile'),
         ai: document.getElementById('tab-ai'),
       };
@@ -1524,7 +1829,7 @@
       const mobileMoreButton = document.getElementById('mobile-more-button');
       const mobileMoreSheet = document.getElementById('mobile-more-sheet');
       const mobileMoreItems = document.querySelectorAll('[data-mobile-tab]');
-      const mobileMoreTabs = new Set(['behaviour', 'ai', 'profile']);
+      const mobileMoreTabs = new Set();
       if (tabsInitialized) {
         activateAppTab?.(activeTabName);
         return;
@@ -1538,6 +1843,10 @@
       }
 
       function activateTab(name) {
+        if (name === 'behaviour') {
+          name = 'ai';
+          setAIAssistMode?.('video');
+        }
         if (!tabPages[name]) name = 'map';
         const chatPane = document.getElementById('chat-left-pane');
         const chatToggle = document.getElementById('chat-toggle-contacts');
@@ -1568,10 +1877,10 @@
         }
         if (name === 'chat' && window.innerWidth <= 1024) {
           chatPane?.classList.add('open');
-          if (chatToggle) chatToggle.textContent = 'Hide friends';
+          setChatToggleLabel(chatToggle, 'Hide friends');
         } else if (name !== 'chat' && window.innerWidth <= 1024) {
           chatPane?.classList.remove('open');
-          if (chatToggle) chatToggle.textContent = 'Show friends';
+          setChatToggleLabel(chatToggle, 'Show friends');
         }
       }
       activateAppTab = activateTab;
@@ -1605,11 +1914,11 @@
         setMobileMoreOpen(false);
       });
       window.addEventListener('hashchange', () => {
-        const hashTab = window.location.hash.replace('#', '');
-        if (hashTab && tabPages[hashTab]) activateTab(hashTab);
+        const hashTab = getHashPathAndParams().path;
+        if (hashTab === 'behaviour' || (hashTab && tabPages[hashTab])) activateTab(hashTab);
       });
-      const initialTab = window.location.hash.replace('#', '');
-      activateTab(initialTab && tabPages[initialTab] ? initialTab : 'map');
+      const initialTab = getHashPathAndParams().path;
+      activateTab((initialTab === 'behaviour' || (initialTab && tabPages[initialTab])) ? initialTab : 'map');
     }
 
     // --- Pet data & UI ---
@@ -1617,6 +1926,9 @@
     const MONITORING_API = '/api/monitor/collect';
     const DEVICE_TELEMETRY_LATEST_API = '/api/device/telemetry/latest';
     const DEVICE_TELEMETRY_POLL_MS = 8000;
+    const BLE_SERVICE_UUID = '7b9f0001-6f3a-4f8a-9f4d-111111111111';
+    const BLE_TELEMETRY_UUID = '7b9f0002-6f3a-4f8a-9f4d-222222222222';
+    const BLE_MESSAGE_UUID = '7b9f0003-6f3a-4f8a-9f4d-333333333333';
     const DEFAULT_PET_AVATAR = '/assets/1.png';
     const MY_PETS_KEY = 'pawtrace_my_pets';
     const AI_SERVICE_CONFIG = {
@@ -1632,14 +1944,6 @@
         placeholder: "Describe your pet's recent health status, last vet visit, weight changes, or concerns (e.g., 'Cat has been lethargic and eating less').",
         icon: 'fas fa-notes-medical',
         subtitle: 'Vitals, vaccines, and next steps'
-      },
-      behavior: {
-        label: 'Behavior Insight',
-        endpoint: '/api/ai/qwen-advice',
-        summary: 'Decode recent interactions to explain moods and highlight training priorities.',
-        placeholder: "Describe the behavior (e.g., 'Dog barks at strangers on walks' or 'Cat is scratching the sofa').",
-        icon: 'fas fa-brain',
-        subtitle: 'Mood shifts, training cues'
       },
       diet: {
         label: 'Diet Guide',
@@ -1740,6 +2044,19 @@
       return statusLabel(optionalBoolean(value));
     }
 
+    function isBleTelemetrySource(source = '', transport = '') {
+      return /ble/i.test(`${source || ''} ${transport || ''}`);
+    }
+
+    function telemetrySourceLabel(source = '', transport = '') {
+      const value = `${source || ''} ${transport || ''}`.toLowerCase();
+      if (value.includes('ble')) return 'BLE sync';
+      if (value.includes('wifi') || value.includes('http')) return 'Wi-Fi HTTP';
+      if (value.includes('m5stack')) return 'M5Stack';
+      if (value.includes('manual')) return 'Manual';
+      return source || transport || '--';
+    }
+
     function hasValidCoordinate(lat, lon) {
       const numericLat = Number(lat);
       const numericLon = Number(lon);
@@ -1794,10 +2111,15 @@
             uploadEnabled: optionalBoolean(entry?.uploadEnabled ?? entry?.upload_enabled),
             uploadOk: optionalBoolean(entry?.uploadOk ?? entry?.upload_ok),
             uploadCode: finiteNumber(entry?.uploadCode ?? entry?.upload_code, NaN),
+            bleConnected: optionalBoolean(entry?.bleConnected ?? entry?.ble_connected),
+            bleRssi: finiteNumber(entry?.bleRssi ?? entry?.ble_rssi, NaN),
+            bleMtu: finiteNumber(entry?.bleMtu ?? entry?.ble_mtu, NaN),
+            notifySeq: finiteNumber(entry?.notifySeq ?? entry?.notify_seq, NaN),
             deviceId: entry?.deviceId || entry?.device_id || '',
             lat: finiteNumber(entry?.lat, NaN),
             lon: finiteNumber(entry?.lon, NaN),
             source: entry?.source || '',
+            transport: entry?.transport || '',
           };
         })
         .filter((entry) => Number.isFinite(entry.temperature) || Number.isFinite(entry.heartRate) || Number.isFinite(entry.spo2Pct) || entry.activity)
@@ -2027,6 +2349,9 @@
     }
 
     function getStoredPets() {
+      if (isGuestSession()) {
+        return Array.isArray(guestPetStore) ? guestPetStore.map((pet, index) => normalizePetRecord(pet, index)) : [];
+      }
       try {
         const parsed = JSON.parse(localStorage.getItem(PETS_DATA_KEY)) || [];
         return Array.isArray(parsed) ? parsed.map((pet, index) => normalizePetRecord(pet, index)) : [];
@@ -2037,11 +2362,24 @@
 
     function setStoredPets(pets) {
       const normalized = Array.isArray(pets) ? pets.map((pet, index) => normalizePetRecord(pet, index)) : [];
+      if (isGuestSession()) {
+        guestPetStore = normalized;
+        emitPetsChanged(normalized);
+        return;
+      }
       localStorage.setItem(PETS_DATA_KEY, JSON.stringify(normalized));
       emitPetsChanged(normalized);
     }
 
     function normalizeDeviceTelemetryRecord(record = {}) {
+      const metadata = record?.metadata && typeof record.metadata === 'object' ? record.metadata : {};
+      const source = String(record.source || metadata.source || '').trim();
+      const transport = String(record.transport || metadata.transport || '').trim();
+      const bleLike = isBleTelemetrySource(source, transport)
+        || record.bat !== undefined
+        || record.alert !== undefined
+        || record.bleRssi !== undefined
+        || record.ble_rssi !== undefined;
       const lat = Number(record.lat);
       const lon = Number(record.lon);
       const temperature = Number(record.tempC ?? record.temp_c ?? record.temperature);
@@ -2052,13 +2390,13 @@
       const locationValid = optionalBoolean(record.locationValid ?? record.location_valid ?? record.gpsValid ?? record.gps_valid);
       return {
         id: record.id || '',
-        deviceId: String(record.deviceId || record.device_id || record.device || '').trim(),
+        deviceId: String(record.deviceId || record.device_id || record.device || record.bleDeviceId || record.ble_device_id || (bleLike ? record.id : '') || '').trim(),
         tagId: String(record.tagId || record.tag_id || '').trim(),
         petId: String(record.petId || record.pet_id || '').trim(),
         timestamp: record.timestamp || record.receivedAt || new Date().toISOString(),
         temperature: Number.isFinite(temperature) ? temperature : null,
         heartRate: Number.isFinite(heartRate) ? heartRate : null,
-        batteryPct: Number.isFinite(Number(record.batteryPct ?? record.battery_pct)) ? Number(record.batteryPct ?? record.battery_pct) : null,
+        batteryPct: Number.isFinite(Number(record.batteryPct ?? record.battery_pct ?? record.bat)) ? Number(record.batteryPct ?? record.battery_pct ?? record.bat) : null,
         batteryMv: finiteNumber(record.batteryMv ?? record.battery_mv, null),
         steps: Number.isFinite(Number(record.steps)) ? Number(record.steps) : null,
         activity: String(record.activity || record.activityState || '').trim(),
@@ -2075,7 +2413,7 @@
         trackSamples: finiteNumber(record.trackSamples ?? record.track_samples, null),
         geofenceEnabled: optionalBoolean(record.geofenceEnabled ?? record.geofence_enabled),
         distanceM: finiteNumber(record.distanceM ?? record.distance_m, null),
-        lostAlert: optionalBoolean(record.lostAlert ?? record.lost_alert),
+        lostAlert: optionalBoolean(record.lostAlert ?? record.lost_alert ?? record.alert),
         heartFound: optionalBoolean(record.heartFound ?? record.heart_found),
         finger: optionalBoolean(record.finger),
         spo2Pct: finiteNumber(record.spo2Pct ?? record.spo2, null),
@@ -2085,10 +2423,16 @@
         uploadEnabled: optionalBoolean(record.uploadEnabled ?? record.upload_enabled),
         uploadOk: optionalBoolean(record.uploadOk ?? record.upload_ok, null),
         uploadCode: finiteNumber(record.uploadCode ?? record.upload_code, null),
+        bleConnected: optionalBoolean(record.bleConnected ?? record.ble_connected ?? (bleLike ? true : null)),
+        bleRssi: finiteNumber(record.bleRssi ?? record.ble_rssi ?? record.rssi, null),
+        bleMtu: finiteNumber(record.bleMtu ?? record.ble_mtu ?? record.mtu, null),
+        notifySeq: finiteNumber(record.notifySeq ?? record.notify_seq ?? record.seq, null),
         locationAccuracy: Number.isFinite(Number(record.locationAccuracy)) ? Number(record.locationAccuracy) : null,
         mapCoords: Number.isFinite(mapX) && Number.isFinite(mapY)
           ? { x: clampNumber(mapX, 8, 92, 50), y: clampNumber(mapY, 8, 92, 50) }
           : null,
+        source: source || (bleLike ? 'm5stickc-plus-ble' : ''),
+        transport: transport || (bleLike ? 'ble' : ''),
       };
     }
 
@@ -2150,19 +2494,26 @@
               uploadEnabled: record.uploadEnabled,
               uploadOk: record.uploadOk,
               uploadCode: record.uploadCode ?? undefined,
+              bleConnected: record.bleConnected,
+              bleRssi: record.bleRssi ?? undefined,
+              bleMtu: record.bleMtu ?? undefined,
+              notifySeq: record.notifySeq ?? undefined,
               deviceId: record.deviceId,
               lat: record.lat ?? undefined,
               lon: record.lon ?? undefined,
-              source: 'm5stack',
+              source: record.source || 'm5stack',
+              transport: record.transport || '',
             },
             ...existingHistory.filter((entry) => entry.timestamp !== record.timestamp),
           ].slice(0, 12)
         : existingHistory;
       const zone = getDefaultTrackedZone(index);
       const location = buildTelemetryLocationLabel(record, pet.location || zone.label);
-      const statusParts = ['M5Stack live'];
+      const statusParts = [isBleTelemetrySource(record.source, record.transport) ? 'BLE live sync' : 'M5Stack live'];
       if (record.activity) statusParts.push(record.activity);
       if (record.batteryPct !== null) statusParts.push(`${Math.round(record.batteryPct)}% battery`);
+      if (record.bleConnected !== null) statusParts.push(`BLE ${statusLabel(record.bleConnected)}`);
+      if (record.bleRssi !== null) statusParts.push(`RSSI ${Math.round(record.bleRssi)} dBm`);
       if (record.wifiConnected !== null) statusParts.push(`Wi-Fi ${statusLabel(record.wifiConnected)}`);
       if (record.uploadCode !== null) statusParts.push(`HTTP ${record.uploadCode}`);
 
@@ -2208,6 +2559,12 @@
         uploadEnabled: record.uploadEnabled,
         uploadOk: record.uploadOk,
         uploadCode: record.uploadCode,
+        bleConnected: record.bleConnected,
+        bleRssi: record.bleRssi,
+        bleMtu: record.bleMtu,
+        notifySeq: record.notifySeq,
+        telemetrySource: record.source,
+        telemetryTransport: record.transport,
         telemetryUpdatedAt: record.timestamp,
       }, index);
     }
@@ -2260,6 +2617,242 @@
       deviceTelemetryPollTimer = window.setInterval(refreshDeviceTelemetry, DEVICE_TELEMETRY_POLL_MS);
     }
 
+    function initBluetoothTelemetryBridge() {
+      if (bluetoothBridgeInitialized) return;
+      bluetoothBridgeInitialized = true;
+
+      const connectBtn = document.getElementById('ble-connect');
+      const disconnectBtn = document.getElementById('ble-disconnect');
+      const sendBtn = document.getElementById('ble-send-message');
+      const messageInput = document.getElementById('ble-message-input');
+      const statusEl = document.getElementById('ble-bridge-status');
+      const deviceNameEl = document.getElementById('ble-device-name');
+      const storedCountEl = document.getElementById('ble-stored-count');
+      const latestPayloadEl = document.getElementById('ble-latest-payload');
+      const storeStatusEl = document.getElementById('ble-store-status');
+
+      if (!connectBtn || !statusEl || !latestPayloadEl) return;
+
+      const setStatus = (text, state = 'stable') => {
+        statusEl.textContent = text;
+        statusEl.dataset.status = state;
+      };
+
+      const setStoreStatus = (text, state = 'neutral') => {
+        if (!storeStatusEl) return;
+        storeStatusEl.textContent = text;
+        storeStatusEl.classList.toggle('text-red-500', state === 'error');
+        storeStatusEl.classList.toggle('text-primary', state === 'ok');
+        storeStatusEl.classList.toggle('text-gray-500', state !== 'error' && state !== 'ok');
+      };
+
+      const updateButtons = () => {
+        const connected = Boolean(bluetoothBridgeState.device?.gatt?.connected);
+        connectBtn.disabled = connected;
+        if (disconnectBtn) disconnectBtn.disabled = !connected;
+        if (sendBtn) sendBtn.disabled = !connected || !bluetoothBridgeState.messageChar;
+        if (deviceNameEl) {
+          deviceNameEl.textContent = bluetoothBridgeState.device?.name || (connected ? 'PawTrace BLE' : '--');
+        }
+      };
+
+      const decodeValue = (value) => {
+        const bytes = value instanceof DataView
+          ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+          : new Uint8Array(value || []);
+        return new TextDecoder('utf-8').decode(bytes).replace(/\0+$/g, '').trim();
+      };
+
+      const hasObjectShape = (value) => value && typeof value === 'object' && !Array.isArray(value);
+
+      const buildTelemetryPayload = (text) => {
+        let parsed = {};
+        let parsedOk = false;
+        try {
+          const candidate = JSON.parse(text);
+          if (hasObjectShape(candidate)) {
+            parsed = candidate;
+            parsedOk = true;
+          }
+        } catch {}
+
+        const now = new Date().toISOString();
+        const currentUser = getCurrentUser();
+        const explicitDeviceId = parsed.deviceId
+          || parsed.device_id
+          || parsed.device
+          || bluetoothBridgeState.device?.name
+          || bluetoothBridgeState.device?.id
+          || 'pawtrace-ble';
+        const metadata = hasObjectShape(parsed.metadata) ? parsed.metadata : {};
+
+        return {
+          ...parsed,
+          deviceId: String(explicitDeviceId),
+          userId: currentUser?.username && currentUser.username !== 'guest' ? currentUser.username : parsed.userId,
+          source: parsed.source || 'm5stickc-plus-ble-web',
+          transport: 'ble',
+          bleName: bluetoothBridgeState.device?.name || parsed.bleName || parsed.ble_name || '',
+          bleServiceUuid: BLE_SERVICE_UUID,
+          bleTelemetryUuid: BLE_TELEMETRY_UUID,
+          bleMessageUuid: BLE_MESSAGE_UUID,
+          bleBridgeReceivedAt: now,
+          bleBridgeStoredBy: currentUser?.username || '',
+          bleLastMessage: parsed.bleLastMessage || parsed.ble_last_message || bluetoothBridgeState.lastMessage || '',
+          metadata: {
+            ...metadata,
+            bridge: 'web-bluetooth',
+            rawBlePayload: parsedOk ? undefined : text,
+          },
+        };
+      };
+
+      const storeTelemetryPayload = async (payload) => {
+        if (!getAuthToken()) {
+          setStoreStatus('BLE packet received. Sign in to store it on the backend.');
+          return;
+        }
+
+        const response = await authJsonFetch('/api/device/telemetry', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || 'Telemetry store failed.');
+        }
+
+        bluetoothBridgeState.storedCount += 1;
+        if (storedCountEl) storedCountEl.textContent = String(bluetoothBridgeState.storedCount);
+        setStoreStatus(`Stored packet ${bluetoothBridgeState.storedCount}.`, 'ok');
+        if (data.telemetry) {
+          mergeDeviceTelemetry([data.telemetry]);
+        } else {
+          refreshDeviceTelemetry();
+        }
+      };
+
+      const handleTelemetryNotification = async (event) => {
+        const text = decodeValue(event.target?.value);
+        if (!text) return;
+        const payload = buildTelemetryPayload(text);
+        latestPayloadEl.textContent = JSON.stringify(payload, null, 2).slice(0, 2400);
+        setStatus('Receiving', 'stable');
+        try {
+          await storeTelemetryPayload(payload);
+        } catch (err) {
+          console.warn('BLE telemetry store failed', err);
+          setStoreStatus(err instanceof Error ? err.message : 'Telemetry store failed.', 'error');
+        }
+      };
+
+      const handleDisconnected = () => {
+        bluetoothBridgeState.telemetryChar = null;
+        bluetoothBridgeState.messageChar = null;
+        setStatus('Disconnected', 'watch');
+        updateButtons();
+      };
+
+      const connect = async () => {
+        if (!navigator.bluetooth) {
+          setStatus('Unsupported', 'alert');
+          setStoreStatus('This browser does not support Web Bluetooth. Use Chrome or Edge on localhost/HTTPS.', 'error');
+          return;
+        }
+
+        setStatus('Scanning', 'watch');
+        setStoreStatus('Choose PawTrace-001 in the Bluetooth picker.');
+        try {
+          const device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: 'PawTrace' }],
+            optionalServices: [BLE_SERVICE_UUID],
+          });
+          bluetoothBridgeState.device = device;
+          device.addEventListener('gattserverdisconnected', handleDisconnected);
+          if (deviceNameEl) deviceNameEl.textContent = device.name || 'PawTrace BLE';
+
+          setStatus('Connecting', 'watch');
+          const server = await device.gatt.connect();
+          const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+          bluetoothBridgeState.telemetryChar = await service.getCharacteristic(BLE_TELEMETRY_UUID);
+          bluetoothBridgeState.telemetryChar.addEventListener('characteristicvaluechanged', handleTelemetryNotification);
+          await bluetoothBridgeState.telemetryChar.startNotifications();
+
+          try {
+            bluetoothBridgeState.messageChar = await service.getCharacteristic(BLE_MESSAGE_UUID);
+          } catch {
+            bluetoothBridgeState.messageChar = null;
+            setStoreStatus('Connected, but firmware does not expose the writable message characteristic.', 'error');
+          }
+
+          setStatus('Connected', 'stable');
+          updateButtons();
+
+          try {
+            const initial = await bluetoothBridgeState.telemetryChar.readValue();
+            await handleTelemetryNotification({ target: { value: initial } });
+          } catch {}
+        } catch (err) {
+          console.warn('BLE bridge connection failed', err);
+          setStatus('Failed', 'alert');
+          setStoreStatus(err instanceof Error ? err.message : 'Bluetooth connection failed.', 'error');
+          updateButtons();
+        }
+      };
+
+      const disconnect = () => {
+        if (bluetoothBridgeState.device?.gatt?.connected) {
+          bluetoothBridgeState.device.gatt.disconnect();
+        } else {
+          handleDisconnected();
+        }
+      };
+
+      const sendMessage = async () => {
+        const text = String(messageInput?.value || '').trim();
+        if (!text || !bluetoothBridgeState.messageChar) return;
+        const messagePacket = {
+          message: text,
+          source: 'pawtrace-web',
+          sentAt: new Date().toISOString(),
+          user: getCurrentUser()?.username || 'guest',
+        };
+        bluetoothBridgeState.lastMessage = text;
+        const bytes = new TextEncoder().encode(JSON.stringify(messagePacket));
+        try {
+          if (typeof bluetoothBridgeState.messageChar.writeValueWithResponse === 'function') {
+            await bluetoothBridgeState.messageChar.writeValueWithResponse(bytes);
+          } else {
+            await bluetoothBridgeState.messageChar.writeValue(bytes);
+          }
+          setStoreStatus('Message sent to PawTrace device.', 'ok');
+          if (messageInput) messageInput.value = '';
+        } catch (err) {
+          console.warn('BLE message send failed', err);
+          setStoreStatus(err instanceof Error ? err.message : 'BLE message send failed.', 'error');
+        }
+      };
+
+      if (!navigator.bluetooth) {
+        connectBtn.disabled = true;
+        setStatus('Unsupported', 'alert');
+        setStoreStatus('Web Bluetooth is unavailable in this browser. Use Chrome or Edge on localhost/HTTPS.', 'error');
+      } else {
+        setStatus('Idle', 'watch');
+      }
+
+      connectBtn.addEventListener('click', connect);
+      disconnectBtn?.addEventListener('click', disconnect);
+      sendBtn?.addEventListener('click', sendMessage);
+      messageInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+      updateButtons();
+    }
+
     function isSeededDefaultPetList(list = []) {
       const seedIds = ['pet-1', 'pet-2', 'pet-3'];
       const seedNames = ['Xiao Hei', 'Xiao Bai', 'Xiao Huang'];
@@ -2293,10 +2886,14 @@
         type: pet.type,
         breed: pet.breed,
         age: pet.age,
+        birthday: pet.birthday,
         gender: pet.gender,
+        traits: Array.isArray(pet.traits) ? pet.traits : [],
         status: pet.status,
         health: pet.health,
         location: pet.location,
+        nfcContact: pet.nfcContact,
+        nfcNote: pet.nfcNote,
         temperature: latestVitals?.temperature ?? null,
         heartRate: latestVitals?.heartRate ?? null,
       };
@@ -2308,6 +2905,7 @@
 
     async function sendMonitoringPayload(payload = {}) {
       if (!window.PAWTRACE_ENABLE_MONITORING) return;
+      if (isGuestSession()) return;
       try {
         await authJsonFetch(MONITORING_API, {
           method: 'POST',
@@ -2319,6 +2917,9 @@
     }
 
     function loadMyPetsFromStorage() {
+      if (isGuestSession()) {
+        return Array.isArray(guestMyPetStore) ? [...guestMyPetStore] : [];
+      }
       try {
         return JSON.parse(localStorage.getItem(MY_PETS_KEY)) || [];
       } catch {
@@ -2327,6 +2928,10 @@
     }
 
     function saveMyPetsToStorage(list) {
+      if (isGuestSession()) {
+        guestMyPetStore = Array.isArray(list) ? [...list] : [];
+        return;
+      }
       localStorage.setItem(MY_PETS_KEY, JSON.stringify(list));
     }
 
@@ -2609,7 +3214,8 @@
         const assessment = getVitalsAssessment(latestVitals);
         const deviceId = firstTelemetryValue(latestVitals?.deviceId, activePet.deviceId);
         const packetTimestamp = firstTelemetryValue(latestVitals?.timestamp, activePet.telemetryUpdatedAt);
-        const packetSource = firstTelemetryValue(latestVitals?.source, deviceId ? 'm5stack' : latestVitals ? 'manual' : '--');
+        const packetSource = firstTelemetryValue(latestVitals?.source, activePet.telemetrySource, deviceId ? 'm5stack' : latestVitals ? 'manual' : '--');
+        const packetTransport = firstTelemetryValue(latestVitals?.transport, activePet.telemetryTransport);
         const batteryPct = firstTelemetryValue(latestVitals?.batteryPct, activePet.batteryPct);
         const batteryMv = firstTelemetryValue(latestVitals?.batteryMv, activePet.batteryMv);
         const activity = firstTelemetryValue(latestVitals?.activity, activePet.activity);
@@ -2634,6 +3240,11 @@
         const uploadEnabled = firstTelemetryValue(latestVitals?.uploadEnabled, activePet.uploadEnabled);
         const uploadOk = firstTelemetryValue(latestVitals?.uploadOk, activePet.uploadOk);
         const uploadCode = firstTelemetryValue(latestVitals?.uploadCode, activePet.uploadCode);
+        const bleConnected = firstTelemetryValue(latestVitals?.bleConnected, activePet.bleConnected);
+        const bleRssi = firstTelemetryValue(latestVitals?.bleRssi, activePet.bleRssi);
+        const bleMtu = firstTelemetryValue(latestVitals?.bleMtu, activePet.bleMtu);
+        const notifySeq = firstTelemetryValue(latestVitals?.notifySeq, activePet.notifySeq);
+        const isBlePacket = isBleTelemetrySource(packetSource, packetTransport);
         const coordsLabel = hasTelemetryNumber(lat) && hasTelemetryNumber(lon)
           ? `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}`
           : '--';
@@ -2644,11 +3255,12 @@
           || hasTelemetryNumber(gpsFix)
           || hasTelemetryValue(locationValid)
           || hasTelemetryValue(wifiConnected)
-          || hasTelemetryValue(uploadOk);
+          || hasTelemetryValue(uploadOk)
+          || hasTelemetryValue(bleConnected);
 
         setHealthText(deviceIdEl, deviceId || '--');
         setHealthText(packetTimeEl, packetTimestamp ? formatReadingTimestamp(packetTimestamp) : '--');
-        setHealthText(packetSourceEl, packetSource || '--');
+        setHealthText(packetSourceEl, telemetrySourceLabel(packetSource, packetTransport));
         setHealthText(latestTempEl, assessment.tempLabel);
         setHealthText(latestHeartEl, assessment.heartLabel);
         setHealthText(latestSpo2El, hasTelemetryNumber(latestVitals?.spo2Pct) ? `${Math.round(Number(latestVitals.spo2Pct))}%` : '--');
@@ -2670,12 +3282,16 @@
         setHealthTone(activityScoreEl, activityStatusTone);
         setHealthText(batteryStateEl, hasTelemetryNumber(batteryPct) ? `${Math.round(Number(batteryPct))}%` : '--');
         setHealthText(batteryMetaEl, hasTelemetryNumber(batteryMv) ? `battery_mv ${Math.round(Number(batteryMv))} mV` : 'battery_mv --');
-        setHealthText(networkStateEl, `Wi-Fi ${telemetryBoolLabel(wifiConnected)}`);
-        setHealthText(wifiStateEl, telemetryBoolLabel(wifiConnected));
-        setHealthText(wifiRssiEl, hasTelemetryNumber(wifiRssi) ? `${Math.round(Number(wifiRssi))} dBm` : '--');
+        setHealthText(networkStateEl, isBlePacket
+          ? `BLE ${telemetryBoolLabel(firstTelemetryValue(bleConnected, true))}`
+          : `Wi-Fi ${telemetryBoolLabel(wifiConnected)}`);
+        setHealthText(wifiStateEl, isBlePacket ? telemetryBoolLabel(firstTelemetryValue(bleConnected, true)) : telemetryBoolLabel(wifiConnected));
+        setHealthText(wifiRssiEl, isBlePacket
+          ? (hasTelemetryNumber(bleRssi) ? `${Math.round(Number(bleRssi))} dBm` : (hasTelemetryNumber(bleMtu) ? `MTU ${Math.round(Number(bleMtu))}` : '--'))
+          : (hasTelemetryNumber(wifiRssi) ? `${Math.round(Number(wifiRssi))} dBm` : '--'));
         setHealthText(uploadStateEl, `upload_ok ${telemetryBoolLabel(uploadOk)}`);
         setHealthText(uploadEnabledEl, telemetryBoolLabel(uploadEnabled));
-        setHealthText(uploadCodeEl, telemetryIntegerLabel(uploadCode));
+        setHealthText(uploadCodeEl, hasTelemetryNumber(notifySeq) && isBlePacket ? `notify ${Math.round(Number(notifySeq))}` : telemetryIntegerLabel(uploadCode));
         setHealthText(vitalsStateEl, assessment.state);
         setHealthText(locationStateEl, `location_valid ${telemetryBoolLabel(locationValid)}`);
         setHealthText(gpsStateEl, `gps_fix ${telemetryIntegerLabel(gpsFix)}`);
@@ -2797,10 +3413,12 @@
       const btnClosePetForm = document.getElementById('btn-close-pet-form');
       const profilePetManager = document.getElementById('profile-pet-manager');
       const communityPetFeed = document.getElementById('community-pet-feed');
+      const nfcPetResult = document.getElementById('nfc-pet-result');
       let openPetId = null;
       const petFormHeading = document.getElementById('pet-form-heading');
       const petFormSubtitle = document.getElementById('pet-form-subtitle');
       const petFormSubmitLabel = document.getElementById('pet-form-submit-label');
+      const petFormError = document.getElementById('pet-form-error');
       let editingPetId = null;
       const newPetInputs = {
         name: document.getElementById('new-pet-name'),
@@ -2819,6 +3437,233 @@
       const petImagePreviewImg = document.getElementById('pet-image-preview-img');
       const petImagePlaceholder = document.getElementById('pet-image-placeholder');
 
+      function getTodayDateValue() {
+        const today = new Date();
+        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+        return today.toISOString().slice(0, 10);
+      }
+
+      function normalizePetSingleLine(value = '', maxLength = 80) {
+        return String(value || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, maxLength);
+      }
+
+      function normalizePetNote(value = '', maxLength = 220) {
+        return String(value || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, maxLength);
+      }
+
+      function normalizePetTraitsInput(value = '') {
+        const seen = new Set();
+        return String(value || '')
+          .split(/[,，;；]/)
+          .map((trait) => normalizePetSingleLine(trait, 24))
+          .filter(Boolean)
+          .filter((trait) => {
+            const key = trait.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, 6);
+      }
+
+      function getDefaultPetTraits(type = '') {
+        if (/cat/i.test(type)) return ['Curious'];
+        if (/dog/i.test(type)) return ['Friendly'];
+        return ['Care profile'];
+      }
+
+      function isFuturePetDate(value = '') {
+        if (!value) return false;
+        const selected = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(selected.getTime())) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return selected > today;
+      }
+
+      function setPetFormError(message = '', field = null) {
+        Object.values(newPetInputs).forEach((input) => input?.setCustomValidity?.(''));
+        if (petFormError) {
+          petFormError.textContent = message;
+          petFormError.classList.toggle('hidden', !message);
+        }
+        if (message && field) {
+          field.setCustomValidity?.(message);
+          field.focus?.({ preventScroll: false });
+          field.reportValidity?.();
+        }
+      }
+
+      function readPetFormValues() {
+        return {
+          name: normalizePetSingleLine(newPetInputs.name?.value, 40),
+          type: normalizePetSingleLine(newPetInputs.type?.value, 32),
+          breed: normalizePetSingleLine(newPetInputs.breed?.value, 50),
+          birthday: normalizePetSingleLine(newPetInputs.birthday?.value, 10),
+          gender: normalizePetSingleLine(newPetInputs.gender?.value, 20),
+          status: normalizePetSingleLine(newPetInputs.status?.value, 80),
+          health: normalizePetSingleLine(newPetInputs.health?.value, 120),
+          location: normalizePetSingleLine(newPetInputs.location?.value, 80),
+          nfcContact: normalizePetSingleLine(newPetInputs.nfcContact?.value, 80),
+          nfcNote: normalizePetNote(newPetInputs.nfcNote?.value, 220),
+          traits: normalizePetTraitsInput(newPetInputs.traits?.value),
+        };
+      }
+
+      function validatePetFormValues(values, file) {
+        if (!values.name) {
+          return { message: 'Add the pet name first.', field: newPetInputs.name };
+        }
+        if (!/[A-Za-z0-9\u4e00-\u9fff]/.test(values.name)) {
+          return { message: 'Pet name should include letters or numbers.', field: newPetInputs.name };
+        }
+        if (!values.type) {
+          return { message: 'Choose or type a species, such as Dog, Cat, or Rabbit.', field: newPetInputs.type };
+        }
+        if (!/[A-Za-z\u4e00-\u9fff]/.test(values.type)) {
+          return { message: 'Species should describe the kind of pet, not only symbols or numbers.', field: newPetInputs.type };
+        }
+        if (values.birthday) {
+          const birthdayDate = new Date(`${values.birthday}T00:00:00`);
+          if (Number.isNaN(birthdayDate.getTime())) {
+            return { message: 'Use a valid birthday or adoption date.', field: newPetInputs.birthday };
+          }
+          if (isFuturePetDate(values.birthday)) {
+            return { message: 'Birthday or adoption date cannot be in the future.', field: newPetInputs.birthday };
+          }
+        }
+        if (!values.nfcContact) {
+          return { message: 'Add an emergency contact so the pet card is useful if the pet is found.', field: newPetInputs.nfcContact };
+        }
+        if (values.nfcContact.length < 3) {
+          return { message: 'Emergency contact is too short. Use a phone, email, or WeChat ID.', field: newPetInputs.nfcContact };
+        }
+        if (file && !file.type.startsWith('image/')) {
+          return { message: 'Pet photo must be an image file.', field: newPetInputs.image };
+        }
+        if (file && file.size > 5 * 1024 * 1024) {
+          return { message: 'Please choose an image under 5MB.', field: newPetInputs.image };
+        }
+        return null;
+      }
+
+      if (newPetInputs.birthday) {
+        newPetInputs.birthday.max = getTodayDateValue();
+      }
+      Object.values(newPetInputs).forEach((input) => {
+        input?.addEventListener?.('input', () => setPetFormError(''));
+        input?.addEventListener?.('change', () => setPetFormError(''));
+      });
+
+      function buildPetNfcPayload(pet = {}) {
+        const user = getCurrentUser() || {};
+        const avatar = safeImageSrc(pet.avatar, DEFAULT_PET_AVATAR);
+        return {
+          v: 1,
+          i: pet.id,
+          nid: pet.nfcId || buildPetNfcId(pet, 0),
+          n: pet.name || 'Found pet',
+          t: pet.type || 'Pet',
+          b: pet.breed || 'Unknown',
+          l: pet.location || user.campus || 'Campus',
+          h: pet.health || 'No health notes provided.',
+          c: pet.nfcContact || user.contact || '',
+          m: pet.nfcNote || `${pet.name || 'This pet'} is friendly. Please contact the owner if found.`,
+          o: user.displayName || user.username || 'Pet owner',
+          campus: user.campus || 'Taicang',
+          img: avatar.startsWith('data:image/') ? '' : avatar
+        };
+      }
+
+      function buildPetNfcLink(pet = {}) {
+        const url = new URL(window.location.href);
+        url.search = '';
+        url.hash = 'pets';
+        url.searchParams.set('nfc', base64UrlEncode(JSON.stringify(buildPetNfcPayload(pet))));
+        return url.toString();
+      }
+
+      function renderNfcPetResult() {
+        if (!nfcPetResult) return;
+        if (!activeNfcPetCard) {
+          nfcPetResult.classList.add('hidden');
+          nfcPetResult.innerHTML = '';
+          return;
+        }
+        const pet = normalizeNfcPetPayload(activeNfcPetCard);
+        activeNfcPetCard = pet;
+        const href = contactHref(pet.nfcContact);
+        const directLink = window.location.href;
+        nfcPetResult.classList.remove('hidden');
+        nfcPetResult.innerHTML = `
+          <div class="nfc-pet-card pixel-card">
+            <div class="nfc-pet-card__media">
+              <img src="${escapeHtml(safeImageSrc(pet.avatar, DEFAULT_PET_AVATAR))}" alt="${escapeHtml(pet.name)}" loading="eager" decoding="async" />
+            </div>
+            <div class="nfc-pet-card__body">
+              <div class="nfc-pet-card__head">
+                <div>
+                  <p class="nfc-pet-card__eyebrow"><i class="fas fa-id-card"></i> NFC Emergency Pet Card</p>
+                  <h3>${escapeHtml(pet.name)}</h3>
+                  <p>${escapeHtml(pet.type)} · ${escapeHtml(pet.breed)} · ${escapeHtml(pet.location)}</p>
+                </div>
+                <span class="pet-nfc-card__code">${escapeHtml(pet.nfcId)}</span>
+              </div>
+              <div class="nfc-pet-card__grid">
+                <div>
+                  <span>Owner</span>
+                  <strong>${escapeHtml(pet.ownerName || 'Pet owner')}</strong>
+                  <p>${escapeHtml(pet.ownerCampus || 'Taicang')}</p>
+                </div>
+                <div>
+                  <span>Contact</span>
+                  <strong>${escapeHtml(pet.nfcContact || 'Not provided')}</strong>
+                  <p>Use this contact to return the pet.</p>
+                </div>
+                <div>
+                  <span>Care Note</span>
+                  <strong>${escapeHtml(pet.nfcNote || 'Please contact the owner if found.')}</strong>
+                  <p>${escapeHtml(pet.health || 'No health notes provided.')}</p>
+                </div>
+              </div>
+              <div class="nfc-pet-card__actions">
+                ${href ? `<a class="pixel-button text-xs" href="${escapeHtml(href)}"><i class="fas fa-phone"></i><span>Contact owner</span></a>` : ''}
+                <button type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30" data-copy-nfc-contact>
+                  <i class="fas fa-copy"></i><span>Copy contact</span>
+                </button>
+                <button type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30" data-copy-current-nfc-link>
+                  <i class="fas fa-link"></i><span>Copy link</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        nfcPetResult.querySelector('[data-copy-nfc-contact]')?.addEventListener('click', async () => {
+          const text = pet.nfcContact || '';
+          if (!text) return;
+          try {
+            await navigator.clipboard.writeText(text);
+            alert('Owner contact copied.');
+          } catch {
+            alert(text);
+          }
+        });
+        nfcPetResult.querySelector('[data-copy-current-nfc-link]')?.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(directLink);
+            alert('NFC link copied.');
+          } catch {
+            alert(directLink);
+          }
+        });
+      }
+
       function setPetFormMode(mode = 'new') {
         if (mode === 'edit') {
           if (petFormHeading) petFormHeading.textContent = 'Edit pet';
@@ -2834,6 +3679,7 @@
       function resetPetFormState() {
         editingPetId = null;
         setPetFormMode('new');
+        setPetFormError('');
         petForm?.reset();
         resetPetImagePreview();
       }
@@ -2846,7 +3692,7 @@
 
       function resetPetImagePreview() {
         if (petImagePreviewImg) {
-          petImagePreviewImg.src = '';
+          setPreviewImageSource(petImagePreviewImg, '');
           petImagePreviewImg.classList.add('hidden');
         }
         petImagePlaceholder?.classList.remove('hidden');
@@ -2857,13 +3703,14 @@
 
       function setPetImagePreview(src) {
         if (!petImagePreviewImg) return;
-        petImagePreviewImg.src = src;
+        setPreviewImageSource(petImagePreviewImg, src);
         petImagePreviewImg.classList.remove('hidden');
         petImagePlaceholder?.classList.add('hidden');
       }
 
       function loadPetIntoForm(pet) {
         if (!petForm) return;
+        setPetFormError('');
         if (newPetInputs.image) newPetInputs.image.value = '';
         newPetInputs.name.value = pet.name || '';
         newPetInputs.type.value = pet.type || '';
@@ -2882,6 +3729,7 @@
 
       function render() {
         if (!petList) return;
+        renderNfcPetResult();
         petList.innerHTML = '';
         if (profilePetCount) profilePetCount.textContent = pets.length.toString();
         if (profileSidePetCount) profileSidePetCount.textContent = pets.length.toString();
@@ -2926,6 +3774,8 @@
           if (!openPetId && !mobileLayout && idx === 0) openPetId = p.id;
           const card = document.createElement('div');
           card.className = 'pixel-card flex flex-col gap-2 animate-slideInLeft';
+          card.dataset.petCardId = p.id || '';
+          card.dataset.petNfcId = p.nfcId || '';
           card.style.animationDelay = (idx * 0.1) + 's';
           card.innerHTML = `
             <button class="w-full flex justify-between items-center text-left" data-pet-toggle="${petId}">
@@ -2947,7 +3797,7 @@
                 <div class="space-y-1 text-[11px]">
                   <p><span class="font-semibold">Type:</span> ${petType}</p>
                   <p><span class="font-semibold">Breed:</span> ${petBreed}</p>
-                  <p><span class="font-semibold">Birthday:</span> ${petBirthday}</p>
+                  <p><span class="font-semibold">Birth/adoption:</span> ${petBirthday}</p>
                   <p><span class="font-semibold">Gender:</span> ${petGender}</p>
                 </div>
               </div>
@@ -2999,6 +3849,9 @@
                   <button type="button" class="pet-action-link" data-copy-nfc="${petId}">
                     <i class="fas fa-id-card"></i><span>Copy Emergency Card</span>
                   </button>
+                  <button type="button" class="pet-action-link" data-copy-nfc-link="${petId}">
+                    <i class="fas fa-link"></i><span>Copy NFC Link</span>
+                  </button>
                   <button type="button" class="pet-action-link" data-open-map="${petId}">
                     <i class="fas fa-location-arrow"></i><span>Locate on Map</span>
                   </button>
@@ -3031,13 +3884,15 @@
             const id = btn.getAttribute('data-copy-nfc');
             const pet = pets.find((entry) => entry.id === id);
             if (!pet) return;
+            const nfcLink = buildPetNfcLink(pet);
             const cardText = [
-              `PawTrace Emergency Card · ${pet.name}`,
+              `PAWTRACE Emergency Card · ${pet.name}`,
               `Card ID: ${pet.nfcId}`,
               `Type: ${pet.type} · ${pet.breed}`,
               `Location: ${pet.location || 'Campus'}`,
               `Emergency: ${pet.nfcContact || 'Not set'}`,
               `Care note: ${pet.nfcNote || 'None'}`,
+              `NFC link: ${nfcLink}`,
             ].join('\n');
             try {
               await navigator.clipboard.writeText(cardText);
@@ -3045,6 +3900,21 @@
             } catch (err) {
               console.warn('Clipboard copy failed', err);
               alert(cardText);
+            }
+          });
+        });
+        petList.querySelectorAll('[data-copy-nfc-link]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-copy-nfc-link');
+            const pet = pets.find((entry) => entry.id === id);
+            if (!pet) return;
+            const link = buildPetNfcLink(pet);
+            try {
+              await navigator.clipboard.writeText(link);
+              alert(`Copied ${pet.name}'s NFC link. Write this URL to the NFC card.`);
+            } catch (err) {
+              console.warn('NFC link copy failed', err);
+              alert(link);
             }
           });
         });
@@ -3159,15 +4029,49 @@
         renderCommunityPets();
       };
 
+      window.openNfcPetDeepLink = () => {
+        if (!activeNfcPetCard && !activeNfcTargetId) return;
+        const target = String(activeNfcTargetId || activeNfcPetCard?.id || activeNfcPetCard?.nfcId || '').trim();
+        const matchedPet = target
+          ? pets.find((pet) => pet.id === target || pet.nfcId === target)
+          : null;
+        if (matchedPet) {
+          openPetId = matchedPet.id;
+          activeNfcPetCard = null;
+          render();
+        } else {
+          renderNfcPetResult();
+        }
+        activateAppTab?.('pets');
+        if (window.location.hash.split('?')[0] !== '#pets') {
+          history.replaceState(null, '', `${window.location.pathname}${window.location.search}#pets`);
+        }
+        window.requestAnimationFrame(() => {
+          const petCardEl = Array.from(petList.querySelectorAll('[data-pet-card-id]'))
+            .find((card) => card.getAttribute('data-pet-card-id') === openPetId);
+          const targetEl = activeNfcPetCard
+            ? nfcPetResult
+            : petCardEl;
+          targetEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      };
+
       newPetInputs.image?.addEventListener('change', () => {
         const file = newPetInputs.image.files && newPetInputs.image.files[0];
         if (!file) {
           resetPetImagePreview();
           return;
         }
-        if (file.size > 5 * 1024 * 1024) {
-          alert('Please choose an image under 5MB.');
+        if (!file.type.startsWith('image/')) {
+          setPetFormError('Pet photo must be an image file.', newPetInputs.image);
           newPetInputs.image.value = '';
+          resetPetImagePreview();
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          setPetFormError('Please choose an image under 5MB.', newPetInputs.image);
+          newPetInputs.image.value = '';
+          resetPetImagePreview();
           return;
         }
         const reader = new FileReader();
@@ -3198,9 +4102,14 @@
       if (petForm) {
         petForm.addEventListener('submit', async (e) => {
           e.preventDefault();
-          const name = newPetInputs.name.value.trim();
-          if (!name) return;
+          setPetFormError('');
+          const formValues = readPetFormValues();
           const file = newPetInputs.image?.files && newPetInputs.image.files[0];
+          const validationError = validatePetFormValues(formValues, file);
+          if (validationError) {
+            setPetFormError(validationError.message, validationError.field);
+            return;
+          }
           const isEdit = Boolean(editingPetId);
           const existingPet = isEdit ? pets.find(p => p.id === editingPetId) : null;
           let avatar = existingPet?.avatar || DEFAULT_PET_AVATAR;
@@ -3211,11 +4120,7 @@
               console.warn('Image load failed', err);
             }
           }
-          const traits = (newPetInputs.traits.value || '')
-            .split(',')
-            .map(t => t.trim())
-            .filter(Boolean);
-          const birthdayValue = newPetInputs.birthday?.value || '';
+          const birthdayValue = formValues.birthday;
           const birthdayLabel = birthdayValue
             ? (() => {
                 try {
@@ -3226,21 +4131,21 @@
           const updatedPet = {
             ...(existingPet || {}),
             id: existingPet?.id || `pet-${Date.now()}`,
-            name,
-            type: newPetInputs.type.value.trim() || 'Pet',
-            breed: newPetInputs.breed.value.trim() || 'Unknown',
+            name: formValues.name,
+            type: formValues.type,
+            breed: formValues.breed || 'Mixed / Unknown',
             age: birthdayLabel,
             birthday: birthdayValue,
-            gender: newPetInputs.gender.value.trim() || 'Unknown',
+            gender: formValues.gender || 'Unknown',
             avatar,
-            traits: traits.length ? traits : ['Playful'],
-            status: newPetInputs.status.value.trim() || 'Just joined the crew.',
-            health: newPetInputs.health.value.trim() || 'No health notes yet.',
-            location: newPetInputs.location.value.trim() || existingPet?.location || getDefaultTrackedZone(pets.length).label,
-            nfcContact: newPetInputs.nfcContact.value.trim() || existingPet?.nfcContact || getCurrentUser()?.contact || '',
-            nfcNote: newPetInputs.nfcNote.value.trim() || existingPet?.nfcNote || `${name} is friendly. Please contact the owner if found.`,
+            traits: formValues.traits.length ? formValues.traits : getDefaultPetTraits(formValues.type),
+            status: formValues.status || `${formValues.name} is ready for care tracking.`,
+            health: formValues.health || 'No known health notes.',
+            location: formValues.location || existingPet?.location || getDefaultTrackedZone(pets.length).label,
+            nfcContact: formValues.nfcContact,
+            nfcNote: formValues.nfcNote || existingPet?.nfcNote || `${formValues.name} is friendly. Please contact the owner if found.`,
             mapCoords: existingPet?.mapCoords || getDefaultTrackedZone(pets.length).coords,
-            vitalsHistory: existingPet?.vitalsHistory || createStarterVitals(existingPet || { name, type: newPetInputs.type.value.trim() || 'Pet' }, pets.length),
+            vitalsHistory: existingPet?.vitalsHistory || createStarterVitals(existingPet || { name: formValues.name, type: formValues.type }, pets.length),
           };
 
           if (isEdit && existingPet) {
@@ -3250,7 +4155,6 @@
           }
           setStoredPets(pets);
           render();
-          resetPetFormState();
           hidePetForm();
           const currentUser = getCurrentUser();
           sendMonitoringPayload({
@@ -3412,7 +4316,9 @@
         .map(m => {
           let content = (m.content || '').trim();
           if (m.media?.type === 'image') {
-            const note = `Shared image: ${m.media.src}`;
+            const note = m.media.src?.startsWith('data:image/')
+              ? 'Shared image attachment from device upload.'
+              : `Shared image link: ${m.media.src || ''}`;
             content = content ? `${content}\n${note}` : note;
           }
           return {
@@ -3464,6 +4370,9 @@
       const sharePreviewWrapper = document.getElementById('share-image-preview');
       const sharePreviewImg = document.getElementById('share-preview-img');
       const shareImageFileInput = document.getElementById('share-image-file');
+      const shareCameraFileInput = document.getElementById('share-camera-file');
+      const shareOpenCameraBtn = document.getElementById('share-open-camera');
+      const shareOpenLibraryBtn = document.getElementById('share-open-library');
       const chatPetInfoPlaceholder = document.getElementById('chat-pet-info-placeholder');
       const chatPetDetails = document.getElementById('chat-pet-details');
       const chatPetName = document.getElementById('chat-pet-name');
@@ -3548,7 +4457,7 @@
               const summaryEl = hoverCard.querySelector('#hover-summary');
               const healthEl = hoverCard.querySelector('#hover-health');
               const tagsEl = hoverCard.querySelector('#hover-tags');
-              if (avatarEl) avatarEl.src = data.avatar;
+              setPreviewImageSource(avatarEl, data.avatar);
               if (nameEl) nameEl.textContent = data.name || 'Friend';
               if (petTagEl) petTagEl.textContent = `${data.petName || 'Pet'} · ${data.petType || ''}`.trim() || 'Pet info';
               if (summaryEl) summaryEl.textContent = data.petNotes || data.lastPreview || '';
@@ -3667,9 +4576,9 @@
         if (!c) return;
         if (window.innerWidth <= 1024 && chatPane && chatPane.classList.contains('open')) {
           chatPane.classList.remove('open');
-          if (chatToggle) chatToggle.textContent = 'Show friends';
+          setChatToggleLabel(chatToggle, 'Show friends');
         }
-        if (chatAvatar) chatAvatar.src = c.avatar;
+        setPreviewImageSource(chatAvatar, c.avatar);
         if (chatName) chatName.textContent = c.name;
         if (chatPetTag) {
           chatPetTag.textContent = c.petName + ' · ' + c.petType;
@@ -3725,7 +4634,9 @@
         };
         history.push(imageMessage);
         CHAT_STATE.history[contact.id] = history;
+        contact.lastPreview = caption || 'Shared a photo';
         appendMessageBubble(imageMessage, contact.id);
+        renderContacts(searchEl?.value || '');
         closeShareImageModal();
         await handleAssistantReply(contact, contact.id, `${contact.petName} got a new photo!`);
       }
@@ -3751,7 +4662,7 @@
         if (!(target instanceof Element)) return;
         if (chatPane.contains(target) || target.closest('#chat-toggle-contacts') || target.closest('#chat-back-btn')) return;
         chatPane.classList.remove('open');
-        if (chatToggle) chatToggle.textContent = 'Show friends';
+        setChatToggleLabel(chatToggle, 'Show friends');
       });
       const chatAttachImage = document.getElementById('chat-attach-image');
       chatAttachImage?.addEventListener('click', () => {
@@ -3772,48 +4683,77 @@
             if (!shareImageIsUpload) {
               shareImageSource = '';
               sharePreviewWrapper?.classList.add('hidden');
-              sharePreviewImg.src = '';
+              setPreviewImageSource(sharePreviewImg, '');
             }
           } else {
             shareImageSource = url;
             shareImageIsUpload = false;
             if (shareImageFileInput) shareImageFileInput.value = '';
-            sharePreviewImg.src = url;
+            if (shareCameraFileInput) shareCameraFileInput.value = '';
+            setPreviewImageSource(sharePreviewImg, url);
             sharePreviewWrapper?.classList.remove('hidden');
           }
         });
       }
-      shareImageFileInput?.addEventListener('change', async () => {
-        const file = shareImageFileInput.files && shareImageFileInput.files[0];
+
+      function clearShareFileInputs(activeInput = null) {
+        if (shareImageFileInput && shareImageFileInput !== activeInput) shareImageFileInput.value = '';
+        if (shareCameraFileInput && shareCameraFileInput !== activeInput) shareCameraFileInput.value = '';
+      }
+
+      async function handleShareImageFileInput(input) {
+        const file = input?.files && input.files[0];
         if (!file) {
           shareImageIsUpload = false;
           shareImageSource = shareImageUrlInput?.value.trim() || '';
+          clearShareFileInputs(input);
           if (!shareImageSource) {
-            sharePreviewImg.src = '';
+            setPreviewImageSource(sharePreviewImg, '');
             sharePreviewWrapper?.classList.add('hidden');
           }
           return;
         }
+        if (!file.type.startsWith('image/')) {
+          alert('Please choose an image file.');
+          input.value = '';
+          return;
+        }
         if (file.size > 5 * 1024 * 1024) {
           alert('Please choose an image under 5MB.');
-          shareImageFileInput.value = '';
+          input.value = '';
           return;
         }
         try {
           const data = await fileToDataURL(file);
           shareImageSource = data;
           shareImageIsUpload = true;
+          clearShareFileInputs(input);
           if (shareImageUrlInput) shareImageUrlInput.value = '';
-          sharePreviewImg.src = data;
+          setPreviewImageSource(sharePreviewImg, data);
           sharePreviewWrapper?.classList.remove('hidden');
         } catch (err) {
           console.warn('Image upload failed', err);
           alert('Unable to load that image.');
-          shareImageFileInput.value = '';
+          input.value = '';
           shareImageSource = '';
           shareImageIsUpload = false;
         }
+      }
+
+      function triggerShareInputOnKeyboard(event, input) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        input?.click();
+      }
+
+      shareOpenCameraBtn?.addEventListener('keydown', (event) => {
+        triggerShareInputOnKeyboard(event, shareCameraFileInput);
       });
+      shareOpenLibraryBtn?.addEventListener('keydown', (event) => {
+        triggerShareInputOnKeyboard(event, shareImageFileInput);
+      });
+      shareCameraFileInput?.addEventListener('change', () => handleShareImageFileInput(shareCameraFileInput));
+      shareImageFileInput?.addEventListener('change', () => handleShareImageFileInput(shareImageFileInput));
 
       const btnSendImage = document.getElementById('btn-send-image');
       if (btnSendImage) {
@@ -3862,11 +4802,16 @@
         if (!checkInBtn) return;
 
         function getCheckInData() {
+          if (isGuestSession()) return { ...guestCheckInStore };
           const data = localStorage.getItem('pawtrace_checkins');
           return data ? JSON.parse(data) : {};
         }
 
         function saveCheckInData(data) {
+          if (isGuestSession()) {
+            guestCheckInStore = { ...(data || {}) };
+            return;
+          }
           localStorage.setItem('pawtrace_checkins', JSON.stringify(data));
         }
 

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
+import express from 'express';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import multer from 'multer';
 import type { Express, Request, Response, NextFunction } from 'express';
@@ -27,6 +28,22 @@ const VIDEO_UPLOAD_MIME_TYPES = new Set([
 ]);
 const VIDEO_BEHAVIOR_DISCLAIMER = 'This result is only a behavior-risk hint and does not constitute veterinary diagnosis.';
 const videoUploadDir = path.join(os.tmpdir(), 'pawtrace-video-uploads');
+const MAP_TILE_TIMEOUT_MS = 8000;
+const MAP_TILE_MAX_ZOOM = 19;
+const MAP_TILE_SOURCES = [
+  {
+    name: 'openstreetmap',
+    url: (z: number, x: number, y: number) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+  },
+  {
+    name: 'openstreetmap-a',
+    url: (z: number, x: number, y: number) => `https://a.tile.openstreetmap.org/${z}/${x}/${y}.png`,
+  },
+  {
+    name: 'carto-light',
+    url: (z: number, x: number, y: number) => `https://basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png`,
+  },
+];
 const videoUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
@@ -56,6 +73,13 @@ function asyncHandler(fn: AsyncRouteHandler) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
+}
+
+function validMapTile(z: number, x: number, y: number): boolean {
+  if (![z, x, y].every(Number.isInteger)) return false;
+  if (z < 0 || z > MAP_TILE_MAX_ZOOM) return false;
+  const maxTile = 2 ** z;
+  return x >= 0 && x < maxTile && y >= 0 && y < maxTile;
 }
 
 function toIsoTimestamp(input?: string): string {
@@ -120,6 +144,11 @@ function compactRecord(record: Record<string, unknown>): Record<string, unknown>
   );
 }
 
+function getLocalChatReply(contactProfile = ''): string {
+  const profileHint = contactProfile ? ' I will keep the pet profile in mind.' : '';
+  return `Thanks for the update.${profileHint} Please keep notes on appetite, energy, and behavior changes so the owner can compare later.`;
+}
+
 function normalizeRecordList(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value.filter(isRecord);
   return isRecord(value) ? [value] : [];
@@ -146,6 +175,97 @@ function firstTextField(record: Record<string, unknown>, keys: string[]): string
     if (value) return value;
   }
   return '';
+}
+
+function normalizeTelemetryKey(key: string): string {
+  return key
+    .trim()
+    .replace(/[-\s]+/g, '_')
+    .replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`)
+    .replace(/^_+/, '')
+    .toLowerCase();
+}
+
+function coerceTelemetryValue(value: string): string | number | boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const normalized = trimmed.toLowerCase();
+  if (['true', 'yes', 'ok'].includes(normalized)) return true;
+  if (['false', 'no', 'invalid'].includes(normalized)) return false;
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return trimmed;
+}
+
+function parseTelemetryCsv(input: string): Record<string, unknown> {
+  const lines = input
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return {};
+
+  const first = lines[0].split(',').map((part) => part.trim());
+  const second = lines[1]?.split(',').map((part) => part.trim()) || [];
+  const firstLooksLikeHeader = first.some((part) => /^(device_?id|battery|bat|bpm|pet_?bpm|lat|lon|lost_?alert|alert|source)$/i.test(part));
+  if (firstLooksLikeHeader && second.length) {
+    return compactRecord(
+      Object.fromEntries(first.map((key, index) => [normalizeTelemetryKey(key), coerceTelemetryValue(second[index] || '')]))
+    );
+  }
+
+  const [deviceId, batteryPct, heartRateBpm, lat, lon, lostAlert] = first;
+  return compactRecord({
+    deviceId,
+    batteryPct: coerceTelemetryValue(batteryPct || ''),
+    heartRateBpm: coerceTelemetryValue(heartRateBpm || ''),
+    lat: coerceTelemetryValue(lat || ''),
+    lon: coerceTelemetryValue(lon || ''),
+    lostAlert: coerceTelemetryValue(lostAlert || ''),
+    source: 'm5stickc-plus-ble-csv',
+    transport: 'ble',
+  });
+}
+
+function parseTelemetryPayload(body: unknown): Record<string, unknown> {
+  if (isRecord(body)) return body;
+  if (typeof body !== 'string') return {};
+  const raw = body.trim();
+  if (!raw) return {};
+  if (raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw);
+      return isRecord(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return parseTelemetryCsv(raw);
+}
+
+function isBleTelemetryPayload(payload: Record<string, unknown>): boolean {
+  const source = firstTextField(payload, ['source', 'transport', 'connection']).toLowerCase();
+  return source.includes('ble')
+    || payload.bat !== undefined
+    || payload.alert !== undefined
+    || payload.bleRssi !== undefined
+    || payload.ble_rssi !== undefined
+    || payload.bleName !== undefined
+    || payload.ble_name !== undefined;
+}
+
+function telemetryDeviceId(payload: Record<string, unknown>): string {
+  const explicit = firstTextField(payload, [
+    'deviceId',
+    'deviceID',
+    'device_id',
+    'device',
+    'bleDeviceId',
+    'ble_device_id',
+  ]);
+  if (explicit) return explicit;
+  return isBleTelemetryPayload(payload) ? firstTextField(payload, ['id', 'i']) : '';
 }
 
 function optionalBooleanField(record: Record<string, unknown>, key: string): boolean | undefined {
@@ -209,6 +329,7 @@ function telemetryMetadata(payload: Record<string, unknown>, source: string): Re
   return compactRecord({
     ...rawMetadata,
     source,
+    transport: firstTextField(payload, ['transport', 'connection']) || (source.toLowerCase().includes('ble') ? 'ble' : ''),
     petId: firstTextField(payload, ['petId', 'petID', 'pet_id']),
     gpsValid: firstBooleanField(payload, ['gpsValid', 'gps_valid', 'location_valid']),
     gpsFix: firstNumericField(payload, ['gpsFix', 'gps_fix']),
@@ -220,11 +341,23 @@ function telemetryMetadata(payload: Record<string, unknown>, source: string): Re
     trackSamples: firstNumericField(payload, ['trackSamples', 'track_samples']),
     geofenceEnabled: firstBooleanField(payload, ['geofenceEnabled', 'geofence_enabled']),
     distanceM: firstNumericField(payload, ['distanceM', 'distance_m']),
-    lostAlert: firstBooleanField(payload, ['lostAlert', 'lost_alert']),
+    lostAlert: firstBooleanField(payload, ['lostAlert', 'lost_alert', 'alert']),
     heartFound: firstBooleanField(payload, ['heartFound', 'heart_found']),
     finger: firstBooleanField(payload, ['finger']),
     spo2Valid: firstBooleanField(payload, ['spo2Valid', 'spo2_valid']),
     batteryMv: firstNumericField(payload, ['batteryMv', 'battery_mv']),
+    bleConnected: firstBooleanField(payload, ['bleConnected', 'ble_connected']),
+    bleRssi: firstNumericField(payload, ['bleRssi', 'ble_rssi', 'rssi']),
+    bleMtu: firstNumericField(payload, ['bleMtu', 'ble_mtu', 'mtu']),
+    bleName: firstTextField(payload, ['bleName', 'ble_name', 'name']),
+    bleServiceUuid: firstTextField(payload, ['bleServiceUuid', 'ble_service_uuid', 'serviceUuid', 'service_uuid']),
+    bleTelemetryUuid: firstTextField(payload, ['bleTelemetryUuid', 'ble_telemetry_uuid', 'characteristicUuid', 'characteristic_uuid']),
+    bleMessageUuid: firstTextField(payload, ['bleMessageUuid', 'ble_message_uuid', 'messageUuid', 'message_uuid']),
+    bleLastMessage: firstTextField(payload, ['bleLastMessage', 'ble_last_message', 'lastBleMessage', 'last_ble_message', 'message']),
+    bleMessageSeq: firstNumericField(payload, ['bleMessageSeq', 'ble_message_seq', 'messageSeq', 'message_seq']),
+    bleBridgeReceivedAt: firstTextField(payload, ['bleBridgeReceivedAt', 'ble_bridge_received_at']),
+    bleBridgeStoredBy: firstTextField(payload, ['bleBridgeStoredBy', 'ble_bridge_stored_by']),
+    notifySeq: firstNumericField(payload, ['notifySeq', 'notify_seq', 'seq']),
     activityScore: firstNumericField(payload, ['activityScore', 'activity_score']),
     wifiConnected: firstBooleanField(payload, ['wifiConnected', 'wifi_connected']),
     wifiRssi: firstNumericField(payload, ['wifiRssi', 'wifi_rssi']),
@@ -253,6 +386,8 @@ function mapTelemetryRow(row: HealthMeasurementRow) {
     userId: row.userId,
     tagId: row.tagId,
     petId: typeof metadata.petId === 'string' ? metadata.petId : null,
+    source: typeof metadata.source === 'string' ? metadata.source : null,
+    transport: typeof metadata.transport === 'string' ? metadata.transport : null,
     timestamp: row.timestamp,
     receivedAt: row.receivedAt,
     heartRateBpm: row.heartRateBpm,
@@ -286,6 +421,18 @@ function mapTelemetryRow(row: HealthMeasurementRow) {
     spo2Pct: numericField(metadata, 'spo2Pct'),
     spo2Valid: typeof metadata.spo2Valid === 'boolean' ? metadata.spo2Valid : null,
     batteryMv: numericField(metadata, 'batteryMv'),
+    bleConnected: typeof metadata.bleConnected === 'boolean' ? metadata.bleConnected : null,
+    bleRssi: numericField(metadata, 'bleRssi'),
+    bleMtu: numericField(metadata, 'bleMtu'),
+    bleName: typeof metadata.bleName === 'string' ? metadata.bleName : null,
+    bleServiceUuid: typeof metadata.bleServiceUuid === 'string' ? metadata.bleServiceUuid : null,
+    bleTelemetryUuid: typeof metadata.bleTelemetryUuid === 'string' ? metadata.bleTelemetryUuid : null,
+    bleMessageUuid: typeof metadata.bleMessageUuid === 'string' ? metadata.bleMessageUuid : null,
+    bleLastMessage: typeof metadata.bleLastMessage === 'string' ? metadata.bleLastMessage : null,
+    bleMessageSeq: numericField(metadata, 'bleMessageSeq'),
+    bleBridgeReceivedAt: typeof metadata.bleBridgeReceivedAt === 'string' ? metadata.bleBridgeReceivedAt : null,
+    bleBridgeStoredBy: typeof metadata.bleBridgeStoredBy === 'string' ? metadata.bleBridgeStoredBy : null,
+    notifySeq: numericField(metadata, 'notifySeq'),
     activityScore: numericField(metadata, 'activityScore'),
     wifiConnected: typeof metadata.wifiConnected === 'boolean' ? metadata.wifiConnected : null,
     wifiRssi: numericField(metadata, 'wifiRssi'),
@@ -480,12 +627,12 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     res.json({ history: rows });
   }));
 
-  app.post('/api/chat', requireAuth, async (req, res) => {
+  app.post('/api/chat', async (req, res) => {
     const { contactId, messages, contactProfile } = req.body || {};
     if (!contactId || typeof contactId !== 'string') return res.status(400).json({ error: 'contactId is required' });
-    const scopedId = scopedContactId(req.authUser!.sub, contactId);
-    if (!config.DASHSCOPE_API_KEY) return res.status(500).json({ error: 'DASHSCOPE_API_KEY not configured.' });
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array is required' });
+    const authUserId = req.authUser?.sub || '';
+    const scopedId = authUserId ? scopedContactId(authUserId, contactId) : '';
 
     const normalizedMessages = messages
       .map((msg: { role?: string; content?: string }) => ({
@@ -496,34 +643,41 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
 
     try {
       const sysPrompt = ai.getSystemPrompt(contactId, contactProfile);
-      const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.DASHSCOPE_API_KEY}` },
-        body: JSON.stringify({ model: 'qwen-plus', messages: [{ role: 'system', content: sysPrompt }, ...normalizedMessages] }),
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        console.error('DashScope error:', response.status, text);
-        return res.status(500).json({ error: 'DashScope API error', detail: text });
-      }
-      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-      const reply = data.choices?.[0]?.message?.content || 'I could not generate a proper reply.';
+      const generatedReply = ai.hasDashScopeKey()
+        ? await ai.callQwen([{ role: 'system', content: sysPrompt }, ...normalizedMessages])
+        : undefined;
+      const reply = generatedReply || getLocalChatReply(contactProfile);
+      const source = generatedReply ? 'qwen' : 'local';
 
-      const now = new Date().toISOString();
-      for (const m of normalizedMessages) {
-        await prisma.chatMessage.create({ data: { contactId: scopedId, role: m.role, content: m.content, createdAt: new Date(now) } });
+      if (scopedId) {
+        const now = new Date().toISOString();
+        for (const m of normalizedMessages) {
+          await prisma.chatMessage.create({ data: { contactId: scopedId, role: m.role, content: m.content, createdAt: new Date(now) } });
+        }
+        await prisma.chatMessage.create({ data: { contactId: scopedId, role: 'assistant', content: reply, createdAt: new Date(now) } });
       }
-      await prisma.chatMessage.create({ data: { contactId: scopedId, role: 'assistant', content: reply, createdAt: new Date(now) } });
-      res.json({ reply });
+      res.json({ reply, source, saved: Boolean(scopedId) });
     } catch (err) {
       console.error('Chat backend error:', err);
-      res.status(500).json({ error: 'Server error', detail: String(err) });
+      res.json({ reply: getLocalChatReply(contactProfile), source: 'local', warning: String(err) });
     }
   });
 
   // ─── Map & Notes ───
   app.get('/api/status', (_req, res) => {
-    res.json({ ready: true, lastSync: new Date().toISOString() });
+    res.json({
+      ready: true,
+      lastSync: new Date().toISOString(),
+      ai: {
+        dashscopeConfigured: ai.hasDashScopeKey(),
+        textModel: ai.QWEN_TEXT_MODEL,
+        visionModel: ai.QWEN_VISION_MODEL,
+        thinkingEnabled: config.QWEN_ENABLE_THINKING,
+      },
+      videoAi: {
+        url: config.VIDEO_AI_URL,
+      },
+    });
   });
 
   app.get('/api/map-locations', (_req, res) => {
@@ -534,6 +688,44 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
       ],
     });
   });
+
+  app.get('/api/map/tile/:z/:x/:y.png', asyncHandler(async (req, res) => {
+    const z = Number(req.params.z);
+    const x = Number(req.params.x);
+    const y = Number(req.params.y);
+    if (!validMapTile(z, x, y)) {
+      return res.status(400).json({ error: 'Invalid map tile coordinates' });
+    }
+
+    const errors: string[] = [];
+    for (const source of MAP_TILE_SOURCES) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), MAP_TILE_TIMEOUT_MS);
+      try {
+        const upstream = await fetch(source.url(z, x, y), {
+          headers: {
+            'User-Agent': 'PawTrace/8.9 local development map tile proxy',
+            Accept: 'image/avif,image/webp,image/png,image/*,*/*;q=0.8',
+          },
+          signal: controller.signal,
+        });
+        if (!upstream.ok) {
+          throw new Error(`${upstream.status} ${upstream.statusText}`);
+        }
+        const body = Buffer.from(await upstream.arrayBuffer());
+        res.setHeader('Content-Type', upstream.headers.get('content-type') || 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        res.setHeader('X-PawTrace-Tile-Source', source.name);
+        return res.send(body);
+      } catch (err) {
+        errors.push(`${source.name}: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    return res.status(502).json({ error: 'Map tile unavailable', detail: errors.join('; ') });
+  }));
 
   app.get('/api/sticky-notes', requireAuth, asyncHandler(async (_req, res) => {
     const notes = await prisma.stickyNote.findMany({ orderBy: { createdAt: 'asc' } });
@@ -585,9 +777,9 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
   }));
 
   // ─── M5Stack Device Telemetry ───
-  app.post('/api/device/telemetry', requireDeviceIngestAuth, asyncHandler(async (req, res) => {
-    const payload = isRecord(req.body) ? req.body : {};
-    const deviceId = firstTextField(payload, ['deviceId', 'deviceID', 'device_id', 'device']);
+  app.post('/api/device/telemetry', express.text({ type: ['text/csv', 'text/plain'], limit: '16kb' }), requireDeviceIngestAuth, asyncHandler(async (req, res) => {
+    const payload = parseTelemetryPayload(req.body);
+    const deviceId = telemetryDeviceId(payload);
     if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
 
     const payloadUserId = await resolveUserId(firstTextField(payload, ['userId', 'user_id', 'username', 'ownerId', 'owner_id']));
@@ -598,7 +790,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     const userId = req.authUser?.sub || payloadUserId || defaultUserId || null;
 
     const tagId = firstTextField(payload, ['tagId', 'tagID', 'tag_id', 'nfcId', 'nfc_id']);
-    const source = firstTextField(payload, ['source']) || 'm5stack-http';
+    const source = firstTextField(payload, ['source']) || (isBleTelemetryPayload(payload) ? 'm5stickc-plus-ble' : 'm5stack-http');
     const timestamp = toIsoTimestamp(firstTextField(payload, ['timestamp', 'capturedAt', 'time']));
     const receivedAt = new Date().toISOString();
     const heartRateBpm = firstNumericField(payload, ['heartRateBpm', 'heart_rate_bpm', 'heartRate', 'pet_bpm', 'bpm']);
@@ -632,7 +824,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
         timestamp,
         heartRateBpm,
         soundLevelDb: firstNumericField(payload, ['soundLevelDb', 'soundDb', 'soundLevel']),
-        batteryPct: firstNumericField(payload, ['batteryPct', 'battery_pct', 'batteryPercent', 'battery']),
+        batteryPct: firstNumericField(payload, ['batteryPct', 'battery_pct', 'batteryPercent', 'battery', 'bat']),
         steps: firstNumericField(payload, ['steps', 'stepCount']),
         tempC,
         accelPeak: firstNumericField(payload, ['accelPeak', 'accelerationPeak']),
@@ -733,37 +925,51 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
   }));
 
   // ─── AI (Qwen only) ───
-  app.post('/api/pet-prediction', requireAuth, async (req, res) => {
+  app.get('/api/ai/status', (_req, res) => {
+    res.json({
+      dashscopeConfigured: ai.hasDashScopeKey(),
+      textModel: ai.QWEN_TEXT_MODEL,
+      visionModel: ai.QWEN_VISION_MODEL,
+      thinkingEnabled: config.QWEN_ENABLE_THINKING,
+      timeoutMs: config.AI_TIMEOUT_MS,
+    });
+  });
+
+  app.post('/api/pet-prediction', async (req, res) => {
     const profile = req.body?.profile || {};
     if (!profile.starSign && !profile.petName) return res.json({ prediction: 'Share your star sign or pet info to unlock predictions.' });
     const fallback = ai.getLocalPetPrediction(profile);
-    if (!config.DASHSCOPE_API_KEY) return res.json({ prediction: fallback, source: 'local' });
+    if (!ai.hasDashScopeKey()) return res.json({ prediction: fallback, source: 'local' });
     try {
       const result = await ai.callQwen([
         { role: 'system', content: 'You are an upbeat pet behavior astrologist. Reply with at most 3 short sentences including one actionable tip.' },
         { role: 'user', content: ai.buildPetPredictionPrompt(profile) },
       ]);
-      res.json({ prediction: result || fallback });
+      res.json({ prediction: result || fallback, source: result ? 'qwen' : 'local' });
     } catch (err) {
       console.error('Pet prediction error:', err);
-      res.json({ prediction: fallback, source: 'local' });
+      res.json({ prediction: fallback, source: 'local', warning: String(err) });
     }
   });
 
-  app.post(['/api/ai/qwen-advice', '/api/ai/gemini-advice'], requireAuth, async (req, res) => {
+  app.post(['/api/ai/qwen-advice', '/api/ai/gemini-advice'], async (req, res) => {
     const { service, context, profile, pets } = req.body || {};
     if (!service || !['health', 'behavior', 'diet'].includes(service)) return res.status(400).json({ error: 'service must be health | behavior | diet' });
+    const fallback = ai.getLocalAdvice(service, profile || {});
+    if (!ai.hasDashScopeKey()) {
+      return res.json({ result: fallback, source: 'local', warning: 'DASHSCOPE_API_KEY is not configured.' });
+    }
     try {
       const messages = ai.buildAdviceMessages(service, context, profile || {}, pets || []);
       const result = await ai.callQwen(messages);
-      res.json({ result: result || 'Unable to generate advice.' });
+      res.json({ result: result || fallback, source: result ? 'qwen' : 'local' });
     } catch (err) {
       console.error('AI advice error:', err);
-      res.status(500).json({ error: 'Server error', detail: String(err) });
+      res.json({ result: fallback, source: 'local', warning: String(err) });
     }
   });
 
-  app.post(['/api/ai/qwen-diagnosis', '/api/ai/gemini-diagnosis'], requireAuth, async (req, res) => {
+  app.post(['/api/ai/qwen-diagnosis', '/api/ai/gemini-diagnosis'], async (req, res) => {
     const { imageBase64, mimeType, symptoms } = req.body || {};
     if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required' });
     const prompt = `You are an expert veterinary AI assistant named "PawTrace Health Engine".
@@ -774,6 +980,10 @@ Provide a structured Markdown response:
 ### Severity Assessment
 ### Recommended Actions
 **Disclaimer:** You are an AI, not a licensed veterinarian. This is informational only.`;
+    const fallback = ai.getLocalDiagnosis(String(symptoms || ''));
+    if (!ai.hasDashScopeKey()) {
+      return res.json({ result: fallback, source: 'local', warning: 'DASHSCOPE_API_KEY is not configured.' });
+    }
     try {
       const result = await ai.callQwenVision({ imageBase64, mimeType, prompt });
       if (result) return res.json({ result, source: 'qwen-vl' });
@@ -783,14 +993,14 @@ Provide a structured Markdown response:
     try {
       const messages = ai.buildAdviceMessages('health', `Symptoms: ${symptoms || 'not provided'}.`, {}, []);
       const result = await ai.callQwen(messages);
-      res.json({ result: result || 'AI could not analyze; please try again.', source: 'qwen-text-fallback' });
+      res.json({ result: result || fallback, source: result ? 'qwen-text-fallback' : 'local' });
     } catch (err) {
       console.error('Diagnosis fallback error:', err);
-      res.status(500).json({ error: 'AI service unavailable.', detail: String(err) });
+      res.json({ result: fallback, source: 'local', warning: String(err) });
     }
   });
 
-  app.post('/api/ai/video-behavior', requireAuth, (req, res) => {
+  app.post('/api/ai/video-behavior', (req, res) => {
     videoUpload.single('video')(req, res, async (uploadErr: unknown) => {
       const uploaded = req.file;
       const cleanup = () => {

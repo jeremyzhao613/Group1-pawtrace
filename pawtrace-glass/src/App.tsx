@@ -24,6 +24,8 @@ type Telemetry = {
   id?: string;
   deviceId?: string;
   userId?: string | null;
+  source?: string | null;
+  transport?: string | null;
   timestamp?: string;
   receivedAt?: string;
   heartRateBpm?: number | null;
@@ -54,6 +56,10 @@ type Telemetry = {
   uploadEnabled?: boolean | null;
   uploadOk?: boolean | null;
   uploadCode?: number | null;
+  bleConnected?: boolean | null;
+  bleRssi?: number | null;
+  bleMtu?: number | null;
+  notifySeq?: number | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -87,6 +93,8 @@ type MapCoordinate = {
 
 const demoPacket = {
   device_id: 'm5stickc-plus-1-1',
+  source: 'm5stickc-plus-wifi',
+  transport: 'wifi-http',
   battery_pct: 100,
   battery_mv: 4193,
   gps_fix: 0,
@@ -116,6 +124,22 @@ const demoPacket = {
   upload_code: 0,
 };
 
+const demoBlePacket = {
+  id: 'pawtrace_001',
+  source: 'm5stickc-plus-ble',
+  transport: 'ble',
+  bat: 82,
+  bpm: 92,
+  lat: 31.2983,
+  lon: 120.5853,
+  alert: 0,
+  ble_connected: true,
+  ble_rssi: -58,
+  ble_mtu: 185,
+  service_uuid: '7b9f0001-6f3a-4f8a-9f4d-111111111111',
+  characteristic_uuid: '7b9f0002-6f3a-4f8a-9f4d-222222222222',
+};
+
 const emptyState: DashboardState = {
   token: '',
   user: null,
@@ -142,6 +166,7 @@ function formatDate(value?: string) {
 }
 
 function numberLabel(value: unknown, suffix = '', digits = 0) {
+  if (value === undefined || value === null || value === '') return '--';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return '--';
   return `${numeric.toFixed(digits)}${suffix}`;
@@ -153,18 +178,34 @@ function boolLabel(value: unknown) {
   return '--';
 }
 
+function isBleTelemetry(latest: Telemetry | null) {
+  const source = `${latest?.source || latest?.metadata?.source || ''} ${latest?.transport || latest?.metadata?.transport || ''}`;
+  return /ble/i.test(source);
+}
+
+function telemetrySourceLabel(latest: Telemetry | null) {
+  if (!latest) return 'Waiting';
+  const source = String(latest.source || latest.metadata?.source || '');
+  const transport = String(latest.transport || latest.metadata?.transport || '');
+  const joined = `${source} ${transport}`.toLowerCase();
+  if (joined.includes('ble')) return 'BLE sync';
+  if (joined.includes('wifi') || joined.includes('http')) return 'Wi-Fi HTTP';
+  return source || transport || 'M5Stack';
+}
+
 function statusTone(value: unknown) {
   if (value === true) return 'good';
   if (value === false) return 'bad';
   return 'idle';
 }
 
-function latestValue<T>(latest: Telemetry | null, key: keyof Telemetry, fallback: T): T {
-  const value = latest?.[key];
-  return value === undefined || value === null ? fallback : (value as T);
+function hasNumber(value: unknown) {
+  if (value === undefined || value === null || value === '') return false;
+  return Number.isFinite(Number(value));
 }
 
 function hasValidCoordinate(lat?: number | null, lon?: number | null) {
+  if (lat === undefined || lat === null || lon === undefined || lon === null) return false;
   const numericLat = Number(lat);
   const numericLon = Number(lon);
   return Number.isFinite(numericLat)
@@ -174,6 +215,20 @@ function hasValidCoordinate(lat?: number | null, lon?: number | null) {
     && numericLon >= -180
     && numericLon <= 180
     && !(numericLat === 0 && numericLon === 0);
+}
+
+function hasLiveCoordinateLock(telemetry: Telemetry | null) {
+  if (!telemetry || !hasValidCoordinate(telemetry.lat, telemetry.lon)) return false;
+  const explicitGpsValid = telemetry.locationValid ?? telemetry.gpsValid;
+  if (explicitGpsValid === false) return false;
+  if (!isBleTelemetry(telemetry) && Number(telemetry.gpsFix ?? 1) === 0) return false;
+  return true;
+}
+
+function gpsStatusValue(telemetry: Telemetry | null) {
+  if (!telemetry) return null;
+  if (hasLiveCoordinateLock(telemetry)) return true;
+  return telemetry.locationValid ?? telemetry.gpsValid ?? null;
 }
 
 function getLastPoint(points: LocationPoint[]) {
@@ -186,7 +241,7 @@ function getActiveCoordinate(latest: Telemetry | null, points: LocationPoint[], 
       lat: Number(latest?.lat),
       lon: Number(latest?.lon),
       live: true,
-      source: 'Live Wi-Fi GPS',
+      source: isBleTelemetry(latest) ? 'Live BLE sync GPS' : 'Live Wi-Fi GPS',
       timestamp: latest?.receivedAt || latest?.timestamp,
     };
   }
@@ -289,14 +344,14 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [refresh]);
 
-  const sendDemoPacket = useCallback(async () => {
+  const sendPacket = useCallback(async (packet: Record<string, unknown>) => {
     setPosting(true);
     try {
       const token = await ensureToken();
       await apiFetch('/api/device/telemetry', token, {
         method: 'POST',
         body: JSON.stringify({
-          ...demoPacket,
+          ...packet,
           timestamp: new Date().toISOString(),
         }),
       });
@@ -311,11 +366,13 @@ export default function App() {
     }
   }, [apiFetch, ensureToken, refresh]);
 
+  const sendDemoPacket = useCallback(() => sendPacket(demoPacket), [sendPacket]);
+  const sendBlePacket = useCallback(() => sendPacket(demoBlePacket), [sendPacket]);
+
   const latest = state.latest;
-  const gpsFlagValid = latestValue(latest, 'locationValid', latest?.gpsValid ?? false);
-  const liveGpsValid = Boolean(gpsFlagValid)
-    && Number(latest?.gpsFix ?? 1) !== 0
-    && hasValidCoordinate(latest?.lat, latest?.lon);
+  const sourceLabel = telemetrySourceLabel(latest);
+  const latestGpsStatus = gpsStatusValue(latest);
+  const liveGpsValid = hasLiveCoordinateLock(latest);
   const mapPoint = useMemo(
     () => getActiveCoordinate(latest, state.points, liveGpsValid),
     [liveGpsValid, latest, state.points],
@@ -326,20 +383,20 @@ export default function App() {
     {
       label: 'Device',
       value: latest?.deviceId || 'Waiting',
-      note: `User ${state.user?.username || 'demo'}`,
+      note: `${sourceLabel} · User ${state.user?.username || 'demo'}`,
       tone: 'idle',
     },
     {
       label: 'Battery',
       value: numberLabel(latest?.batteryPct, '%'),
       note: `${numberLabel(latest?.batteryMv, ' mV')} power rail`,
-      tone: Number(latest?.batteryPct) > 25 ? 'good' : 'bad',
+      tone: hasNumber(latest?.batteryPct) ? (Number(latest?.batteryPct) > 25 ? 'good' : 'bad') : 'idle',
     },
     {
       label: 'GPS Fix',
-      value: boolLabel(liveGpsValid),
+      value: boolLabel(latestGpsStatus),
       note: `${numberLabel(latest?.gpsVisible)} visible · HDOP ${numberLabel(latest?.gpsHdop, '', 1)}`,
-      tone: statusTone(liveGpsValid),
+      tone: statusTone(latestGpsStatus),
     },
     {
       label: 'Health',
@@ -358,13 +415,16 @@ export default function App() {
             <p className="eyebrow">PawTrace hardware database</p>
             <h1>GPS & Pet Health Telemetry Hub</h1>
             <p className="topbar-copy">
-              M5StickC Plus Wi-Fi packets, PostgreSQL telemetry, user records, pet cards, GPS validity,
+              M5StickC Plus BLE sync or Wi-Fi packets, PostgreSQL telemetry, user records, pet cards, GPS validity,
               geofence state, and health prototype signals in one operational view.
             </p>
           </div>
           <div className="topbar-actions">
             <button type="button" onClick={sendDemoPacket} disabled={posting}>
-              {posting ? 'Posting packet...' : 'Send demo M5 packet'}
+              {posting ? 'Posting packet...' : 'Send demo Wi-Fi packet'}
+            </button>
+            <button type="button" onClick={sendBlePacket} disabled={posting}>
+              {posting ? 'Posting packet...' : 'Send demo BLE packet'}
             </button>
             <span className={`status-pill ${state.error ? 'bad' : 'good'}`}>
               {state.error ? 'Backend warning' : 'Backend linked'}
@@ -420,7 +480,9 @@ export default function App() {
                 <p className="eyebrow">GPS status</p>
                 <h2>
                   {liveGpsValid
-                    ? 'Live Wi-Fi GPS on real map'
+                    ? isBleTelemetry(latest)
+                      ? 'Live BLE sync GPS on real map'
+                      : 'Live Wi-Fi GPS on real map'
                     : mapPoint
                       ? 'Showing last valid GPS point'
                       : 'Waiting for valid GPS fix'}
@@ -519,7 +581,7 @@ export default function App() {
                     <th>GPS</th>
                     <th>Battery</th>
                     <th>Health</th>
-                    <th>Wi-Fi / upload</th>
+                    <th>Link / upload</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -527,10 +589,14 @@ export default function App() {
                     <tr key={row.id || row.receivedAt}>
                       <td>{formatDate(row.receivedAt || row.timestamp)}</td>
                       <td>{row.deviceId}</td>
-                      <td>{boolLabel(row.locationValid ?? row.gpsValid)} · {numberLabel(row.gpsVisible)} sats</td>
+                      <td>{boolLabel(gpsStatusValue(row))} · {numberLabel(row.gpsVisible)} sats</td>
                       <td>{numberLabel(row.batteryPct, '%')} · {numberLabel(row.batteryMv, 'mV')}</td>
                       <td>{numberLabel(row.heartRateBpm)} BPM · {numberLabel(row.tempC, '°C', 1)}</td>
-                      <td>{boolLabel(row.wifiConnected)} · code {numberLabel(row.uploadCode)}</td>
+                      <td>
+                        {telemetrySourceLabel(row)} · {isBleTelemetry(row)
+                          ? `RSSI ${numberLabel(row.bleRssi, ' dBm')}`
+                          : `code ${numberLabel(row.uploadCode)}`}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -542,7 +608,7 @@ export default function App() {
             <div className="section-head">
               <div>
                 <p className="eyebrow">Raw packet model</p>
-                <h3>Wi-Fi JSON payload</h3>
+                <h3>{latest && isBleTelemetry(latest) ? 'BLE JSON payload' : 'Wi-Fi JSON payload'}</h3>
               </div>
               <span>{formatDate(state.lastRefresh)}</span>
             </div>

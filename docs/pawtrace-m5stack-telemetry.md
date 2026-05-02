@@ -26,6 +26,23 @@ GPS v1.1 + Heart Rate HAT + IMU
   -> Map, Health Monitoring, and Pet Cards
 ```
 
+BLE is treated as a near-field sync path, not the long-range tracking path:
+
+```text
+GPS v1.1 + Heart Rate HAT + IMU
+  -> M5StickC Plus BLE GATT notify
+  -> PawTrace web Bluetooth bridge or mobile app BLE Central / GATT Client
+  -> App POSTs normalized telemetry JSON to /api/device/telemetry
+  -> same PostgreSQL tables, latest cache, map, health panel, and dashboard
+```
+
+Use this split:
+
+| Link | Role | Use |
+| --- | --- | --- |
+| BLE | near-field sync / provisioning | battery, vitals, GPS snapshot, Wi-Fi setup, buzzer or LED control |
+| Wi-Fi HTTP | remote upload | live map, last known location, geofence alert, history |
+
 ## MVP Scope
 
 | Priority | Function | Recommendation |
@@ -109,7 +126,7 @@ motion-artifact filtering, and validation against veterinary-grade sensors are r
 Set a device ingest token in `backend/.env`:
 
 ```env
-DEVICE_INGEST_TOKEN="replace-with-a-shared-device-token"
+DEVICE_INGEST_TOKEN="pawtrace-m5-dev-token"
 ```
 
 The M5StickC must send this token as either:
@@ -127,8 +144,16 @@ Authorization: Bearer replace-with-a-shared-device-token
 For local testing, the backend runs on port `3000`. From the M5StickC, use the computer LAN IP, not `localhost`:
 
 ```text
-http://192.168.x.x:3000/api/device/telemetry
+http://10.13.180.141:3000/api/device/telemetry
 ```
+
+The included Arduino example is:
+
+```text
+hardware/m5stack/pawtrace_wifi_telemetry.ino
+```
+
+Update `WIFI_SSID` and `WIFI_PASSWORD` in that sketch before flashing. If your Mac LAN IP changes, update `PAWTRACE_TELEMETRY_URL` to the new `http://<mac-lan-ip>:3000/api/device/telemetry`.
 
 ## Telemetry Payload
 
@@ -201,6 +226,101 @@ Actual M5StickC Plus snake_case packet supported by the backend:
 
 The backend stores `pet_bpm` as `heartRateBpm`, `temp_c` as `tempC`, `spo2` as `spo2Pct`, and keeps the hardware status fields in telemetry metadata. If `location_valid` is false, `gps_fix` is `0`, or the coordinates are `0,0`, PawTrace still records the health packet but does not create a map location point.
 
+## BLE Interface Contract
+
+M5StickC Plus should act as the BLE Peripheral / GATT Server. The phone app acts as the BLE Central / GATT Client.
+
+```text
+Service UUID:        7b9f0001-6f3a-4f8a-9f4d-111111111111
+Telemetry UUID:      7b9f0002-6f3a-4f8a-9f4d-222222222222
+Telemetry property:  READ + NOTIFY
+Message UUID:        7b9f0003-6f3a-4f8a-9f4d-333333333333
+Message property:    READ + WRITE + WRITE_WITHOUT_RESPONSE
+Device name:         PawTrace-001
+```
+
+Recommended canonical BLE notify JSON:
+
+```json
+{
+  "device_id": "pawtrace_001",
+  "source": "m5stickc-plus-ble",
+  "transport": "ble",
+  "battery_pct": 82,
+  "pet_bpm": 92,
+  "lat": 31.2983,
+  "lon": 120.5853,
+  "location_valid": true,
+  "gps_fix": 1,
+  "lost_alert": false,
+  "ble_rssi": -58,
+  "ble_mtu": 185,
+  "ble_message_uuid": "7b9f0003-6f3a-4f8a-9f4d-333333333333",
+  "ble_last_message": "hello from web bridge",
+  "ble_message_seq": 1
+}
+```
+
+The backend also accepts the compact BLE JSON you can use for quick demos:
+
+```json
+{
+  "id": "pawtrace_001",
+  "bat": 82,
+  "bpm": 92,
+  "lat": 31.2983,
+  "lon": 120.5853,
+  "alert": 0,
+  "source": "m5stickc-plus-ble",
+  "transport": "ble"
+}
+```
+
+And compact CSV:
+
+```text
+pawtrace_001,82,92,31.2983,120.5853,0
+```
+
+CSV field order:
+
+```text
+device_id,battery_pct,pet_bpm,lat,lon,lost_alert
+```
+
+Mobile app bridge rule:
+
+```text
+BLE notify payload -> parse JSON or CSV -> POST to /api/device/telemetry
+BLE message input -> write UTF-8 text or JSON to Message UUID
+```
+
+The main web app now includes a Web Bluetooth bridge in:
+
+```text
+Health -> Bluetooth Bridge
+```
+
+Use Chrome or Edge on `localhost` or HTTPS, sign in, click `Connect BLE`, choose `PawTrace-001`, send a short message, and keep the page open. The bridge subscribes to telemetry notifications and stores GPS, vitals, activity, Wi-Fi, and BLE metadata through the signed-in user's JWT.
+
+If the mobile app is logged in, use the user JWT:
+
+```http
+Authorization: Bearer <app-user-jwt>
+```
+
+For local bridge testing, use:
+
+```http
+x-device-token: pawtrace-m5-dev-token
+```
+
+The included BLE Arduino example is:
+
+```text
+hardware/m5stack/pawtrace_ble_telemetry.ino
+```
+
 ## Real Map Display
 
 The glass dashboard at `http://localhost:3001/` uses a real OpenStreetMap embed for the pet location panel. The marker is driven by Wi-Fi telemetry:
@@ -218,7 +338,7 @@ When those conditions are met, the dashboard shows `Live Wi-Fi GPS` and centers 
 ```bash
 curl -X POST http://localhost:3000/api/device/telemetry \
   -H "Content-Type: application/json" \
-  -H "x-device-token: replace-with-a-shared-device-token" \
+  -H "x-device-token: pawtrace-m5-dev-token" \
   -d '{
     "deviceId": "pawtrace-vest-001",
     "userId": "demo",
@@ -234,6 +354,24 @@ curl -X POST http://localhost:3000/api/device/telemetry \
     "activityState": "walking",
     "mapCoords": { "x": 50, "y": 69 }
   }'
+```
+
+BLE compact JSON test:
+
+```bash
+curl -X POST http://localhost:3000/api/device/telemetry \
+  -H "Content-Type: application/json" \
+  -H "x-device-token: pawtrace-m5-dev-token" \
+  -d '{"id":"pawtrace_001","bat":82,"bpm":92,"lat":31.2983,"lon":120.5853,"alert":0,"source":"m5stickc-plus-ble","transport":"ble","ble_rssi":-58}'
+```
+
+BLE compact CSV test:
+
+```bash
+curl -X POST http://localhost:3000/api/device/telemetry \
+  -H "Content-Type: text/csv" \
+  -H "x-device-token: pawtrace-m5-dev-token" \
+  --data 'pawtrace_001,82,92,31.2983,120.5853,0'
 ```
 
 Then log in as `demo / demo123` and open:

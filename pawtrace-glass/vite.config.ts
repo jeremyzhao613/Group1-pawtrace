@@ -6,19 +6,29 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
+  const apiTarget = env.VITE_API_BASE_URL || 'http://localhost:3000';
+  const apiProxy = {
+    target: apiTarget,
+    changeOrigin: true,
+  };
+
   return {
     server: {
       port: 3001,
       host: '0.0.0.0',
+      allowedHosts: true,
       proxy: {
-        '/api': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:3000',
-          changeOrigin: true,
-        },
-        '/assets': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:3000',
-          changeOrigin: true,
-        },
+        '/api': apiProxy,
+        '/assets': apiProxy,
+      },
+    },
+    preview: {
+      port: 3001,
+      host: '0.0.0.0',
+      allowedHosts: true,
+      proxy: {
+        '/api': apiProxy,
+        '/assets': apiProxy,
       },
     },
     plugins: [react(), tailwindcss()],

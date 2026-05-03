@@ -17,6 +17,7 @@
           query.has('nfc') ||
           query.has('pet') ||
           query.has('nfcId') ||
+          /^#nfc(?:[/?]|$)/i.test(hash) ||
           /[?&](nfc|pet|nfcId)=/.test(hash)
         ) {
           document.documentElement.classList.add('nfc-deep-link');
@@ -25,7 +26,9 @@
     })();
   </script>
   <style>
-    .nfc-deep-link #login-screen {
+    .nfc-deep-link #login-screen,
+    .nfc-deep-link #app-root,
+    .nfc-deep-link #mobile-tabbar {
       display: none !important;
     }
   </style>
@@ -59,6 +62,12 @@
     </symbol>
     <symbol id="ico-send" viewBox="0 0 24 24" fill="currentColor">
       <path d="M3.4 20.6 21 12 3.4 3.4l-.8 6.8L14 12 2.6 13.8l.8 6.8Z"/>
+    </symbol>
+    <symbol id="ico-image" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v9.6l3.4-3.4a1.2 1.2 0 0 1 1.7 0l2.1 2.1 3.7-4a1.2 1.2 0 0 1 1.8 0L19 11.8V6H5Zm0 12h14v-3.3l-2.2-2.3-3.7 4a1.2 1.2 0 0 1-1.7 0l-2.1-2.1L5 18Zm5.2-9.5a1.7 1.7 0 1 1-3.4 0 1.7 1.7 0 0 1 3.4 0Z"/>
+    </symbol>
+    <symbol id="ico-smile" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2.5a9.5 9.5 0 1 0 0 19 9.5 9.5 0 0 0 0-19ZM8.4 9.1a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm7.2 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm-7 5.1a1 1 0 0 1 1.4.1c.45.55 1.1.95 2 .95s1.55-.4 2-.95a1 1 0 1 1 1.5 1.32c-.82.95-1.98 1.63-3.5 1.63s-2.68-.68-3.5-1.63a1 1 0 0 1 .1-1.42Z"/>
     </symbol>
   </svg>
   
@@ -187,6 +196,25 @@
     </div>
   </div>
 
+  <!-- NFC STANDALONE PAGE -->
+  <section id="nfc-root" class="nfc-standalone hidden min-h-screen" aria-live="polite">
+    <div class="nfc-page-shell">
+      <header class="nfc-page-topbar">
+        <a class="nfc-brand" href="/?openApp=pets#pets" aria-label="Open PAWTRACE pets">
+          <span class="nfc-brand-mark"><i class="fas fa-paw"></i></span>
+          <span>
+            <strong>PAWTRACE</strong>
+            <small>NFC Pet Card</small>
+          </span>
+        </a>
+        <a class="nfc-page-link" href="/?openApp=pets#pets">
+          <i class="fas fa-arrow-up-right-from-square"></i><span>Open app</span>
+        </a>
+      </header>
+      <main id="nfc-page-content" class="nfc-page-content"></main>
+    </div>
+  </section>
+
   <!-- MAIN APP -->
   <div id="app-root" class="hidden min-h-screen px-4 sm:px-6 py-10 lg:px-12 relative z-10">
     <div class="app-shell-wrapper relative z-10 w-full max-w-6xl mx-auto">
@@ -260,7 +288,7 @@
                 </div>
                 <div class="relative">
                   <img id="current-user-avatar" loading="lazy" decoding="async" class="w-12 h-12 rounded-2xl object-cover border border-white/70 shadow-lg cursor-pointer hover:-translate-y-0.5 transition-transform"
-                     src="https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png"
+                     src="/assets/avatars/avatar1.png"
                      alt="User avatar" onclick="openProfileEditModal()" />
                   <span class="absolute -bottom-1 -right-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500 text-white shadow-lg">Online</span>
                 </div>
@@ -332,9 +360,6 @@
                       <button id="map-toggle-fence" class="map-control-button map-control-button--toggle active" type="button" aria-label="Toggle electronic fence" title="Electronic fence" aria-pressed="true">
                         <i class="fas fa-draw-polygon"></i>
                       </button>
-                      <button id="map-toggle-tracks" class="map-control-button map-control-button--toggle active" type="button" aria-label="Toggle route tracks" title="Route tracks" aria-pressed="true">
-                        <i class="fas fa-route"></i>
-                      </button>
                     </div>
                     <svg id="map-overlay-layer" class="map-overlay-layer map-frame-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
                     <div id="map-markers-layer" class="absolute inset-0 map-frame-layer"></div>
@@ -390,7 +415,7 @@
                   <div class="flex items-start justify-between gap-3">
                     <div>
                       <h3 class="font-semibold text-sm flex items-center gap-2">
-                        <i class="fas fa-draw-polygon text-primary"></i>Fence & Route
+                        <i class="fas fa-draw-polygon text-primary"></i>Electronic Fence
                       </h3>
                       <p id="map-tool-pet-name" class="text-[11px] text-gray-500">Select a pet on the map</p>
                     </div>
@@ -412,27 +437,6 @@
                       </button>
                       <button id="map-fence-center-current" type="button" class="map-tool-button">
                         <i class="fas fa-paw"></i><span>Use pet</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="map-tool-section">
-                    <div class="map-tool-row">
-                      <label class="map-tool-check">
-                        <input id="map-track-active-only" type="checkbox" />
-                        <span>Only active route</span>
-                      </label>
-                      <span id="map-track-status" class="map-tool-value">Route ready</span>
-                    </div>
-                    <div class="map-tool-actions map-tool-actions--three">
-                      <button id="map-track-add-point" type="button" class="map-tool-button">
-                        <i class="fas fa-location-dot"></i><span>Add GPS</span>
-                      </button>
-                      <button id="map-track-clear" type="button" class="map-tool-button">
-                        <i class="fas fa-eraser"></i><span>Clear</span>
-                      </button>
-                      <button id="map-track-restore" type="button" class="map-tool-button">
-                        <i class="fas fa-rotate-left"></i><span>Restore</span>
                       </button>
                     </div>
                   </div>
@@ -701,12 +705,32 @@
                     <div class="pt-2 border-t border-primary/25 mt-2 chat-input-bar">
                       <div class="flex gap-2 mb-2 items-start">
                         <button id="chat-attach-image" class="pixel-button text-[11px] h-10 flex items-center justify-center px-3" type="button" title="Share image">
-                          <i class="fas fa-image"></i>
+                          <svg class="w-4 h-4" aria-hidden="true"><use href="#ico-image"></use></svg>
+                        </button>
+                        <button id="chat-open-stickers" class="pixel-button chat-sticker-trigger text-[11px] h-10 flex items-center justify-center px-3" type="button" title="Send sticker" aria-expanded="false" aria-controls="chat-sticker-panel">
+                          <svg class="w-4 h-4" aria-hidden="true"><use href="#ico-smile"></use></svg>
                         </button>
                         <input id="chat-input" class="pixel-input text-xs flex-1" placeholder="Type a message..." />
                         <button id="chat-send" class="pixel-button flex items-center gap-1 text-[11px] whitespace-nowrap" aria-label="Send message">
                           <svg class="w-4 h-4" aria-hidden="true"><use href="#ico-send"></use></svg><span>Send</span>
                         </button>
+                      </div>
+                      <div id="chat-sticker-panel" class="chat-sticker-panel hidden" aria-hidden="true">
+                        <div class="chat-sticker-panel-head">
+                          <div class="chat-sticker-title-row">
+                            <span>Stickers</span>
+                            <span id="chat-sticker-count">0</span>
+                          </div>
+                          <label class="chat-sticker-size-control" for="chat-sticker-size" title="Sticker size">
+                            <i class="fas fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
+                            <input id="chat-sticker-size" type="range" min="58" max="108" step="2" value="78" aria-label="Sticker size" />
+                            <span id="chat-sticker-size-value">78</span>
+                          </label>
+                          <button id="chat-close-stickers" class="chat-sticker-close" type="button" title="Close stickers" aria-label="Close stickers">
+                            <i class="fas fa-xmark" aria-hidden="true"></i>
+                          </button>
+                        </div>
+                        <div id="chat-sticker-grid" class="chat-sticker-grid"></div>
                       </div>
                       <p id="chat-error" class="text-[10px] text-red-500 h-3"></p>
                     </div>
@@ -740,7 +764,7 @@
                 <div class="profile-main-column">
                   <section class="pixel-card profile-owner-card">
                     <img id="profile-avatar" loading="lazy" decoding="async" class="profile-avatar"
-                         src="https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png"
+                         src="/assets/avatars/avatar1.png"
                          alt="Profile avatar" />
                     <div class="profile-owner-body">
                       <div class="profile-name-row">
@@ -837,6 +861,50 @@
                   </section>
                 </div>
               </div>
+              <div class="pixel-card space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 class="font-semibold text-sm flex items-center gap-2">
+                      <i class="fas fa-bluetooth-b text-primary"></i>BLE WiFi Setup
+                    </h4>
+                    <p class="text-[11px] text-gray-500">Bluetooth only sends WiFi credentials to the M5. Telemetry is stored through WiFi.</p>
+                  </div>
+                  <span id="ble-wifi-status" class="health-status-pill">Pair</span>
+                </div>
+                <div class="grid gap-2">
+                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">WiFi SSID</label>
+                  <input id="ble-wifi-ssid" class="pixel-input text-xs" autocomplete="off" placeholder="Phone hotspot or WiFi name" />
+                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">WiFi Password</label>
+                  <input id="ble-wifi-password" class="pixel-input text-xs" type="password" autocomplete="new-password" placeholder="Hotspot password" />
+                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">Backend Host</label>
+                  <input id="ble-wifi-host" class="pixel-input text-xs" autocomplete="off" placeholder="192.168.31.199" />
+                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">Device Token</label>
+                  <input id="ble-wifi-token" class="pixel-input text-xs" autocomplete="off" placeholder="pawtrace-m5-dev-token" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <button id="ble-wifi-connect" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
+                    <i class="fas fa-link"></i><span>Connect BLE</span>
+                  </button>
+                  <button id="ble-wifi-send" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30 flex items-center justify-center gap-2" disabled>
+                    <i class="fas fa-wifi"></i><span>Send WiFi</span>
+                  </button>
+                </div>
+                <button id="ble-wifi-disconnect" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30 flex items-center justify-center gap-2" disabled>
+                  <i class="fas fa-unlink"></i><span>Disconnect BLE</span>
+                </button>
+                <div class="grid grid-cols-2 gap-2 text-[11px]">
+                  <div class="health-metric-chip">
+                    <span class="health-metric-chip__label">BLE Device</span>
+                    <span id="ble-wifi-device-name" class="health-metric-chip__value">--</span>
+                  </div>
+                  <div class="health-metric-chip">
+                    <span class="health-metric-chip__label">WiFi State</span>
+                    <span id="ble-wifi-state" class="health-metric-chip__value">--</span>
+                  </div>
+                </div>
+                <pre id="ble-wifi-result" class="ble-payload-preview text-[10px] text-gray-600">No WiFi credentials sent.</pre>
+                <p id="ble-wifi-store-status" class="text-[11px] text-gray-500">Use BLE once for provisioning, then read live data from WiFi Telemetry below.</p>
+              </div>
             </div>
           </div>
 
@@ -924,7 +992,7 @@
                   </div>
                 </div>
 
-                <div id="health-manual-card" class="pixel-card space-y-3">
+                <div class="pixel-card space-y-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <h4 class="font-semibold text-sm">Vitals Trend</h4>
@@ -983,23 +1051,7 @@
                   </div>
                 </div>
 
-              </div>
-
-              <div class="space-y-4">
-                <div class="pixel-card space-y-3">
-                  <div class="flex items-center justify-between">
-                    <h4 class="font-semibold text-sm flex items-center gap-2">
-                      <i class="fas fa-clock-rotate-left text-primary"></i>Recent Health Records
-                    </h4>
-                    <span id="health-history-count" class="text-[10px] text-gray-500">0 records</span>
-                  </div>
-                  <div id="health-history-scroll" class="pr-1 custom-scrollbar">
-                    <div id="health-history-list" class="space-y-2 text-[11px] text-gray-700"></div>
-                    <p id="health-history-empty" class="text-[11px] text-gray-400 italic">No health records yet.</p>
-                  </div>
-                </div>
-
-                <div class="pixel-card space-y-3">
+                <div id="health-manual-card" class="pixel-card space-y-3">
                   <div class="flex items-center justify-between">
                     <h4 class="font-semibold text-sm flex items-center gap-2">
                       <i class="fas fa-pen-to-square text-primary"></i>Manual Reading
@@ -1030,43 +1082,74 @@
                   <p id="health-form-status" class="text-[11px] text-primary hidden"></p>
                 </div>
 
+              </div>
+
+              <div class="space-y-4">
+                <div class="pixel-card space-y-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <h4 class="font-semibold text-sm flex items-center gap-2">
+                      <i class="fas fa-clock-rotate-left text-primary"></i>Recent Health Records
+                    </h4>
+                    <div class="flex items-center gap-2">
+                      <span id="health-history-count" class="text-[10px] text-gray-500">0 records</span>
+                      <button id="health-history-toggle" type="button" class="health-history-toggle" aria-expanded="false" aria-controls="health-history-scroll" aria-label="Show recent health records" title="Show records">
+                        <span id="health-history-toggle-label">Show</span>
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div id="health-history-scroll" class="pr-1 custom-scrollbar hidden" aria-hidden="true">
+                    <div id="health-history-list" class="space-y-2 text-[11px] text-gray-700"></div>
+                    <p id="health-history-empty" class="text-[11px] text-gray-400 italic">No health records yet.</p>
+                  </div>
+                </div>
+
                 <div class="pixel-card space-y-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <h4 class="font-semibold text-sm flex items-center gap-2">
-                        <i class="fas fa-bluetooth-b text-primary"></i>Bluetooth Bridge
+                        <i class="fas fa-wifi text-primary"></i>WiFi Telemetry
                       </h4>
-                      <p class="text-[11px] text-gray-500">Connect PawTrace-001, send a message, and store GPS packets.</p>
+                      <p class="text-[11px] text-gray-500">Use the M5 LAN URL on the same hotspot to read status, send messages, and trigger uploads.</p>
                     </div>
-                    <span id="ble-bridge-status" class="health-status-pill">Idle</span>
+                    <span id="wifi-bridge-status" class="health-status-pill">Idle</span>
                   </div>
                   <div class="grid gap-2">
-                    <button id="ble-connect" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
-                      <i class="fas fa-satellite-dish"></i><span>Connect BLE</span>
-                    </button>
-                    <button id="ble-disconnect" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30 flex items-center justify-center gap-2" disabled>
-                      <i class="fas fa-link-slash"></i><span>Disconnect</span>
-                    </button>
+                    <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">M5 LAN URL</label>
+                    <div class="flex gap-2">
+                      <input id="wifi-lan-url" class="pixel-input text-xs flex-1" placeholder="http://192.168.31.42:8080" />
+                      <button id="wifi-lan-save" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
+                        <i class="fas fa-floppy-disk"></i><span>Save</span>
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <button id="wifi-lan-refresh" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
+                        <i class="fas fa-arrows-rotate"></i><span>Read Status</span>
+                      </button>
+                      <button id="wifi-lan-upload" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30 flex items-center justify-center gap-2">
+                        <i class="fas fa-cloud-arrow-up"></i><span>Upload Now</span>
+                      </button>
+                    </div>
                   </div>
                   <div class="grid gap-2">
-                    <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">Message to device</label>
-                    <input id="ble-message-input" class="pixel-input text-xs" maxlength="120" placeholder="Hi PawTrace, blink or confirm GPS." />
-                    <button id="ble-send-message" type="button" class="pixel-button text-xs flex items-center justify-center gap-2" disabled>
-                      <i class="fas fa-paper-plane"></i><span>Send BLE Message</span>
+                    <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">Message to M5</label>
+                    <input id="wifi-message-input" class="pixel-input text-xs" maxlength="160" placeholder="Hi PawTrace, confirm WiFi upload." />
+                    <button id="wifi-send-message" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
+                      <i class="fas fa-paper-plane"></i><span>Send WiFi Message</span>
                     </button>
                   </div>
                   <div class="grid grid-cols-2 gap-2 text-[11px]">
                     <div class="health-metric-chip">
                       <span class="health-metric-chip__label">Device</span>
-                      <span id="ble-device-name" class="health-metric-chip__value">--</span>
+                      <span id="wifi-device-name" class="health-metric-chip__value">--</span>
                     </div>
                     <div class="health-metric-chip">
-                      <span class="health-metric-chip__label">Stored</span>
-                      <span id="ble-stored-count" class="health-metric-chip__value">0</span>
+                      <span class="health-metric-chip__label">Queue</span>
+                      <span id="wifi-queue-depth" class="health-metric-chip__value">--</span>
                     </div>
                   </div>
-                  <pre id="ble-latest-payload" class="ble-payload-preview text-[10px] text-gray-600">No BLE packet received.</pre>
-                  <p id="ble-store-status" class="text-[11px] text-gray-500">Sign in before storing Bluetooth packets.</p>
+                  <pre id="wifi-latest-payload" class="ble-payload-preview text-[10px] text-gray-600">No WiFi packet received.</pre>
+                  <p id="wifi-store-status" class="text-[11px] text-gray-500">On the M5 serial monitor, run CONFIG or LAN to get the same-network URL.</p>
                 </div>
               </div>
             </div>

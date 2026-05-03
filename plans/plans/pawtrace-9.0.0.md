@@ -10,6 +10,8 @@ base_commit: bce4e0d
 
 # PawTrace 9.0.0 技术更新文档 / Technical Update Document
 
+> Current implementation note: this 9.0.0 document records the earlier BLE telemetry bridge release. The current hardware path has since been changed to WiFi-only telemetry; BLE is now used only for WiFi provisioning.
+
 ## 版本定位
 
 - **版本号**：9.0.0

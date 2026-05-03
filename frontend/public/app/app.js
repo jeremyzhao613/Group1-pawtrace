@@ -35,15 +35,29 @@
     let chatInitialized = false;
     let rerenderChat = null;
     let chatHoverCard = null;
+    let lastChatAssistantSource = '';
+    let lastChatAssistantWarning = '';
     let petCheckInInitialized = false;
     let deviceTelemetryPollTimer = null;
+    let deviceTelemetryCommitTimer = null;
+    let pendingDeviceTelemetryRecords = [];
+    let lastDeviceTelemetryCommitMs = 0;
+    let wifiTelemetryBridgeInitialized = false;
+    let wifiTelemetryPollTimer = null;
+    let stopWifiTelemetryBridge = () => {};
     let bluetoothBridgeInitialized = false;
+    let stopBluetoothTelemetryBridge = () => {};
     const bluetoothBridgeState = {
       device: null,
       telemetryChar: null,
       messageChar: null,
       storedCount: 0,
       lastMessage: '',
+      autoReconnectTimer: null,
+      autoReconnectBusy: false,
+      userDisconnected: false,
+      rxBuffer: '',
+      logDumpCurrentUptimeMs: null,
     };
     let activeTabName = 'map';
     let activateAppTab = null;
@@ -191,7 +205,7 @@
       pendingAvatarData = null;
       if (editAvatarFileInput) editAvatarFileInput.value = '';
       if (profileAvatarPreviewImg) {
-        setPreviewImageSource(profileAvatarPreviewImg, currentUser.avatar || DEFAULT_PET_AVATAR);
+        setPreviewImageSource(profileAvatarPreviewImg, normalizeUserAvatar(currentUser.avatar), DEFAULT_USER_AVATAR);
       }
       document.getElementById('edit-display-name').value = currentUser.displayName || '';
       document.getElementById('edit-bio').value = currentUser.bio || '';
@@ -342,8 +356,12 @@
           localStorage.removeItem(LS_CURRENT_USER_KEY);
           return null;
         }
-        if (user) localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(user));
-        return user;
+        if (user) {
+          const normalized = normalizeSessionUser(user);
+          localStorage.setItem(LS_CURRENT_USER_KEY, JSON.stringify(normalized));
+          return normalized;
+        }
+        return null;
       } catch { return null; }
     }
 
@@ -374,12 +392,38 @@
       return fetch(apiUrl(url), { ...options, headers });
     }
 
+    function telemetryRecordsFromPayload(data = {}) {
+      if (Array.isArray(data?.telemetry)) return data.telemetry.filter(Boolean);
+      return data?.latest ? [data.latest] : [];
+    }
+
+    function telemetryAuthHeaders(token, extra = {}) {
+      return {
+        'Content-Type': 'application/json',
+        ...(extra || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+    }
+
+    async function fetchDeviceTelemetryPayload(path) {
+      const appToken = getAuthToken();
+      if (!appToken) return null;
+      const response = await fetch(apiUrl(path), {
+        headers: telemetryAuthHeaders(appToken),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Device telemetry request failed.');
+      }
+      return data;
+    }
+
     function normalizeSessionUser(user = {}) {
       const safeUser = sanitizeStoredUser(user) || {};
       return {
         username: safeUser.username || 'guest',
         displayName: safeUser.displayName || safeUser.username || 'Guest Explorer',
-        avatar: safeUser.avatar || 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png',
+        avatar: normalizeUserAvatar(safeUser.avatar),
         bio: safeUser.bio || '',
         campus: safeUser.campus || 'Taicang',
         contact: safeUser.contact || '',
@@ -407,6 +451,12 @@
       if (!src) return fallback;
       if (/^(https?:\/\/|data:image\/|\/|\.\/|\.\.\/)/i.test(src)) return src;
       return fallback;
+    }
+
+    function normalizeUserAvatar(value) {
+      const src = safeImageSrc(value, DEFAULT_USER_AVATAR);
+      if (/design\.gemcoder\.com\/staticResource\/echoAiSystemImages/i.test(src)) return DEFAULT_USER_AVATAR;
+      return src || DEFAULT_USER_AVATAR;
     }
 
     function base64UrlEncode(value = '') {
@@ -437,6 +487,12 @@
       const raw = payload && typeof payload === 'object' ? payload : {};
       const id = String(raw.id || raw.i || raw.petId || raw.nfcId || raw.nid || `nfc-${Date.now()}`).trim();
       const contact = String(raw.nfcContact || raw.c || raw.ownerContact || raw.contact || '').trim();
+      const rawTraits = Array.isArray(raw.traits)
+        ? raw.traits
+        : String(raw.traits || raw.tags || '')
+          .split(/[,，;；]/)
+          .map((trait) => trait.trim())
+          .filter(Boolean);
       return {
         id,
         nfcId: String(raw.nfcId || raw.nid || buildPetNfcId({ id }, 0)).trim(),
@@ -445,11 +501,18 @@
         breed: String(raw.breed || raw.b || 'Unknown').trim(),
         avatar: safeImageSrc(raw.avatar || raw.img || '', DEFAULT_PET_AVATAR),
         location: String(raw.location || raw.l || 'Campus').trim(),
+        status: String(raw.status || raw.s || 'No recent status notes.').trim(),
         health: String(raw.health || raw.h || 'No health notes provided.').trim(),
+        birthday: String(raw.birthday || raw.bd || raw.age || '').trim(),
+        gender: String(raw.gender || raw.g || '').trim(),
+        traits: rawTraits.slice(0, 6),
         nfcContact: contact,
         nfcNote: String(raw.nfcNote || raw.m || 'Please contact the owner if this pet is found.').trim(),
-        ownerName: String(raw.ownerName || raw.o || 'Pet owner').trim(),
+        ownerName: String(raw.ownerName || raw.o || raw.owner || 'Pet owner').trim(),
         ownerCampus: String(raw.ownerCampus || raw.campus || 'Taicang').trim(),
+        ownerAvatar: safeImageSrc(raw.ownerAvatar || raw.oa || '', ''),
+        ownerBio: String(raw.ownerBio || raw.ob || '').trim(),
+        ownerUsername: String(raw.ownerUsername || raw.ou || '').trim(),
         publicNfc: true
       };
     }
@@ -459,18 +522,38 @@
       const hash = getHashPathAndParams();
       const encoded = query.get('nfc') || hash.params.get('nfc');
       const targetId = query.get('pet') || query.get('nfcId') || hash.params.get('pet') || hash.params.get('nfcId') || '';
+      const hashPath = String(hash.path || '').toLowerCase();
+      const isNfcRoute = hashPath === 'nfc' || query.has('nfc') || query.has('pet') || query.has('nfcId') || hash.params.has('nfc') || hash.params.has('pet') || hash.params.has('nfcId');
       if (encoded) {
         try {
           const parsed = JSON.parse(base64UrlDecode(encoded));
           return {
             pet: normalizeNfcPetPayload(parsed),
-            targetId: String(parsed.id || parsed.i || parsed.nfcId || parsed.nid || targetId || '').trim()
+            targetId: String(parsed.id || parsed.i || parsed.nfcId || parsed.nid || targetId || '').trim(),
+            isNfcRoute
           };
         } catch (err) {
           console.warn('Invalid NFC pet link payload', err);
         }
       }
-      return { pet: null, targetId: String(targetId).trim() };
+      return { pet: null, targetId: String(targetId).trim(), isNfcRoute };
+    }
+
+    function buildAppRouteHref(tab = 'map') {
+      const targetTab = String(tab || 'map').replace(/[^\w-]/g, '') || 'map';
+      return `/?openApp=${encodeURIComponent(targetTab)}#${targetTab}`;
+    }
+
+    function shouldExitNfcStandalone() {
+      if (!document.documentElement.classList.contains('nfc-deep-link')) return false;
+      const nfcDeepLink = readNfcDeepLink();
+      return !nfcDeepLink.isNfcRoute && !nfcDeepLink.pet && !nfcDeepLink.targetId;
+    }
+
+    function reloadOutsideNfcStandalone() {
+      if (!shouldExitNfcStandalone()) return;
+      const targetTab = getHashPathAndParams().path || 'map';
+      window.location.replace(buildAppRouteHref(targetTab));
     }
 
     function contactHref(value = '') {
@@ -483,19 +566,220 @@
       return '';
     }
 
+    function getContactActionMeta(value = '') {
+      const href = contactHref(value);
+      if (!href) return null;
+      if (href.startsWith('tel:')) return { href, label: 'Call owner now', icon: 'fas fa-phone' };
+      if (href.startsWith('mailto:')) return { href, label: 'Email owner', icon: 'fas fa-envelope' };
+      return { href, label: 'Open contact', icon: 'fas fa-arrow-up-right-from-square' };
+    }
+
+    function buildPublicNfcPetPayload(pet = {}, user = getCurrentUser() || {}) {
+      const avatar = safeImageSrc(pet.avatar, DEFAULT_PET_AVATAR);
+      const ownerAvatar = safeImageSrc(user.avatar, '');
+      return {
+        v: 1,
+        i: pet.id,
+        nid: pet.nfcId || buildPetNfcId(pet, 0),
+        n: pet.name || 'Found pet',
+        t: pet.type || 'Pet',
+        b: pet.breed || 'Unknown',
+        l: pet.location || user.campus || 'Campus',
+        h: pet.health || 'No health notes provided.',
+        s: pet.status || 'No recent status notes.',
+        bd: pet.birthday || pet.age || '',
+        g: pet.gender || '',
+        traits: Array.isArray(pet.traits) ? pet.traits.slice(0, 6) : [],
+        c: pet.nfcContact || user.contact || '',
+        m: pet.nfcNote || `${pet.name || 'This pet'} is friendly. Please contact the owner if found.`,
+        o: user.displayName || user.username || 'Pet owner',
+        campus: user.campus || 'Taicang',
+        ownerUsername: user.username || '',
+        ownerBio: user.bio || '',
+        ownerAvatar: ownerAvatar.startsWith('data:image/') ? '' : ownerAvatar,
+        img: avatar.startsWith('data:image/') ? '' : avatar
+      };
+    }
+
+    function resolveNfcPetCard(nfcDeepLink = {}) {
+      if (nfcDeepLink.pet) return normalizeNfcPetPayload(nfcDeepLink.pet);
+      const target = String(nfcDeepLink.targetId || '').trim();
+      if (!target) return null;
+      const pets = getStoredPets();
+      const matchedPet = pets.find((pet) => pet.id === target || pet.nfcId === target);
+      if (!matchedPet) return null;
+      return normalizeNfcPetPayload(buildPublicNfcPetPayload(matchedPet, getCurrentUser() || getDefaultUser()));
+    }
+
+    function renderStandaloneNfcPage(petPayload, options = {}) {
+      const nfcRoot = document.getElementById('nfc-root');
+      const content = document.getElementById('nfc-page-content');
+      if (!nfcRoot || !content) return;
+      nfcRoot.classList.remove('hidden');
+      if (!petPayload) {
+        const target = String(options.targetId || '').trim();
+        document.title = 'PAWTRACE · NFC Pet Card';
+        content.innerHTML = `
+          <section class="nfc-empty-card pixel-card">
+            <div class="nfc-empty-icon"><i class="fas fa-id-card"></i></div>
+            <h1>NFC pet card unavailable</h1>
+            <p>${target ? `No local pet card matches ${escapeHtml(target)}.` : 'This NFC link does not contain a pet card yet.'}</p>
+            <a class="pixel-button text-xs" href="${buildAppRouteHref('pets')}"><i class="fas fa-paw"></i><span>Open PAWTRACE</span></a>
+          </section>
+        `;
+        return;
+      }
+
+      const pet = normalizeNfcPetPayload(petPayload);
+      const petName = escapeHtml(pet.name || 'Found pet');
+      const petType = escapeHtml(pet.type || 'Pet');
+      const petBreed = escapeHtml(pet.breed || 'Unknown');
+      const petLocation = escapeHtml(pet.location || 'Campus');
+      const petHealth = escapeHtml(pet.health || 'No health notes provided.');
+      const petStatus = escapeHtml(pet.status || 'No recent status notes.');
+      const petNfcId = escapeHtml(pet.nfcId || '');
+      const petNote = escapeHtml(pet.nfcNote || 'Please contact the owner if found.');
+      const petBirthday = escapeHtml(pet.birthday || 'Not provided');
+      const petGender = escapeHtml(pet.gender || 'Not provided');
+      const contact = escapeHtml(pet.nfcContact || 'Not provided');
+      const ownerName = escapeHtml(pet.ownerName || 'Pet owner');
+      const ownerCampus = escapeHtml(pet.ownerCampus || 'Taicang');
+      const ownerBio = escapeHtml(pet.ownerBio || 'Owner profile details are not shared on this card.');
+      const ownerAvatar = safeImageSrc(pet.ownerAvatar, '');
+      const petAvatar = escapeHtml(safeImageSrc(pet.avatar, DEFAULT_PET_AVATAR));
+      const traits = Array.isArray(pet.traits) ? pet.traits.filter(Boolean).slice(0, 6) : [];
+      const traitsMarkup = traits.length
+        ? traits.map((trait) => `<span>${escapeHtml(trait)}</span>`).join('')
+        : '<span>Care profile</span>';
+      const contactAction = getContactActionMeta(pet.nfcContact);
+      const contactActionMarkup = contactAction
+        ? `<a class="pixel-button nfc-call-button" href="${escapeHtml(contactAction.href)}"><i class="${escapeHtml(contactAction.icon)}"></i><span>${escapeHtml(contactAction.label)}</span></a>`
+        : '';
+      const appChatHref = buildAppRouteHref('chat');
+      document.title = `${pet.name || 'Pet'} · PAWTRACE NFC Pet Card`;
+      content.innerHTML = `
+        <section class="nfc-hero-card">
+          <div class="nfc-photo-frame">
+            <img src="${petAvatar}" alt="${petName}" loading="eager" decoding="async" />
+          </div>
+          <div class="nfc-hero-copy">
+            <div class="nfc-card-meta">
+              <span><i class="fas fa-id-card"></i> NFC Emergency Pet Card</span>
+              <strong>${petNfcId}</strong>
+            </div>
+            <h1>Help ${petName} get home</h1>
+            <p class="nfc-pet-line">${petType} · ${petBreed} · ${petLocation}</p>
+            <div class="nfc-trait-list">${traitsMarkup}</div>
+            <div class="nfc-action-row">
+              ${contactActionMarkup}
+              <a class="pixel-button nfc-app-action" href="${appChatHref}">
+                <i class="fas fa-comment-dots"></i><span>Log in to app chat</span>
+              </a>
+              <button type="button" class="pixel-button nfc-secondary-action" data-nfc-copy-contact>
+                <i class="fas fa-copy"></i><span>Copy contact</span>
+              </button>
+              <button type="button" class="pixel-button nfc-secondary-action" data-nfc-copy-link>
+                <i class="fas fa-link"></i><span>Copy card link</span>
+              </button>
+            </div>
+          </div>
+        </section>
+        <section class="nfc-info-grid">
+          <article class="nfc-info-panel">
+            <p class="nfc-panel-label">Pet information</p>
+            <dl class="nfc-detail-list">
+              <div><dt>Status</dt><dd>${petStatus}</dd></div>
+              <div><dt>Health notes</dt><dd>${petHealth}</dd></div>
+              <div><dt>Birthday / adoption</dt><dd>${petBirthday}</dd></div>
+              <div><dt>Gender</dt><dd>${petGender}</dd></div>
+            </dl>
+          </article>
+          <article class="nfc-info-panel">
+            <p class="nfc-panel-label">Owner information</p>
+            <div class="nfc-owner-row">
+              ${ownerAvatar ? `<img src="${escapeHtml(ownerAvatar)}" alt="${ownerName}" loading="lazy" decoding="async" />` : '<span><i class="fas fa-user"></i></span>'}
+              <div>
+                <strong>${ownerName}</strong>
+                <p>${ownerCampus}</p>
+              </div>
+            </div>
+            <dl class="nfc-detail-list">
+              <div><dt>Emergency contact</dt><dd>${contact}</dd></div>
+              <div><dt>Profile note</dt><dd>${ownerBio}</dd></div>
+            </dl>
+            <a class="nfc-owner-chat-link" href="${appChatHref}">
+              <i class="fas fa-message"></i><span>Sign in to PAWTRACE and contact the owner in app</span>
+            </a>
+          </article>
+          <article class="nfc-info-panel nfc-info-panel--note">
+            <p class="nfc-panel-label">Care note</p>
+            <strong>${petNote}</strong>
+            <p>${petName} was registered in PAWTRACE for quick return support.</p>
+          </article>
+        </section>
+      `;
+      content.querySelector('[data-nfc-copy-contact]')?.addEventListener('click', async () => {
+        const text = pet.nfcContact || '';
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          alert('Owner contact copied.');
+        } catch {
+          alert(text);
+        }
+      });
+      content.querySelector('[data-nfc-copy-link]')?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          alert('NFC link copied.');
+        } catch {
+          alert(window.location.href);
+        }
+      });
+    }
+
     function restoreImagePreviewElement(img) {
       if (!img) return;
       delete img.dataset.fallback;
+      delete img.dataset.fallbackApplied;
       img.style.display = '';
       const fallback = img.nextElementSibling;
       if (fallback?.classList?.contains('img-fallback')) fallback.remove();
     }
 
-    function setPreviewImageSource(img, src) {
+    function getImageFallbackSource(img, fallback = '') {
+      if (fallback) return fallback;
+      const id = String(img?.id || '');
+      if (
+        id === 'current-user-avatar' ||
+        id === 'profile-avatar' ||
+        id === 'profile-avatar-preview-img' ||
+        id === 'chat-avatar' ||
+        id === 'hover-avatar'
+      ) {
+        return DEFAULT_USER_AVATAR;
+      }
+      return '';
+    }
+
+    function setPreviewImageSource(img, src, fallback = '') {
       if (!img) return;
       restoreImagePreviewElement(img);
-      if (src) {
-        img.src = src;
+      const fallbackSrc = getImageFallbackSource(img, fallback);
+      if (fallbackSrc) {
+        img.dataset.fallback = fallbackSrc;
+        img.onerror = () => {
+          if (img.dataset.fallbackApplied === '1') return;
+          img.dataset.fallbackApplied = '1';
+          img.src = fallbackSrc;
+        };
+      } else {
+        img.onerror = null;
+      }
+      const resolvedSrc = safeImageSrc(src, fallbackSrc);
+      if (resolvedSrc) {
+        img.dataset.fallbackApplied = resolvedSrc === fallbackSrc ? '1' : '0';
+        img.src = resolvedSrc;
       } else {
         img.removeAttribute('src');
       }
@@ -515,7 +799,7 @@
       return {
         username: 'guest',
         displayName: 'Guest Explorer',
-        avatar: 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png',
+        avatar: DEFAULT_USER_AVATAR,
         bio: 'Exploring PAWTRACE without logging in.',
         campus: 'Taicang',
         contact: 'N/A',
@@ -890,6 +1174,7 @@
       initModalSystem();
       const loginScreen = document.getElementById('login-screen');
       const appRoot = document.getElementById('app-root');
+      const nfcRoot = document.getElementById('nfc-root');
       const authMsg = document.getElementById('auth-message');
       const mobileTabbar = document.getElementById('mobile-tabbar');
       const guestAccessBtn = document.getElementById('btn-guest-access');
@@ -897,7 +1182,8 @@
       const nfcDeepLink = readNfcDeepLink();
       activeNfcPetCard = nfcDeepLink.pet;
       activeNfcTargetId = nfcDeepLink.targetId || nfcDeepLink.pet?.id || nfcDeepLink.pet?.nfcId || '';
-      const hasNfcDeepLink = Boolean(activeNfcPetCard || activeNfcTargetId);
+      const hasNfcDeepLink = Boolean(nfcDeepLink.isNfcRoute || activeNfcPetCard || activeNfcTargetId);
+      window.addEventListener('hashchange', reloadOutsideNfcStandalone);
       aiServiceOutputEl = document.getElementById('ai-service-output');
       aiServiceStatusEl = document.getElementById('ai-service-status');
       aiServiceButtons = Array.from(document.querySelectorAll('.ai-service-card[data-ai-service]'));
@@ -982,19 +1268,13 @@
           reset: document.getElementById('map-reset-view'),
           zoomLabel: document.getElementById('map-zoom-label'),
           fenceToggle: document.getElementById('map-toggle-fence'),
-          tracksToggle: document.getElementById('map-toggle-tracks'),
           toolPetName: document.getElementById('map-tool-pet-name'),
           fenceStatus: document.getElementById('map-fence-status'),
           fenceEnabled: document.getElementById('map-fence-enable'),
           fenceRadius: document.getElementById('map-fence-radius'),
           fenceRadiusValue: document.getElementById('map-fence-radius-value'),
           fencePickCenter: document.getElementById('map-fence-pick-center'),
-          fenceCenterCurrent: document.getElementById('map-fence-center-current'),
-          trackActiveOnly: document.getElementById('map-track-active-only'),
-          trackAddPoint: document.getElementById('map-track-add-point'),
-          trackClear: document.getElementById('map-track-clear'),
-          trackRestore: document.getElementById('map-track-restore'),
-          trackStatus: document.getElementById('map-track-status')
+          fenceCenterCurrent: document.getElementById('map-fence-center-current')
         },
         petLocationListEl: document.getElementById('pet-location-feed'),
         trackedCountEl: document.getElementById('tracked-pet-count'),
@@ -1063,13 +1343,13 @@
       if (chatToggleContacts && chatLeftPane) {
         chatToggleContacts.addEventListener('click', () => {
           const isOpen = chatLeftPane.classList.toggle('open');
-          setChatToggleLabel(chatToggleContacts, isOpen ? 'Hide friends' : 'Show friends');
+          setChatToggleLabel(chatToggleContacts, isOpen ? 'Show chat' : 'Show friends');
         });
       }
       if (chatBackBtn && chatLeftPane) {
         chatBackBtn.addEventListener('click', () => {
           chatLeftPane.classList.add('open');
-          setChatToggleLabel(chatToggleContacts, 'Hide friends');
+          setChatToggleLabel(chatToggleContacts, 'Show chat');
         });
       }
       if (chatTabBack) {
@@ -1576,7 +1856,7 @@
         if (!file) {
           pendingAvatarData = null;
           if (profileAvatarPreviewImg) {
-            setPreviewImageSource(profileAvatarPreviewImg, (getCurrentUser()?.avatar) || DEFAULT_PET_AVATAR);
+            setPreviewImageSource(profileAvatarPreviewImg, normalizeUserAvatar(getCurrentUser()?.avatar), DEFAULT_USER_AVATAR);
           }
           return;
         }
@@ -1586,9 +1866,9 @@
           return;
         }
         try {
-          const data = await fileToDataURL(file);
+          const data = await fileToAvatarDataURL(file);
           pendingAvatarData = data;
-          setPreviewImageSource(profileAvatarPreviewImg, data);
+          setPreviewImageSource(profileAvatarPreviewImg, data, DEFAULT_USER_AVATAR);
         } catch (err) {
           console.warn('Avatar load failed', err);
           pendingAvatarData = null;
@@ -1598,16 +1878,17 @@
       function showApp(user) {
         authMsg.textContent = '';
         closeAllModals();
+        nfcRoot?.classList.add('hidden');
         loginScreen?.classList.add('hidden');
         appRoot.classList.remove('hidden');
         mobileTabbar?.classList.remove('hidden');
         const displayName = user.displayName || user.username;
-        const avatar = user.avatar || 'https://design.gemcoder.com/staticResource/echoAiSystemImages/fdca457404bba5bf76bb0fd8378c6d8d.png';
+        const avatar = normalizeUserAvatar(user.avatar);
         currentUserNameEl.textContent = displayName;
-        setPreviewImageSource(currentUserAvatarEl, avatar);
+        setPreviewImageSource(currentUserAvatarEl, avatar, DEFAULT_USER_AVATAR);
         if (sidebarUserNameEl) sidebarUserNameEl.textContent = displayName;
         if (headerConnectionStatusEl) headerConnectionStatusEl.textContent = `${user.campus || 'Taicang'} · Connected`;
-        setPreviewImageSource(profileAvatarEl, avatar);
+        setPreviewImageSource(profileAvatarEl, avatar, DEFAULT_USER_AVATAR);
         profileNameEl.textContent = displayName;
         profileUsernameEl.textContent = '@' + user.username;
         profileBioEl.textContent = user.bio || 'Welcome to PAWTRACE!';
@@ -1618,6 +1899,7 @@
         initPets();
         window.openNfcPetDeepLink?.();
         initHealthMonitor();
+        initWifiTelemetryBridge();
         initBluetoothTelemetryBridge();
         mapController?.refreshTrackedPets?.();
         initChat();
@@ -1776,20 +2058,20 @@
 
       const existing = getCurrentUser();
       if (hasNfcDeepLink) {
-        const canUseSignedInSession = Boolean(existing && getAuthToken());
-        const nfcUser = canUseSignedInSession ? existing : getDefaultUser();
-        if (!canUseSignedInSession) {
-          setAuthToken('');
-          setCurrentUser(nfcUser);
-        }
-        showApp(nfcUser);
-        setAIStatusBadge('NFC view: no login required', 'fallback');
+        closeAllModals();
+        loginScreen?.classList.add('hidden');
+        appRoot.classList.add('hidden');
+        mobileTabbar?.classList.add('hidden');
+        const nfcPetCard = resolveNfcPetCard(nfcDeepLink);
+        activeNfcPetCard = nfcPetCard;
+        renderStandaloneNfcPage(nfcPetCard, { targetId: activeNfcTargetId });
       } else if (existing && (existing.username === 'guest' || getAuthToken())) {
         showApp(existing);
       } else {
         setAuthToken('');
         setCurrentUser(null);
         closeAllModals();
+        nfcRoot?.classList.add('hidden');
         appRoot.classList.add('hidden');
         mobileTabbar?.classList.add('hidden');
         loginScreen?.classList.remove('hidden');
@@ -1799,8 +2081,11 @@
         btn.addEventListener('click', () => {
           closeAllModals();
           stopDeviceTelemetrySync();
+          stopWifiTelemetryBridge();
+          stopBluetoothTelemetryBridge();
           setAuthToken('');
           setCurrentUser(null);
+          nfcRoot?.classList.add('hidden');
           appRoot.classList.add('hidden');
           mobileTabbar?.classList.add('hidden');
           loginScreen?.classList.remove('hidden');
@@ -1877,7 +2162,7 @@
         }
         if (name === 'chat' && window.innerWidth <= 1024) {
           chatPane?.classList.add('open');
-          setChatToggleLabel(chatToggle, 'Hide friends');
+          setChatToggleLabel(chatToggle, 'Show chat');
         } else if (name !== 'chat' && window.innerWidth <= 1024) {
           chatPane?.classList.remove('open');
           setChatToggleLabel(chatToggle, 'Show friends');
@@ -1925,11 +2210,20 @@
     const PETS_DATA_KEY = 'pawtrace_pets';
     const MONITORING_API = '/api/monitor/collect';
     const DEVICE_TELEMETRY_LATEST_API = '/api/device/telemetry/latest';
+    const DEVICE_TELEMETRY_HISTORY_API = '/api/device/telemetry/history';
+    const DEVICE_TELEMETRY_HISTORY_LIMIT = 120;
+    const DEVICE_BLE_HISTORY_DUMP_LIMIT = 24;
     const DEVICE_TELEMETRY_POLL_MS = 8000;
+    const DEVICE_TELEMETRY_UI_COMMIT_MS = 2500;
+    const WIFI_LAN_URL_KEY = 'pawtrace_m5_lan_url';
+    const WIFI_LAN_POLL_MS = 5000;
+    const BLE_AUTO_RECONNECT_MS = 8000;
+    const BLE_REMEMBERED_DEVICE_KEY = 'pawtrace_ble_device';
     const BLE_SERVICE_UUID = '7b9f0001-6f3a-4f8a-9f4d-111111111111';
     const BLE_TELEMETRY_UUID = '7b9f0002-6f3a-4f8a-9f4d-222222222222';
     const BLE_MESSAGE_UUID = '7b9f0003-6f3a-4f8a-9f4d-333333333333';
     const DEFAULT_PET_AVATAR = '/assets/1.png';
+    const DEFAULT_USER_AVATAR = '/assets/avatars/avatar1.png';
     const MY_PETS_KEY = 'pawtrace_my_pets';
     const AI_SERVICE_CONFIG = {
       diagnosis: {
@@ -2050,7 +2344,7 @@
 
     function telemetrySourceLabel(source = '', transport = '') {
       const value = `${source || ''} ${transport || ''}`.toLowerCase();
-      if (value.includes('ble')) return 'BLE sync';
+      if (value.includes('ble')) return 'BLE WiFi setup';
       if (value.includes('wifi') || value.includes('http')) return 'Wi-Fi HTTP';
       if (value.includes('m5stack')) return 'M5Stack';
       if (value.includes('manual')) return 'Manual';
@@ -2084,6 +2378,7 @@
           const batteryValue = entry?.batteryPct ?? entry?.battery_pct;
           const stepsValue = entry?.steps;
           return {
+            id: entry?.id || '',
             timestamp: entry?.timestamp || new Date().toISOString(),
             temperature: temperatureValue === undefined || temperatureValue === null || temperatureValue === '' ? NaN : Number(temperatureValue),
             heartRate: heartRateValue === undefined || heartRateValue === null || heartRateValue === '' ? NaN : Number(heartRateValue),
@@ -2115,6 +2410,7 @@
             bleRssi: finiteNumber(entry?.bleRssi ?? entry?.ble_rssi, NaN),
             bleMtu: finiteNumber(entry?.bleMtu ?? entry?.ble_mtu, NaN),
             notifySeq: finiteNumber(entry?.notifySeq ?? entry?.notify_seq, NaN),
+            uptimeMs: finiteNumber(entry?.uptimeMs ?? entry?.uptime_ms, NaN),
             deviceId: entry?.deviceId || entry?.device_id || '',
             lat: finiteNumber(entry?.lat, NaN),
             lon: finiteNumber(entry?.lon, NaN),
@@ -2331,6 +2627,40 @@
       });
     }
 
+    function fileToAvatarDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const raw = String(reader.result || '');
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const maxSide = 512;
+              const scale = Math.min(1, maxSide / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+              const width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+              const height = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                resolve(raw);
+                return;
+              }
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.86));
+            } catch {
+              resolve(raw);
+            }
+          };
+          img.onerror = () => resolve(raw);
+          img.src = raw;
+        };
+        reader.onerror = () => reject(new Error('Unable to read file'));
+        reader.readAsDataURL(file);
+      });
+    }
+
     function fileToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -2371,6 +2701,56 @@
       emitPetsChanged(normalized);
     }
 
+    function stableTelemetrySnapshot(value) {
+      if (Array.isArray(value)) {
+        return `[${value.map(stableTelemetrySnapshot).join(',')}]`;
+      }
+      if (value && typeof value === 'object') {
+        return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableTelemetrySnapshot(value[key])}`).join(',')}}`;
+      }
+      return JSON.stringify(value);
+    }
+
+    function telemetryRecordTimeMs(record = {}) {
+      const parsed = Date.parse(String(record.timestamp || record.receivedAt || record.bleBridgeReceivedAt || ''));
+      if (Number.isFinite(parsed)) return parsed;
+      const uptimeMs = Number(record.uptimeMs ?? record.uptime_ms);
+      return Number.isFinite(uptimeMs) ? uptimeMs : 0;
+    }
+
+    function telemetryValueOr(value, fallback = null) {
+      return hasTelemetryValue(value) ? value : fallback;
+    }
+
+    function clearQueuedDeviceTelemetryMerge() {
+      if (deviceTelemetryCommitTimer) {
+        window.clearTimeout(deviceTelemetryCommitTimer);
+        deviceTelemetryCommitTimer = null;
+      }
+      pendingDeviceTelemetryRecords = [];
+    }
+
+    function flushQueuedDeviceTelemetryMerge() {
+      const records = pendingDeviceTelemetryRecords;
+      pendingDeviceTelemetryRecords = [];
+      deviceTelemetryCommitTimer = null;
+      lastDeviceTelemetryCommitMs = Date.now();
+      if (records.length) mergeDeviceTelemetry(records);
+    }
+
+    function queueDeviceTelemetryMerge(records = []) {
+      const nextRecords = (Array.isArray(records) ? records : []).filter(Boolean);
+      if (!nextRecords.length) return false;
+      pendingDeviceTelemetryRecords.push(...nextRecords);
+      if (deviceTelemetryCommitTimer) return true;
+      const elapsed = Date.now() - lastDeviceTelemetryCommitMs;
+      const delay = lastDeviceTelemetryCommitMs === 0
+        ? 120
+        : Math.max(0, DEVICE_TELEMETRY_UI_COMMIT_MS - elapsed);
+      deviceTelemetryCommitTimer = window.setTimeout(flushQueuedDeviceTelemetryMerge, delay);
+      return true;
+    }
+
     function normalizeDeviceTelemetryRecord(record = {}) {
       const metadata = record?.metadata && typeof record.metadata === 'object' ? record.metadata : {};
       const source = String(record.source || metadata.source || '').trim();
@@ -2380,6 +2760,7 @@
         || record.alert !== undefined
         || record.bleRssi !== undefined
         || record.ble_rssi !== undefined;
+      if (bleLike) return {};
       const lat = Number(record.lat);
       const lon = Number(record.lon);
       const temperature = Number(record.tempC ?? record.temp_c ?? record.temperature);
@@ -2406,7 +2787,7 @@
         gpsValid: optionalBoolean(record.gpsValid ?? record.gps_valid ?? record.locationValid ?? record.location_valid),
         gpsFix,
         gpsSatsUsed: finiteNumber(record.gpsSatsUsed ?? record.gps_sats_used, null),
-        gpsVisible: finiteNumber(record.gpsVisible ?? record.gps_visible, null),
+        gpsVisible: finiteNumber(record.gpsVisible ?? record.gps_visible ?? record.sat, null),
         gpsHdop: finiteNumber(record.gpsHdop ?? record.gps_hdop, null),
         locationValid,
         lastLocationValid: optionalBoolean(record.lastLocationValid ?? record.last_location_valid),
@@ -2423,16 +2804,17 @@
         uploadEnabled: optionalBoolean(record.uploadEnabled ?? record.upload_enabled),
         uploadOk: optionalBoolean(record.uploadOk ?? record.upload_ok, null),
         uploadCode: finiteNumber(record.uploadCode ?? record.upload_code, null),
-        bleConnected: optionalBoolean(record.bleConnected ?? record.ble_connected ?? (bleLike ? true : null)),
+        bleConnected: null,
         bleRssi: finiteNumber(record.bleRssi ?? record.ble_rssi ?? record.rssi, null),
         bleMtu: finiteNumber(record.bleMtu ?? record.ble_mtu ?? record.mtu, null),
         notifySeq: finiteNumber(record.notifySeq ?? record.notify_seq ?? record.seq, null),
+        uptimeMs: finiteNumber(record.uptimeMs ?? record.uptime_ms, null),
         locationAccuracy: Number.isFinite(Number(record.locationAccuracy)) ? Number(record.locationAccuracy) : null,
         mapCoords: Number.isFinite(mapX) && Number.isFinite(mapY)
           ? { x: clampNumber(mapX, 8, 92, 50), y: clampNumber(mapY, 8, 92, 50) }
           : null,
-        source: source || (bleLike ? 'm5stickc-plus-ble' : ''),
-        transport: transport || (bleLike ? 'ble' : ''),
+        source: source || 'm5stack-wifi-http',
+        transport: transport || 'wifi',
       };
     }
 
@@ -2461,12 +2843,42 @@
       return 0;
     }
 
+    function telemetryHistoryKey(entry = {}) {
+      const deviceId = String(entry.deviceId || entry.device_id || '').trim();
+      const seq = entry.notifySeq ?? entry.notify_seq ?? entry.seq;
+      const timestamp = String(entry.timestamp || entry.receivedAt || '').trim();
+      if (deviceId && hasTelemetryValue(seq) && timestamp) return `seq:${deviceId}:${seq}:${timestamp}`;
+      const id = String(entry.id || '').trim();
+      if (id) return `id:${id}`;
+      return [
+        'sample',
+        deviceId,
+        timestamp,
+        entry.temperature ?? entry.tempC ?? entry.temp_c ?? '',
+        entry.heartRate ?? entry.heartRateBpm ?? entry.pet_bpm ?? entry.bpm ?? '',
+        entry.activity || '',
+      ].join(':');
+    }
+
+    function mergeVitalsHistoryEntries(entries = [], limit = DEVICE_TELEMETRY_HISTORY_LIMIT) {
+      const seen = new Set();
+      return normalizeVitalsHistory(entries)
+        .filter((entry) => {
+          const key = telemetryHistoryKey(entry);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, limit);
+    }
+
     function applyTelemetryToPet(pet = {}, record = {}, index = 0) {
       const existingHistory = normalizeVitalsHistory(pet.vitalsHistory);
       const hasVitals = record.temperature !== null || record.heartRate !== null || record.spo2Pct !== null || record.activity;
       const nextVitals = hasVitals
-        ? [
+        ? mergeVitalsHistoryEntries([
             {
+              id: record.id,
               timestamp: record.timestamp,
               temperature: record.temperature ?? undefined,
               heartRate: record.heartRate ?? undefined,
@@ -2498,24 +2910,24 @@
               bleRssi: record.bleRssi ?? undefined,
               bleMtu: record.bleMtu ?? undefined,
               notifySeq: record.notifySeq ?? undefined,
+              uptimeMs: record.uptimeMs ?? undefined,
               deviceId: record.deviceId,
               lat: record.lat ?? undefined,
               lon: record.lon ?? undefined,
               source: record.source || 'm5stack',
               transport: record.transport || '',
             },
-            ...existingHistory.filter((entry) => entry.timestamp !== record.timestamp),
-          ].slice(0, 12)
+            ...existingHistory,
+          ])
         : existingHistory;
       const zone = getDefaultTrackedZone(index);
       const location = buildTelemetryLocationLabel(record, pet.location || zone.label);
-      const statusParts = [isBleTelemetrySource(record.source, record.transport) ? 'BLE live sync' : 'M5Stack live'];
+      const statusParts = ['Wi-Fi live sync'];
       if (record.activity) statusParts.push(record.activity);
       if (record.batteryPct !== null) statusParts.push(`${Math.round(record.batteryPct)}% battery`);
-      if (record.bleConnected !== null) statusParts.push(`BLE ${statusLabel(record.bleConnected)}`);
-      if (record.bleRssi !== null) statusParts.push(`RSSI ${Math.round(record.bleRssi)} dBm`);
       if (record.wifiConnected !== null) statusParts.push(`Wi-Fi ${statusLabel(record.wifiConnected)}`);
       if (record.uploadCode !== null) statusParts.push(`HTTP ${record.uploadCode}`);
+      const hasFreshCoordinate = hasValidCoordinate(record.lat, record.lon);
 
       return normalizePetRecord({
         ...pet,
@@ -2532,39 +2944,39 @@
         location,
         mapCoords: isTelemetryLocationValid(record) ? { x: 50, y: 50 } : (record.mapCoords || pet.mapCoords || zone.coords),
         vitalsHistory: nextVitals,
-        batteryPct: record.batteryPct,
-        batteryMv: record.batteryMv,
-        steps: record.steps,
-        activity: record.activity,
-        activityScore: record.activityScore,
-        heartFound: record.heartFound,
-        finger: record.finger,
-        spo2Pct: record.spo2Pct,
-        spo2Valid: record.spo2Valid,
-        lat: record.lat,
-        lon: record.lon,
-        gpsValid: record.gpsValid,
-        gpsFix: record.gpsFix,
-        gpsSatsUsed: record.gpsSatsUsed,
-        gpsVisible: record.gpsVisible,
-        gpsHdop: record.gpsHdop,
-        locationValid: record.locationValid,
-        lastLocationValid: record.lastLocationValid,
-        trackSamples: record.trackSamples,
-        geofenceEnabled: record.geofenceEnabled,
-        distanceM: record.distanceM,
-        lostAlert: record.lostAlert,
-        wifiConnected: record.wifiConnected,
-        wifiRssi: record.wifiRssi,
-        uploadEnabled: record.uploadEnabled,
-        uploadOk: record.uploadOk,
-        uploadCode: record.uploadCode,
-        bleConnected: record.bleConnected,
-        bleRssi: record.bleRssi,
-        bleMtu: record.bleMtu,
-        notifySeq: record.notifySeq,
-        telemetrySource: record.source,
-        telemetryTransport: record.transport,
+        batteryPct: telemetryValueOr(record.batteryPct, pet.batteryPct),
+        batteryMv: telemetryValueOr(record.batteryMv, pet.batteryMv),
+        steps: telemetryValueOr(record.steps, pet.steps),
+        activity: telemetryValueOr(record.activity, pet.activity),
+        activityScore: telemetryValueOr(record.activityScore, pet.activityScore),
+        heartFound: telemetryValueOr(record.heartFound, pet.heartFound),
+        finger: telemetryValueOr(record.finger, pet.finger),
+        spo2Pct: telemetryValueOr(record.spo2Pct, pet.spo2Pct),
+        spo2Valid: telemetryValueOr(record.spo2Valid, pet.spo2Valid),
+        lat: hasFreshCoordinate ? record.lat : telemetryValueOr(pet.lat, null),
+        lon: hasFreshCoordinate ? record.lon : telemetryValueOr(pet.lon, null),
+        gpsValid: telemetryValueOr(record.gpsValid, pet.gpsValid),
+        gpsFix: telemetryValueOr(record.gpsFix, pet.gpsFix),
+        gpsSatsUsed: telemetryValueOr(record.gpsSatsUsed, pet.gpsSatsUsed),
+        gpsVisible: telemetryValueOr(record.gpsVisible, pet.gpsVisible),
+        gpsHdop: telemetryValueOr(record.gpsHdop, pet.gpsHdop),
+        locationValid: telemetryValueOr(record.locationValid, pet.locationValid),
+        lastLocationValid: telemetryValueOr(record.lastLocationValid, pet.lastLocationValid),
+        trackSamples: telemetryValueOr(record.trackSamples, pet.trackSamples),
+        geofenceEnabled: telemetryValueOr(record.geofenceEnabled, pet.geofenceEnabled),
+        distanceM: telemetryValueOr(record.distanceM, pet.distanceM),
+        lostAlert: telemetryValueOr(record.lostAlert, pet.lostAlert),
+        wifiConnected: telemetryValueOr(record.wifiConnected, pet.wifiConnected),
+        wifiRssi: telemetryValueOr(record.wifiRssi, pet.wifiRssi),
+        uploadEnabled: telemetryValueOr(record.uploadEnabled, pet.uploadEnabled),
+        uploadOk: telemetryValueOr(record.uploadOk, pet.uploadOk),
+        uploadCode: telemetryValueOr(record.uploadCode, pet.uploadCode),
+        bleConnected: telemetryValueOr(record.bleConnected, pet.bleConnected),
+        bleRssi: telemetryValueOr(record.bleRssi, pet.bleRssi),
+        bleMtu: telemetryValueOr(record.bleMtu, pet.bleMtu),
+        notifySeq: telemetryValueOr(record.notifySeq, pet.notifySeq),
+        telemetrySource: record.source || pet.telemetrySource,
+        telemetryTransport: record.transport || pet.telemetryTransport,
         telemetryUpdatedAt: record.timestamp,
       }, index);
     }
@@ -2572,10 +2984,19 @@
     function mergeDeviceTelemetry(records = []) {
       const telemetry = (Array.isArray(records) ? records : [])
         .map(normalizeDeviceTelemetryRecord)
-        .filter((record) => record.deviceId);
+        .filter((record) => record.deviceId)
+        .sort((a, b) => {
+          const timeDelta = telemetryRecordTimeMs(a) - telemetryRecordTimeMs(b);
+          if (timeDelta) return timeDelta;
+          const seqDelta = Number(a.notifySeq ?? 0) - Number(b.notifySeq ?? 0);
+          if (seqDelta) return seqDelta;
+          return String(a.id || '').localeCompare(String(b.id || ''));
+        });
       if (!telemetry.length) return false;
 
       let pets = getStoredPets();
+      const previousPetCount = pets.length;
+      const beforeSnapshot = stableTelemetrySnapshot(pets);
       telemetry.forEach((record) => {
         const index = findTelemetryPetIndex(pets, record);
         if (index >= 0) {
@@ -2584,20 +3005,21 @@
         }
         pets.push(applyTelemetryToPet({}, record, pets.length));
       });
+      if (stableTelemetrySnapshot(pets) === beforeSnapshot) return false;
       setStoredPets(pets);
-      rerenderPets?.();
-      rerenderHealthMonitor?.();
-      mapController?.refreshTrackedPets?.();
+      if (activeTabName === 'pets' && pets.length !== previousPetCount) rerenderPets?.();
       return true;
     }
 
     async function refreshDeviceTelemetry() {
-      if (!getAuthToken()) return;
       try {
-        const response = await authJsonFetch(`${DEVICE_TELEMETRY_LATEST_API}?limit=6`);
-        if (!response.ok) return;
-        const data = await response.json().catch(() => ({}));
-        mergeDeviceTelemetry(data.telemetry || (data.latest ? [data.latest] : []));
+        const data = await fetchDeviceTelemetryPayload(`${DEVICE_TELEMETRY_HISTORY_API}?limit=${DEVICE_TELEMETRY_HISTORY_LIMIT}`);
+        let records = telemetryRecordsFromPayload(data);
+        if (!records.length) {
+          const latest = await fetchDeviceTelemetryPayload(`${DEVICE_TELEMETRY_LATEST_API}?limit=12`);
+          records = telemetryRecordsFromPayload(latest);
+        }
+        if (records.length) mergeDeviceTelemetry(records);
       } catch (err) {
         console.warn('Device telemetry refresh failed', err);
       }
@@ -2608,23 +3030,460 @@
         window.clearInterval(deviceTelemetryPollTimer);
         deviceTelemetryPollTimer = null;
       }
+      clearQueuedDeviceTelemetryMerge();
     }
 
     function startDeviceTelemetrySync() {
       stopDeviceTelemetrySync();
-      if (!getAuthToken()) return;
       refreshDeviceTelemetry();
       deviceTelemetryPollTimer = window.setInterval(refreshDeviceTelemetry, DEVICE_TELEMETRY_POLL_MS);
+    }
+
+    function initWifiTelemetryBridge() {
+      if (wifiTelemetryBridgeInitialized) return;
+      wifiTelemetryBridgeInitialized = true;
+
+      const urlInput = document.getElementById('wifi-lan-url');
+      const saveBtn = document.getElementById('wifi-lan-save');
+      const refreshBtn = document.getElementById('wifi-lan-refresh');
+      const uploadBtn = document.getElementById('wifi-lan-upload');
+      const messageInput = document.getElementById('wifi-message-input');
+      const sendMessageBtn = document.getElementById('wifi-send-message');
+      const statusEl = document.getElementById('wifi-bridge-status');
+      const latestPayloadEl = document.getElementById('wifi-latest-payload');
+      const storeStatusEl = document.getElementById('wifi-store-status');
+      const deviceNameEl = document.getElementById('wifi-device-name');
+      const queueDepthEl = document.getElementById('wifi-queue-depth');
+
+      if (!urlInput || !statusEl || !latestPayloadEl) return;
+
+      const setStatus = (text, state = 'stable') => {
+        statusEl.textContent = text;
+        statusEl.dataset.status = state;
+      };
+
+      const setStoreStatus = (text, state = 'neutral') => {
+        if (!storeStatusEl) return;
+        storeStatusEl.textContent = text;
+        storeStatusEl.classList.toggle('text-red-500', state === 'error');
+        storeStatusEl.classList.toggle('text-primary', state === 'ok');
+        storeStatusEl.classList.toggle('text-gray-500', state !== 'error' && state !== 'ok');
+      };
+
+      const normalizeLanUrl = (value = '') => {
+        let url = String(value || '').trim();
+        if (!url) return '';
+        if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
+        return url.replace(/\/+$/, '');
+      };
+
+      const getLanUrl = () => normalizeLanUrl(urlInput.value);
+
+      const saveLanUrl = () => {
+        const url = getLanUrl();
+        urlInput.value = url;
+        if (url) {
+          localStorage.setItem(WIFI_LAN_URL_KEY, url);
+          setStoreStatus(`Saved M5 LAN URL ${url}`, 'ok');
+        } else {
+          localStorage.removeItem(WIFI_LAN_URL_KEY);
+          setStoreStatus('Enter the M5 LAN URL from the CONFIG or LAN serial command.', 'error');
+        }
+        return url;
+      };
+
+      const updateFromPayload = (payload = {}) => {
+        latestPayloadEl.textContent = JSON.stringify(payload, null, 2).slice(0, 2400);
+        const deviceId = payload.device_id || payload.deviceId || '--';
+        const queueDepth = payload.queue_depth ?? payload.queueDepth ?? '--';
+        if (deviceNameEl) deviceNameEl.textContent = String(deviceId);
+        if (queueDepthEl) queueDepthEl.textContent = String(queueDepth);
+        if (payload.device_id || payload.deviceId) queueDeviceTelemetryMerge([payload]);
+        const wifiConnected = optionalBoolean(payload.wifi_connected ?? payload.wifiConnected);
+        setStatus(wifiConnected === false ? 'WiFi waiting' : 'WiFi online', wifiConnected === false ? 'watch' : 'stable');
+        setStoreStatus(`M5 reachable at ${payload.lan_base_url || payload.lanBaseUrl || getLanUrl()}`, 'ok');
+      };
+
+      const fetchLanJson = async (path, options = {}) => {
+        const baseUrl = getLanUrl();
+        if (!baseUrl) throw new Error('Enter the M5 LAN URL first.');
+        const response = await fetch(`${baseUrl}${path}`, options);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || `M5 request failed with HTTP ${response.status}.`);
+        }
+        return data;
+      };
+
+      const refreshStatus = async ({ silent = false } = {}) => {
+        try {
+          if (!silent) setStatus('Reading', 'watch');
+          const data = await fetchLanJson('/status');
+          updateFromPayload(data);
+          return data;
+        } catch (err) {
+          if (!silent) {
+            console.warn('M5 WiFi status request failed', err);
+            setStatus('Offline', 'alert');
+            setStoreStatus(err instanceof Error ? err.message : 'M5 WiFi request failed.', 'error');
+          }
+          return null;
+        }
+      };
+
+      const sendMessage = async () => {
+        const text = String(messageInput?.value || '').trim();
+        if (!text) {
+          setStoreStatus('Type a message to send to the M5.', 'error');
+          return;
+        }
+        try {
+          setStatus('Sending', 'watch');
+          const data = await fetchLanJson('/message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: text,
+          });
+          latestPayloadEl.textContent = JSON.stringify(data, null, 2).slice(0, 2400);
+          setStatus('Message sent', 'stable');
+          setStoreStatus(`WiFi message ${data.message_seq || ''} sent.`, 'ok');
+          if (messageInput) messageInput.value = '';
+        } catch (err) {
+          console.warn('M5 WiFi message failed', err);
+          setStatus('Send failed', 'alert');
+          setStoreStatus(err instanceof Error ? err.message : 'M5 WiFi message failed.', 'error');
+        }
+      };
+
+      const triggerUpload = async () => {
+        try {
+          setStatus('Uploading', 'watch');
+          const data = await fetchLanJson('/upload', { method: 'POST' });
+          latestPayloadEl.textContent = JSON.stringify(data, null, 2).slice(0, 2400);
+          setStatus(data.upload_ok ? 'Uploaded' : 'Queued', data.upload_ok ? 'stable' : 'watch');
+          setStoreStatus(`M5 queue depth ${data.queue_depth ?? '--'}, HTTP ${data.upload_code ?? '--'}.`, data.upload_ok ? 'ok' : 'neutral');
+          refreshDeviceTelemetry();
+        } catch (err) {
+          console.warn('M5 WiFi upload trigger failed', err);
+          setStatus('Upload failed', 'alert');
+          setStoreStatus(err instanceof Error ? err.message : 'M5 WiFi upload trigger failed.', 'error');
+        }
+      };
+
+      urlInput.value = localStorage.getItem(WIFI_LAN_URL_KEY) || '';
+      if (urlInput.value) setStatus('Ready', 'stable');
+      saveBtn?.addEventListener('click', () => {
+        if (saveLanUrl()) refreshStatus();
+      });
+      refreshBtn?.addEventListener('click', () => {
+        saveLanUrl();
+        refreshStatus();
+      });
+      uploadBtn?.addEventListener('click', () => {
+        saveLanUrl();
+        triggerUpload();
+      });
+      sendMessageBtn?.addEventListener('click', () => {
+        saveLanUrl();
+        sendMessage();
+      });
+      messageInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          saveLanUrl();
+          sendMessage();
+        }
+      });
+
+      if (urlInput.value) refreshStatus({ silent: true });
+      wifiTelemetryPollTimer = window.setInterval(() => {
+        if (getLanUrl()) refreshStatus({ silent: true });
+      }, WIFI_LAN_POLL_MS);
+      stopWifiTelemetryBridge = () => {
+        if (wifiTelemetryPollTimer) {
+          window.clearInterval(wifiTelemetryPollTimer);
+          wifiTelemetryPollTimer = null;
+        }
+      };
     }
 
     function initBluetoothTelemetryBridge() {
       if (bluetoothBridgeInitialized) return;
       bluetoothBridgeInitialized = true;
 
+      const provisionConnectBtn = document.getElementById('ble-wifi-connect');
+      if (provisionConnectBtn) {
+        const disconnectBtn = document.getElementById('ble-wifi-disconnect');
+        const sendWifiBtn = document.getElementById('ble-wifi-send');
+        const ssidInput = document.getElementById('ble-wifi-ssid');
+        const passwordInput = document.getElementById('ble-wifi-password');
+        const hostInput = document.getElementById('ble-wifi-host');
+        const tokenInput = document.getElementById('ble-wifi-token');
+        const statusEl = document.getElementById('ble-wifi-status');
+        const deviceNameEl = document.getElementById('ble-wifi-device-name');
+        const wifiStateEl = document.getElementById('ble-wifi-state');
+        const resultEl = document.getElementById('ble-wifi-result');
+        const storeStatusEl = document.getElementById('ble-wifi-store-status');
+        const savedProvision = (() => {
+          try {
+            return JSON.parse(localStorage.getItem('pawtrace_ble_wifi_provision') || '{}') || {};
+          } catch {
+            return {};
+          }
+        })();
+
+        const setStatus = (text, state = 'stable') => {
+          if (!statusEl) return;
+          statusEl.textContent = text;
+          statusEl.dataset.status = state;
+        };
+
+        const setStoreStatus = (text, state = 'neutral') => {
+          if (!storeStatusEl) return;
+          storeStatusEl.textContent = text;
+          storeStatusEl.classList.toggle('text-red-500', state === 'error');
+          storeStatusEl.classList.toggle('text-primary', state === 'ok');
+          storeStatusEl.classList.toggle('text-gray-500', state !== 'error' && state !== 'ok');
+        };
+
+        const setHeaderWirelessStatus = (text) => {
+          const headerConnectionStatusEl = document.getElementById('header-connection-status');
+          if (!headerConnectionStatusEl) return;
+          const campus = getCurrentUser()?.campus || 'Taicang';
+          headerConnectionStatusEl.textContent = `${campus} · ${text}`;
+        };
+
+        const updateProvisionButtons = () => {
+          const connected = Boolean(bluetoothBridgeState.device?.gatt?.connected);
+          provisionConnectBtn.disabled = connected;
+          if (disconnectBtn) disconnectBtn.disabled = !connected;
+          if (sendWifiBtn) sendWifiBtn.disabled = !connected || !bluetoothBridgeState.messageChar;
+          if (deviceNameEl) deviceNameEl.textContent = bluetoothBridgeState.device?.name || (connected ? 'PawTrace BLE' : '--');
+        };
+
+        const decodeValue = (value) => {
+          const bytes = value instanceof DataView
+            ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+            : new Uint8Array(value || []);
+          return new TextDecoder('utf-8').decode(bytes).replace(/\0+$/g, '').trim();
+        };
+
+        const normalizeBackendUrl = (value = '') => {
+          let raw = String(value || '').trim();
+          if (!raw) return '';
+          if (!/^https?:\/\//i.test(raw)) raw = `http://${raw}`;
+          let url;
+          try {
+            url = new URL(raw);
+          } catch {
+            return '';
+          }
+          if (!url.port) url.port = '3000';
+          if (!url.pathname || url.pathname === '/') url.pathname = '/api/device/telemetry';
+          return url.toString().replace(/\/+$/, '');
+        };
+
+        const backendHostFromUrl = (value = '') => {
+          const normalized = normalizeBackendUrl(value);
+          if (!normalized) return String(value || '').trim();
+          try {
+            const url = new URL(normalized);
+            return url.hostname;
+          } catch {
+            return String(value || '').trim();
+          }
+        };
+
+        const renderProvisionStatus = (payload = {}) => {
+          if (resultEl) resultEl.textContent = JSON.stringify(payload, null, 2).slice(0, 2400);
+          const wifiConnected = optionalBoolean(payload.wifi_connected ?? payload.wifiConnected);
+          if (wifiStateEl) {
+            wifiStateEl.textContent = wifiConnected === true
+              ? (payload.wifi_ip || payload.wifiIp || 'connected')
+              : wifiConnected === false
+                ? 'not connected'
+                : '--';
+          }
+          if (payload.lan_base_url || payload.lanBaseUrl) {
+            localStorage.setItem(WIFI_LAN_URL_KEY, String(payload.lan_base_url || payload.lanBaseUrl));
+          }
+          if (payload.upload_url || payload.uploadUrl) {
+            const host = backendHostFromUrl(String(payload.upload_url || payload.uploadUrl));
+            if (hostInput && host) hostInput.value = host;
+          }
+        };
+
+        const handleProvisionStatusValue = (value) => {
+          const text = decodeValue(value);
+          if (!text) return;
+          try {
+            const payload = JSON.parse(text);
+            renderProvisionStatus(payload);
+            if (payload.ok === false) {
+              setStatus('Device error', 'alert');
+              setStoreStatus(payload.error || 'M5 rejected the WiFi config.', 'error');
+              return;
+            }
+            const wifiConnected = optionalBoolean(payload.wifi_connected ?? payload.wifiConnected);
+            setStatus(wifiConnected === true ? 'WiFi ready' : 'BLE ready', wifiConnected === false ? 'watch' : 'stable');
+            setStoreStatus('BLE provisioning status received. Live data still uses WiFi upload.', 'ok');
+          } catch {
+            if (resultEl) resultEl.textContent = text;
+          }
+        };
+
+        const connectKnownDevice = async (device) => {
+          if (!navigator.bluetooth || !device?.gatt) throw new Error('Bluetooth device is unavailable.');
+          bluetoothBridgeState.userDisconnected = false;
+          bluetoothBridgeState.device = device;
+          device.addEventListener('gattserverdisconnected', () => {
+            bluetoothBridgeState.telemetryChar = null;
+            bluetoothBridgeState.messageChar = null;
+            setStatus('Disconnected', 'watch');
+            setHeaderWirelessStatus('BLE setup disconnected');
+            updateProvisionButtons();
+          });
+          setStatus('Connecting', 'watch');
+          setHeaderWirelessStatus('BLE WiFi setup');
+          const server = await device.gatt.connect();
+          const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+          try {
+            bluetoothBridgeState.telemetryChar = await service.getCharacteristic(BLE_TELEMETRY_UUID);
+            bluetoothBridgeState.telemetryChar.addEventListener('characteristicvaluechanged', (event) => {
+              handleProvisionStatusValue(event.target?.value);
+            });
+            await bluetoothBridgeState.telemetryChar.startNotifications();
+            const initial = await bluetoothBridgeState.telemetryChar.readValue();
+            handleProvisionStatusValue(initial);
+          } catch {
+            bluetoothBridgeState.telemetryChar = null;
+          }
+          bluetoothBridgeState.messageChar = await service.getCharacteristic(BLE_MESSAGE_UUID);
+          setStatus('Connected', 'stable');
+          setHeaderWirelessStatus('BLE WiFi setup connected');
+          setStoreStatus('Connected. Send SSID/password once, then use WiFi telemetry.', 'ok');
+          updateProvisionButtons();
+          return true;
+        };
+
+        const connect = async () => {
+          if (!navigator.bluetooth) {
+            setStatus('Unsupported', 'alert');
+            setStoreStatus('Web Bluetooth is unavailable. Use Chrome or Edge on localhost/HTTPS.', 'error');
+            return;
+          }
+          setStatus('Scanning', 'watch');
+          setStoreStatus('Choose PawTrace-001 in the Bluetooth picker.');
+          try {
+            const device = await navigator.bluetooth.requestDevice({
+              filters: [{ namePrefix: 'PawTrace' }],
+              optionalServices: [BLE_SERVICE_UUID],
+            });
+            await connectKnownDevice(device);
+          } catch (err) {
+            console.warn('BLE WiFi provisioning failed', err);
+            setStatus('Failed', 'alert');
+            setStoreStatus(err instanceof Error ? err.message : 'Bluetooth connection failed.', 'error');
+            updateProvisionButtons();
+          }
+        };
+
+        const writeProvisionText = async (text) => {
+          if (!bluetoothBridgeState.messageChar) throw new Error('BLE WiFi characteristic is not available.');
+          const bytes = new TextEncoder().encode(String(text || '').slice(0, 500));
+          if (typeof bluetoothBridgeState.messageChar.writeValueWithResponse === 'function') {
+            await bluetoothBridgeState.messageChar.writeValueWithResponse(bytes);
+          } else if (typeof bluetoothBridgeState.messageChar.writeValueWithoutResponse === 'function') {
+            await bluetoothBridgeState.messageChar.writeValueWithoutResponse(bytes);
+          } else {
+            await bluetoothBridgeState.messageChar.writeValue(bytes);
+          }
+        };
+
+        const sendWifiConfig = async () => {
+          const ssid = String(ssidInput?.value || '').trim();
+          const password = String(passwordInput?.value || '');
+          const host = String(hostInput?.value || '').trim();
+          const token = String(tokenInput?.value || '').trim();
+          const uploadUrl = normalizeBackendUrl(host);
+          if (!ssid) {
+            setStoreStatus('WiFi SSID is required.', 'error');
+            return;
+          }
+          if (!uploadUrl) {
+            setStoreStatus('Backend host is required, for example 192.168.31.199.', 'error');
+            return;
+          }
+          const packet = {
+            type: 'wifi_config',
+            ssid,
+            password,
+            host: backendHostFromUrl(uploadUrl),
+            url: uploadUrl,
+            token,
+            source: 'pawtrace-web',
+          };
+          try {
+            setStatus('Sending WiFi', 'watch');
+            await writeProvisionText(JSON.stringify(packet));
+            localStorage.setItem('pawtrace_ble_wifi_provision', JSON.stringify({
+              ssid,
+              host: packet.host,
+              token,
+              savedAt: new Date().toISOString(),
+            }));
+            if (resultEl) resultEl.textContent = JSON.stringify({ ...packet, password: password ? '***' : '' }, null, 2);
+            setStatus('WiFi sent', 'stable');
+            setStoreStatus('WiFi credentials sent over BLE. M5 will connect and upload telemetry through WiFi.', 'ok');
+            window.setTimeout(async () => {
+              try {
+                if (bluetoothBridgeState.messageChar && typeof bluetoothBridgeState.messageChar.readValue === 'function') {
+                  handleProvisionStatusValue(await bluetoothBridgeState.messageChar.readValue());
+                }
+              } catch {}
+            }, 500);
+          } catch (err) {
+            console.warn('BLE WiFi config send failed', err);
+            setStatus('Send failed', 'alert');
+            setStoreStatus(err instanceof Error ? err.message : 'BLE WiFi config send failed.', 'error');
+          }
+        };
+
+        const disconnect = () => {
+          bluetoothBridgeState.userDisconnected = true;
+          if (bluetoothBridgeState.device?.gatt?.connected) bluetoothBridgeState.device.gatt.disconnect();
+          bluetoothBridgeState.telemetryChar = null;
+          bluetoothBridgeState.messageChar = null;
+          setStatus('Disconnected', 'watch');
+          setHeaderWirelessStatus('WiFi telemetry');
+          updateProvisionButtons();
+        };
+
+        if (ssidInput) ssidInput.value = savedProvision.ssid || '';
+        if (hostInput) hostInput.value = savedProvision.host || (window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '');
+        if (tokenInput) tokenInput.value = savedProvision.token || 'pawtrace-m5-dev-token';
+        if (!navigator.bluetooth) {
+          provisionConnectBtn.disabled = true;
+          setStatus('Unsupported', 'alert');
+          setStoreStatus('Web Bluetooth is unavailable. Use Chrome or Edge on localhost/HTTPS.', 'error');
+        } else {
+          setStatus('Pair', 'watch');
+        }
+        provisionConnectBtn.addEventListener('click', connect);
+        disconnectBtn?.addEventListener('click', disconnect);
+        sendWifiBtn?.addEventListener('click', sendWifiConfig);
+        updateProvisionButtons();
+        stopBluetoothTelemetryBridge = disconnect;
+        return;
+      }
+
       const connectBtn = document.getElementById('ble-connect');
       const disconnectBtn = document.getElementById('ble-disconnect');
       const sendBtn = document.getElementById('ble-send-message');
       const messageInput = document.getElementById('ble-message-input');
+      const petSelect = document.getElementById('ble-pet-select');
+      const sendPetInfoBtn = document.getElementById('ble-send-pet-info');
+      const petSyncStatusEl = document.getElementById('ble-pet-sync-status');
       const statusEl = document.getElementById('ble-bridge-status');
       const deviceNameEl = document.getElementById('ble-device-name');
       const storedCountEl = document.getElementById('ble-stored-count');
@@ -2646,13 +3505,94 @@
         storeStatusEl.classList.toggle('text-gray-500', state !== 'error' && state !== 'ok');
       };
 
+      const setPetSyncStatus = (text, state = 'neutral') => {
+        if (!petSyncStatusEl) return;
+        petSyncStatusEl.textContent = text;
+        petSyncStatusEl.classList.toggle('text-red-500', state === 'error');
+        petSyncStatusEl.classList.toggle('text-primary', state === 'ok');
+        petSyncStatusEl.classList.toggle('text-gray-500', state !== 'error' && state !== 'ok');
+      };
+
+      const sanitizeBleDisplayText = (value = '', maxLength = 24) => String(value || '')
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/[<>]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, maxLength);
+
+      const getPetAgeLabel = (pet = {}) => {
+        if (pet.birthday) {
+          const birthday = new Date(`${pet.birthday}T00:00:00`);
+          if (!Number.isNaN(birthday.getTime())) {
+            const today = new Date();
+            let years = today.getFullYear() - birthday.getFullYear();
+            let months = today.getMonth() - birthday.getMonth();
+            if (today.getDate() < birthday.getDate()) months -= 1;
+            if (months < 0) {
+              years -= 1;
+              months += 12;
+            }
+            if (years > 0) return `${years}y ${months}m`;
+            return `${Math.max(months, 0)}m`;
+          }
+        }
+        return sanitizeBleDisplayText(pet.age || pet.birthday || 'Age not set', 16);
+      };
+
+      const getBlePetOptions = () => getStoredPets().filter((pet) => String(pet.name || '').trim());
+
+      const renderBlePetOptions = () => {
+        if (!petSelect) return;
+        const selected = petSelect.value;
+        const pets = getBlePetOptions();
+        petSelect.innerHTML = '<option value="">Choose a pet</option>';
+        pets.forEach((pet) => {
+          const option = document.createElement('option');
+          option.value = pet.id || pet.nfcId || pet.name;
+          option.textContent = `${pet.name || 'Unnamed pet'} · ${getPetAgeLabel(pet)}`;
+          petSelect.appendChild(option);
+        });
+        if (selected && pets.some((pet) => (pet.id || pet.nfcId || pet.name) === selected)) {
+          petSelect.value = selected;
+        }
+      };
+
+      const setHeaderWirelessStatus = (text) => {
+        const headerConnectionStatusEl = document.getElementById('header-connection-status');
+        if (!headerConnectionStatusEl) return;
+        const campus = getCurrentUser()?.campus || 'Taicang';
+        headerConnectionStatusEl.textContent = `${campus} · ${text}`;
+      };
+
       const updateButtons = () => {
         const connected = Boolean(bluetoothBridgeState.device?.gatt?.connected);
         connectBtn.disabled = connected;
         if (disconnectBtn) disconnectBtn.disabled = !connected;
         if (sendBtn) sendBtn.disabled = !connected || !bluetoothBridgeState.messageChar;
+        if (sendPetInfoBtn) {
+          sendPetInfoBtn.disabled = !connected || !bluetoothBridgeState.messageChar || !petSelect?.value;
+        }
         if (deviceNameEl) {
           deviceNameEl.textContent = bluetoothBridgeState.device?.name || (connected ? 'PawTrace BLE' : '--');
+        }
+      };
+
+      const rememberBleDevice = (device) => {
+        if (!device) return;
+        try {
+          localStorage.setItem(BLE_REMEMBERED_DEVICE_KEY, JSON.stringify({
+            id: device.id || '',
+            name: device.name || '',
+            savedAt: new Date().toISOString(),
+          }));
+        } catch {}
+      };
+
+      const getRememberedBleDevice = () => {
+        try {
+          return JSON.parse(localStorage.getItem(BLE_REMEMBERED_DEVICE_KEY) || '{}') || {};
+        } catch {
+          return {};
         }
       };
 
@@ -2665,22 +3605,85 @@
 
       const hasObjectShape = (value) => value && typeof value === 'object' && !Array.isArray(value);
 
-      const buildTelemetryPayload = (text) => {
-        let parsed = {};
-        let parsedOk = false;
+      const parseBleJsonObject = (text) => {
         try {
           const candidate = JSON.parse(text);
-          if (hasObjectShape(candidate)) {
-            parsed = candidate;
-            parsedOk = true;
-          }
-        } catch {}
+          return hasObjectShape(candidate) ? candidate : {};
+        } catch {
+          return {};
+        }
+      };
 
-        const now = new Date().toISOString();
+      const extractBleJsonMessages = (chunk) => {
+        const nextBuffer = `${bluetoothBridgeState.rxBuffer || ''}${chunk || ''}`.slice(-6000);
+        const messages = [];
+        let start = -1;
+        let depth = 0;
+        let consumed = 0;
+        let inString = false;
+        let escaping = false;
+
+        for (let index = 0; index < nextBuffer.length; index += 1) {
+          const char = nextBuffer[index];
+          if (start < 0) {
+            if (char === '{') {
+              start = index;
+              depth = 1;
+            }
+            continue;
+          }
+
+          if (escaping) {
+            escaping = false;
+            continue;
+          }
+          if (char === '\\') {
+            escaping = true;
+            continue;
+          }
+          if (char === '"') {
+            inString = !inString;
+            continue;
+          }
+          if (inString) continue;
+          if (char === '{') depth += 1;
+          if (char === '}') depth -= 1;
+          if (depth === 0) {
+            messages.push(nextBuffer.slice(start, index + 1));
+            consumed = index + 1;
+            start = -1;
+          }
+        }
+
+        bluetoothBridgeState.rxBuffer = nextBuffer.slice(consumed).trimStart();
+        if (bluetoothBridgeState.rxBuffer.length > 5000) {
+          const restart = bluetoothBridgeState.rxBuffer.lastIndexOf('{');
+          bluetoothBridgeState.rxBuffer = restart >= 0 ? bluetoothBridgeState.rxBuffer.slice(restart) : '';
+        }
+        return messages;
+      };
+
+      const telemetryTimestampFromUptime = (parsed = {}, now = new Date()) => {
+        const explicit = parsed.timestamp || parsed.capturedAt || parsed.time;
+        if (explicit) return explicit;
+        const uptimeMs = Number(parsed.uptimeMs ?? parsed.uptime_ms);
+        const dumpUptimeMs = Number(bluetoothBridgeState.logDumpCurrentUptimeMs);
+        if (Number.isFinite(uptimeMs) && Number.isFinite(dumpUptimeMs) && dumpUptimeMs >= uptimeMs) {
+          return new Date(now.getTime() - (dumpUptimeMs - uptimeMs)).toISOString();
+        }
+        return now.toISOString();
+      };
+
+      const buildTelemetryPayload = (text, parsed = parseBleJsonObject(text)) => {
+        const parsedOk = Object.keys(parsed).length > 0;
+
+        const now = new Date();
+        const timestamp = telemetryTimestampFromUptime(parsed, now);
         const currentUser = getCurrentUser();
         const explicitDeviceId = parsed.deviceId
           || parsed.device_id
           || parsed.device
+          || parsed.id
           || bluetoothBridgeState.device?.name
           || bluetoothBridgeState.device?.id
           || 'pawtrace-ble';
@@ -2689,6 +3692,7 @@
         return {
           ...parsed,
           deviceId: String(explicitDeviceId),
+          timestamp,
           userId: currentUser?.username && currentUser.username !== 'guest' ? currentUser.username : parsed.userId,
           source: parsed.source || 'm5stickc-plus-ble-web',
           transport: 'ble',
@@ -2696,7 +3700,7 @@
           bleServiceUuid: BLE_SERVICE_UUID,
           bleTelemetryUuid: BLE_TELEMETRY_UUID,
           bleMessageUuid: BLE_MESSAGE_UUID,
-          bleBridgeReceivedAt: now,
+          bleBridgeReceivedAt: now.toISOString(),
           bleBridgeStoredBy: currentUser?.username || '',
           bleLastMessage: parsed.bleLastMessage || parsed.ble_last_message || bluetoothBridgeState.lastMessage || '',
           metadata: {
@@ -2705,6 +3709,30 @@
             rawBlePayload: parsedOk ? undefined : text,
           },
         };
+      };
+
+      const handleBleControlPayload = (parsed = {}) => {
+        const type = String(parsed.type || '').toLowerCase();
+        if (!type) return false;
+        if (type === 'log_begin') {
+          bluetoothBridgeState.logDumpCurrentUptimeMs = Number(parsed.current_uptime_ms ?? parsed.uptime_ms);
+          setStatus('Syncing history', 'watch');
+          setStoreStatus(`Receiving ${Number(parsed.count || 0)} cached M5 packets...`);
+          return true;
+        }
+        if (type === 'log_end') {
+          bluetoothBridgeState.logDumpCurrentUptimeMs = null;
+          setStatus('Receiving', 'stable');
+          setStoreStatus('M5 cached history sync finished.', 'ok');
+          refreshDeviceTelemetry();
+          return true;
+        }
+        if (type === 'ack') {
+          bluetoothBridgeState.lastMessage = String(parsed.cmd || parsed.status || 'ack').slice(0, 40);
+          setStoreStatus(`Device ack: ${bluetoothBridgeState.lastMessage}`);
+          return true;
+        }
+        return false;
       };
 
       const storeTelemetryPayload = async (payload) => {
@@ -2726,18 +3754,31 @@
         if (storedCountEl) storedCountEl.textContent = String(bluetoothBridgeState.storedCount);
         setStoreStatus(`Stored packet ${bluetoothBridgeState.storedCount}.`, 'ok');
         if (data.telemetry) {
-          mergeDeviceTelemetry([data.telemetry]);
+          queueDeviceTelemetryMerge([data.telemetry]);
         } else {
           refreshDeviceTelemetry();
         }
       };
 
-      const handleTelemetryNotification = async (event) => {
-        const text = decodeValue(event.target?.value);
-        if (!text) return;
-        const payload = buildTelemetryPayload(text);
+      const processTelemetryMessage = async (text) => {
+        const parsed = parseBleJsonObject(text);
+        if (!Object.keys(parsed).length && String(text || '').trim().startsWith('{')) {
+          setStatus('Dropped partial BLE packet', 'watch');
+          setStoreStatus('Dropped an incomplete BLE packet; waiting for the next complete packet.', 'watch');
+          return;
+        }
+        if (handleBleControlPayload(parsed)) return;
+        latestPayloadEl.textContent = JSON.stringify(parsed || { raw: text }, null, 2).slice(0, 2400);
+        setStatus('Provisioning only', 'watch');
+        setHeaderWirelessStatus('WiFi telemetry');
+        setStoreStatus('BLE telemetry storage is disabled. Use BLE only to send WiFi credentials; live data must arrive through WiFi.', 'error');
+        return;
+
+        const payload = buildTelemetryPayload(text, parsed);
         latestPayloadEl.textContent = JSON.stringify(payload, null, 2).slice(0, 2400);
         setStatus('Receiving', 'stable');
+        setHeaderWirelessStatus('BLE receiving');
+        queueDeviceTelemetryMerge([payload]);
         try {
           await storeTelemetryPayload(payload);
         } catch (err) {
@@ -2746,11 +3787,152 @@
         }
       };
 
+      const handleTelemetryNotification = async (event) => {
+        const chunk = decodeValue(event.target?.value);
+        if (!chunk) return;
+        const messages = extractBleJsonMessages(chunk);
+        if (!messages.length && chunk.startsWith('{')) setStatus('Receiving chunk', 'watch');
+        for (const message of messages) {
+          await processTelemetryMessage(message);
+        }
+      };
+
+      const writeBleText = async (text) => {
+        if (!bluetoothBridgeState.messageChar) {
+          throw new Error('BLE message characteristic is not available.');
+        }
+        const bytes = new TextEncoder().encode(String(text || '').slice(0, 180));
+        if (typeof bluetoothBridgeState.messageChar.writeValueWithoutResponse === 'function') {
+          await bluetoothBridgeState.messageChar.writeValueWithoutResponse(bytes);
+        } else if (typeof bluetoothBridgeState.messageChar.writeValueWithResponse === 'function') {
+          await bluetoothBridgeState.messageChar.writeValueWithResponse(bytes);
+        } else {
+          await bluetoothBridgeState.messageChar.writeValue(bytes);
+        }
+      };
+
+      const requestBleHistoryDump = async () => {
+        if (!bluetoothBridgeState.messageChar) return;
+        try {
+          await writeBleText(`record:dump:${DEVICE_BLE_HISTORY_DUMP_LIMIT}`);
+          setStoreStatus('Requesting cached M5 history...', 'ok');
+        } catch (err) {
+          console.warn('BLE history request failed', err);
+        }
+      };
+
       const handleDisconnected = () => {
         bluetoothBridgeState.telemetryChar = null;
         bluetoothBridgeState.messageChar = null;
         setStatus('Disconnected', 'watch');
+        setHeaderWirelessStatus(bluetoothBridgeState.userDisconnected ? 'Wireless paused' : 'BLE reconnecting');
         updateButtons();
+      };
+
+      const connectKnownDevice = async (device, { manual = false } = {}) => {
+        if (!navigator.bluetooth || !device?.gatt) {
+          throw new Error('Bluetooth device is unavailable.');
+        }
+        if (bluetoothBridgeState.device?.gatt?.connected && bluetoothBridgeState.device === device) {
+          return true;
+        }
+
+        bluetoothBridgeState.userDisconnected = false;
+        bluetoothBridgeState.device = device;
+        rememberBleDevice(device);
+        device.addEventListener('gattserverdisconnected', handleDisconnected);
+        if (deviceNameEl) deviceNameEl.textContent = device.name || 'PawTrace BLE';
+
+        setStatus(manual ? 'Connecting' : 'Auto connecting', 'watch');
+        setHeaderWirelessStatus(manual ? 'BLE connecting' : 'BLE auto connecting');
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+        bluetoothBridgeState.telemetryChar = await service.getCharacteristic(BLE_TELEMETRY_UUID);
+        bluetoothBridgeState.telemetryChar.addEventListener('characteristicvaluechanged', handleTelemetryNotification);
+        await bluetoothBridgeState.telemetryChar.startNotifications();
+
+        try {
+          bluetoothBridgeState.messageChar = await service.getCharacteristic(BLE_MESSAGE_UUID);
+        } catch {
+          bluetoothBridgeState.messageChar = null;
+          setStoreStatus('Connected, but firmware does not expose the writable message characteristic.', 'error');
+        }
+
+        setStatus('Connected', 'stable');
+        setHeaderWirelessStatus('BLE connected');
+        setStoreStatus('Wireless BLE connected. Live packets will update automatically.', 'ok');
+        updateButtons();
+
+        try {
+          const initial = await bluetoothBridgeState.telemetryChar.readValue();
+          await handleTelemetryNotification({ target: { value: initial } });
+        } catch {}
+        requestBleHistoryDump();
+        return true;
+      };
+
+      const findRememberedBleDevice = async () => {
+        if (!navigator.bluetooth || typeof navigator.bluetooth.getDevices !== 'function') return null;
+        const remembered = getRememberedBleDevice();
+        const devices = await navigator.bluetooth.getDevices();
+        return devices.find((device) => {
+          if (remembered.id && device.id === remembered.id) return true;
+          if (remembered.name && device.name === remembered.name) return true;
+          return /^PawTrace/i.test(device.name || '');
+        }) || null;
+      };
+
+      const tryAutoReconnect = async ({ silent = false } = {}) => {
+        if (!navigator.bluetooth || bluetoothBridgeState.userDisconnected || bluetoothBridgeState.autoReconnectBusy) return false;
+        if (bluetoothBridgeState.device?.gatt?.connected) return true;
+        if (typeof navigator.bluetooth.getDevices !== 'function') {
+          if (!silent) {
+            setStatus('Pair required', 'watch');
+            setHeaderWirelessStatus('BLE pair required');
+            setStoreStatus('Tap Connect once to authorize PawTrace BLE. After that, the app can reconnect automatically.');
+          }
+          return false;
+        }
+
+        bluetoothBridgeState.autoReconnectBusy = true;
+        try {
+          if (!silent) {
+            setStatus('Auto searching', 'watch');
+            setHeaderWirelessStatus('BLE auto search');
+          }
+          const device = await findRememberedBleDevice();
+          if (!device) {
+            if (!silent) {
+              setStatus('Pair required', 'watch');
+              setHeaderWirelessStatus('BLE pair required');
+              setStoreStatus('No remembered PawTrace BLE device yet. Tap Connect once and choose PawTrace-001.');
+            }
+            return false;
+          }
+          await connectKnownDevice(device);
+          return true;
+        } catch (err) {
+          console.warn('BLE auto reconnect failed', err);
+          if (!silent) {
+            setStatus('Reconnect failed', 'alert');
+            setHeaderWirelessStatus('BLE reconnect failed');
+            setStoreStatus(err instanceof Error ? err.message : 'BLE auto reconnect failed.', 'error');
+          }
+          return false;
+        } finally {
+          bluetoothBridgeState.autoReconnectBusy = false;
+        }
+      };
+
+      const startAutoReconnect = () => {
+        if (bluetoothBridgeState.autoReconnectTimer) {
+          window.clearInterval(bluetoothBridgeState.autoReconnectTimer);
+        }
+        bluetoothBridgeState.userDisconnected = false;
+        tryAutoReconnect();
+        bluetoothBridgeState.autoReconnectTimer = window.setInterval(() => {
+          tryAutoReconnect({ silent: true });
+        }, BLE_AUTO_RECONNECT_MS);
       };
 
       const connect = async () => {
@@ -2767,44 +3949,59 @@
             filters: [{ namePrefix: 'PawTrace' }],
             optionalServices: [BLE_SERVICE_UUID],
           });
-          bluetoothBridgeState.device = device;
-          device.addEventListener('gattserverdisconnected', handleDisconnected);
-          if (deviceNameEl) deviceNameEl.textContent = device.name || 'PawTrace BLE';
-
-          setStatus('Connecting', 'watch');
-          const server = await device.gatt.connect();
-          const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-          bluetoothBridgeState.telemetryChar = await service.getCharacteristic(BLE_TELEMETRY_UUID);
-          bluetoothBridgeState.telemetryChar.addEventListener('characteristicvaluechanged', handleTelemetryNotification);
-          await bluetoothBridgeState.telemetryChar.startNotifications();
-
-          try {
-            bluetoothBridgeState.messageChar = await service.getCharacteristic(BLE_MESSAGE_UUID);
-          } catch {
-            bluetoothBridgeState.messageChar = null;
-            setStoreStatus('Connected, but firmware does not expose the writable message characteristic.', 'error');
-          }
-
-          setStatus('Connected', 'stable');
-          updateButtons();
-
-          try {
-            const initial = await bluetoothBridgeState.telemetryChar.readValue();
-            await handleTelemetryNotification({ target: { value: initial } });
-          } catch {}
+          await connectKnownDevice(device, { manual: true });
         } catch (err) {
           console.warn('BLE bridge connection failed', err);
           setStatus('Failed', 'alert');
+          setHeaderWirelessStatus('BLE failed');
           setStoreStatus(err instanceof Error ? err.message : 'Bluetooth connection failed.', 'error');
           updateButtons();
         }
       };
 
       const disconnect = () => {
+        bluetoothBridgeState.userDisconnected = true;
         if (bluetoothBridgeState.device?.gatt?.connected) {
           bluetoothBridgeState.device.gatt.disconnect();
         } else {
           handleDisconnected();
+        }
+        setHeaderWirelessStatus('Wireless paused');
+      };
+
+      const writeBleMessage = async (packet) => {
+        await writeBleText(JSON.stringify(packet));
+      };
+
+      const sendPetDisplayInfo = async () => {
+        if (!petSelect?.value) {
+          setPetSyncStatus('Choose a pet first.', 'error');
+          updateButtons();
+          return;
+        }
+        const pet = getBlePetOptions().find((entry) => (entry.id || entry.nfcId || entry.name) === petSelect.value);
+        if (!pet) {
+          setPetSyncStatus('Selected pet was not found.', 'error');
+          renderBlePetOptions();
+          updateButtons();
+          return;
+        }
+        const petName = sanitizeBleDisplayText(pet.name || 'Pet', 18);
+        const petAge = sanitizeBleDisplayText(getPetAgeLabel(pet), 14);
+        const petDisplayPacket = {
+          type: 'pet_display',
+          pet_name: petName,
+          pet_age: petAge,
+          source: 'pawtrace-web',
+        };
+        try {
+          await writeBleMessage(petDisplayPacket);
+          bluetoothBridgeState.lastMessage = 'pet_display';
+          setPetSyncStatus(`Sent ${petName} · ${petAge}. Owner info was not transmitted.`, 'ok');
+          setStoreStatus('Pet display card sent with name and age only.', 'ok');
+        } catch (err) {
+          console.warn('BLE pet display send failed', err);
+          setPetSyncStatus(err instanceof Error ? err.message : 'BLE pet display send failed.', 'error');
         }
       };
 
@@ -2815,16 +4012,10 @@
           message: text,
           source: 'pawtrace-web',
           sentAt: new Date().toISOString(),
-          user: getCurrentUser()?.username || 'guest',
         };
-        bluetoothBridgeState.lastMessage = text;
-        const bytes = new TextEncoder().encode(JSON.stringify(messagePacket));
         try {
-          if (typeof bluetoothBridgeState.messageChar.writeValueWithResponse === 'function') {
-            await bluetoothBridgeState.messageChar.writeValueWithResponse(bytes);
-          } else {
-            await bluetoothBridgeState.messageChar.writeValue(bytes);
-          }
+          await writeBleMessage(messagePacket);
+          bluetoothBridgeState.lastMessage = 'message_sent';
           setStoreStatus('Message sent to PawTrace device.', 'ok');
           if (messageInput) messageInput.value = '';
         } catch (err) {
@@ -2836,13 +4027,17 @@
       if (!navigator.bluetooth) {
         connectBtn.disabled = true;
         setStatus('Unsupported', 'alert');
+        setHeaderWirelessStatus('BLE unsupported');
         setStoreStatus('Web Bluetooth is unavailable in this browser. Use Chrome or Edge on localhost/HTTPS.', 'error');
       } else {
-        setStatus('Idle', 'watch');
+        setStatus('Auto searching', 'watch');
+        setHeaderWirelessStatus('BLE auto search');
       }
 
       connectBtn.addEventListener('click', connect);
       disconnectBtn?.addEventListener('click', disconnect);
+      petSelect?.addEventListener('change', updateButtons);
+      sendPetInfoBtn?.addEventListener('click', sendPetDisplayInfo);
       sendBtn?.addEventListener('click', sendMessage);
       messageInput?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
@@ -2850,7 +4045,26 @@
           sendMessage();
         }
       });
+      document.addEventListener(PETS_CHANGED_EVENT, () => {
+        renderBlePetOptions();
+        updateButtons();
+      });
+      renderBlePetOptions();
       updateButtons();
+      stopBluetoothTelemetryBridge = () => {
+        bluetoothBridgeState.userDisconnected = true;
+        clearQueuedDeviceTelemetryMerge();
+        if (bluetoothBridgeState.autoReconnectTimer) {
+          window.clearInterval(bluetoothBridgeState.autoReconnectTimer);
+          bluetoothBridgeState.autoReconnectTimer = null;
+        }
+        if (bluetoothBridgeState.device?.gatt?.connected) {
+          bluetoothBridgeState.device.gatt.disconnect();
+        }
+        bluetoothBridgeState.telemetryChar = null;
+        bluetoothBridgeState.messageChar = null;
+      };
+      if (navigator.bluetooth) startAutoReconnect();
     }
 
     function isSeededDefaultPetList(list = []) {
@@ -3087,6 +4301,9 @@
       const fingerStateEl = document.getElementById('health-finger-state');
       const spo2ValidDetailEl = document.getElementById('health-spo2-valid-detail');
       const historyCountEl = document.getElementById('health-history-count');
+      const historyScrollEl = document.getElementById('health-history-scroll');
+      const historyToggleBtn = document.getElementById('health-history-toggle');
+      const historyToggleLabelEl = document.getElementById('health-history-toggle-label');
       const historyListEl = document.getElementById('health-history-list');
       const historyEmptyEl = document.getElementById('health-history-empty');
       const tempChartEl = document.getElementById('health-temp-chart');
@@ -3113,6 +4330,21 @@
         formStatus.classList.toggle('hidden', !message);
         formStatus.classList.toggle('text-red-500', Boolean(message) && isError);
         formStatus.classList.toggle('text-primary', Boolean(message) && !isError);
+      }
+
+      function setHistoryCollapsed(isCollapsed = true) {
+        if (historyScrollEl) {
+          historyScrollEl.classList.toggle('hidden', isCollapsed);
+          historyScrollEl.setAttribute('aria-hidden', String(isCollapsed));
+        }
+        if (historyToggleBtn) {
+          historyToggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+          historyToggleBtn.setAttribute('aria-label', isCollapsed ? 'Show recent health records' : 'Hide recent health records');
+          historyToggleBtn.setAttribute('title', isCollapsed ? 'Show records' : 'Hide records');
+        }
+        if (historyToggleLabelEl) {
+          historyToggleLabelEl.textContent = isCollapsed ? 'Show' : 'Hide';
+        }
       }
 
       function setHealthText(element, value = '--') {
@@ -3240,11 +4472,6 @@
         const uploadEnabled = firstTelemetryValue(latestVitals?.uploadEnabled, activePet.uploadEnabled);
         const uploadOk = firstTelemetryValue(latestVitals?.uploadOk, activePet.uploadOk);
         const uploadCode = firstTelemetryValue(latestVitals?.uploadCode, activePet.uploadCode);
-        const bleConnected = firstTelemetryValue(latestVitals?.bleConnected, activePet.bleConnected);
-        const bleRssi = firstTelemetryValue(latestVitals?.bleRssi, activePet.bleRssi);
-        const bleMtu = firstTelemetryValue(latestVitals?.bleMtu, activePet.bleMtu);
-        const notifySeq = firstTelemetryValue(latestVitals?.notifySeq, activePet.notifySeq);
-        const isBlePacket = isBleTelemetrySource(packetSource, packetTransport);
         const coordsLabel = hasTelemetryNumber(lat) && hasTelemetryNumber(lon)
           ? `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}`
           : '--';
@@ -3255,8 +4482,7 @@
           || hasTelemetryNumber(gpsFix)
           || hasTelemetryValue(locationValid)
           || hasTelemetryValue(wifiConnected)
-          || hasTelemetryValue(uploadOk)
-          || hasTelemetryValue(bleConnected);
+          || hasTelemetryValue(uploadOk);
 
         setHealthText(deviceIdEl, deviceId || '--');
         setHealthText(packetTimeEl, packetTimestamp ? formatReadingTimestamp(packetTimestamp) : '--');
@@ -3282,16 +4508,12 @@
         setHealthTone(activityScoreEl, activityStatusTone);
         setHealthText(batteryStateEl, hasTelemetryNumber(batteryPct) ? `${Math.round(Number(batteryPct))}%` : '--');
         setHealthText(batteryMetaEl, hasTelemetryNumber(batteryMv) ? `battery_mv ${Math.round(Number(batteryMv))} mV` : 'battery_mv --');
-        setHealthText(networkStateEl, isBlePacket
-          ? `BLE ${telemetryBoolLabel(firstTelemetryValue(bleConnected, true))}`
-          : `Wi-Fi ${telemetryBoolLabel(wifiConnected)}`);
-        setHealthText(wifiStateEl, isBlePacket ? telemetryBoolLabel(firstTelemetryValue(bleConnected, true)) : telemetryBoolLabel(wifiConnected));
-        setHealthText(wifiRssiEl, isBlePacket
-          ? (hasTelemetryNumber(bleRssi) ? `${Math.round(Number(bleRssi))} dBm` : (hasTelemetryNumber(bleMtu) ? `MTU ${Math.round(Number(bleMtu))}` : '--'))
-          : (hasTelemetryNumber(wifiRssi) ? `${Math.round(Number(wifiRssi))} dBm` : '--'));
+        setHealthText(networkStateEl, `Wi-Fi ${telemetryBoolLabel(wifiConnected)}`);
+        setHealthText(wifiStateEl, telemetryBoolLabel(wifiConnected));
+        setHealthText(wifiRssiEl, hasTelemetryNumber(wifiRssi) ? `${Math.round(Number(wifiRssi))} dBm` : '--');
         setHealthText(uploadStateEl, `upload_ok ${telemetryBoolLabel(uploadOk)}`);
         setHealthText(uploadEnabledEl, telemetryBoolLabel(uploadEnabled));
-        setHealthText(uploadCodeEl, hasTelemetryNumber(notifySeq) && isBlePacket ? `notify ${Math.round(Number(notifySeq))}` : telemetryIntegerLabel(uploadCode));
+        setHealthText(uploadCodeEl, telemetryIntegerLabel(uploadCode));
         setHealthText(vitalsStateEl, assessment.state);
         setHealthText(locationStateEl, `location_valid ${telemetryBoolLabel(locationValid)}`);
         setHealthText(gpsStateEl, `gps_fix ${telemetryIntegerLabel(gpsFix)}`);
@@ -3374,7 +4596,7 @@
                 heartRate: nextHeartRate,
               },
               ...normalizeVitalsHistory(pet.vitalsHistory),
-            ].slice(0, 12),
+            ].slice(0, DEVICE_TELEMETRY_HISTORY_LIMIT),
           }, index);
         });
         setStoredPets(nextPets);
@@ -3391,8 +4613,13 @@
           render();
         });
         saveBtn?.addEventListener('click', () => saveReading());
+        historyToggleBtn?.addEventListener('click', () => {
+          const isExpanded = historyToggleBtn.getAttribute('aria-expanded') === 'true';
+          setHistoryCollapsed(isExpanded);
+        });
         document.addEventListener(PETS_CHANGED_EVENT, () => render());
       }
+      setHistoryCollapsed(historyToggleBtn?.getAttribute('aria-expanded') !== 'true');
       rerenderHealthMonitor = render;
       render();
     }
@@ -3562,29 +4789,13 @@
       });
 
       function buildPetNfcPayload(pet = {}) {
-        const user = getCurrentUser() || {};
-        const avatar = safeImageSrc(pet.avatar, DEFAULT_PET_AVATAR);
-        return {
-          v: 1,
-          i: pet.id,
-          nid: pet.nfcId || buildPetNfcId(pet, 0),
-          n: pet.name || 'Found pet',
-          t: pet.type || 'Pet',
-          b: pet.breed || 'Unknown',
-          l: pet.location || user.campus || 'Campus',
-          h: pet.health || 'No health notes provided.',
-          c: pet.nfcContact || user.contact || '',
-          m: pet.nfcNote || `${pet.name || 'This pet'} is friendly. Please contact the owner if found.`,
-          o: user.displayName || user.username || 'Pet owner',
-          campus: user.campus || 'Taicang',
-          img: avatar.startsWith('data:image/') ? '' : avatar
-        };
+        return buildPublicNfcPetPayload(pet, getCurrentUser() || getDefaultUser());
       }
 
       function buildPetNfcLink(pet = {}) {
         const url = new URL(window.location.href);
         url.search = '';
-        url.hash = 'pets';
+        url.hash = 'nfc';
         url.searchParams.set('nfc', base64UrlEncode(JSON.stringify(buildPetNfcPayload(pet))));
         return url.toString();
       }
@@ -3773,10 +4984,9 @@
           const isOpen = openPetId ? openPetId === p.id : (!mobileLayout && idx === 0);
           if (!openPetId && !mobileLayout && idx === 0) openPetId = p.id;
           const card = document.createElement('div');
-          card.className = 'pixel-card flex flex-col gap-2 animate-slideInLeft';
+          card.className = 'pixel-card flex flex-col gap-2';
           card.dataset.petCardId = p.id || '';
           card.dataset.petNfcId = p.nfcId || '';
-          card.style.animationDelay = (idx * 0.1) + 's';
           card.innerHTML = `
             <button class="w-full flex justify-between items-center text-left" data-pet-toggle="${petId}">
               <div class="flex items-center gap-3">
@@ -3983,8 +5193,7 @@
             .map(tag => `<span class="px-2 py-0.5 rounded-full bg-secondary/60">${escapeHtml(tag)}</span>`)
             .join('');
           const card = document.createElement('div');
-          card.className = 'pixel-card flex flex-col gap-2 animate-slideIn';
-          card.style.animationDelay = (idx * 0.05) + 's';
+          card.className = 'pixel-card flex flex-col gap-2';
           card.innerHTML = `
             <div class="relative">
               <img src="${petPhoto}" alt="${petName}" loading="lazy" decoding="async" class="community-cover w-full object-cover rounded-sm pixel-border" />
@@ -4026,7 +5235,6 @@
           openPetId = pets[0]?.id || null;
         }
         render();
-        renderCommunityPets();
       };
 
       window.openNfcPetDeepLink = () => {
@@ -4269,17 +5477,31 @@
         },
       ],
       history: {},
+      historyLoaded: {},
       activeId: null,
     };
 
     const LOCAL_CHAT_REPLIES = [
-      'Okay, I understand!',
-      'That’s great!',
-      'Let’s meet this weekend!',
-      'My pet loves this activity too.',
-      'Thanks for letting me know.',
-      'Sounds good!',
+      'Okay, I understand. That sounds worth tracking with your pet’s mood and energy today. Did anything change around food, walks, or playtime?',
+      'That’s great to hear. My pet usually reacts better when the routine stays predictable. Do you want to plan a short walk together this week?',
+      'Let’s meet this weekend if the weather is comfortable. I can bring a few treats and we can keep the first meetup relaxed. What time works for you?',
+      'My pet loves this kind of activity too. I would start gently and watch whether they get tired, excited, or nervous. How did your pet behave afterward?',
+      'Thanks for letting me know. I’ll keep that in mind and compare it with appetite, sleep, and activity later. Has this happened before?',
+      'Sounds good. We can keep the plan simple and pet-friendly so they do not feel rushed. Should we meet near the campus green or the cafe area?',
     ];
+    const CHAT_STICKERS = Array.from({ length: 36 }, (_, index) => {
+      const stickerNumber = String(index + 1).padStart(2, '0');
+      const id = `paw-sticker-${stickerNumber}`;
+      return {
+        id,
+        label: `Pet sticker ${stickerNumber}`,
+        src: `/assets/stickers/${id}.png`,
+      };
+    });
+    const CHAT_STICKER_SIZE_KEY = 'pawtraceChatStickerSize';
+    const CHAT_STICKER_SIZE_MIN = 58;
+    const CHAT_STICKER_SIZE_MAX = 108;
+    const CHAT_STICKER_SIZE_DEFAULT = 78;
     const LOCAL_PET_SUMMARIES = [
       (contact) => `${contact.petName} is a ${contact.petAge} ${contact.petBreed}. ${contact.petNotes || ''}`,
       (contact) => {
@@ -4308,6 +5530,8 @@
       const { type, contact, contactId, messages = [], fallback } = payload;
       if (type === 'owner-pet-summary' && contact) {
         const generator = LOCAL_PET_SUMMARIES[Math.floor(Math.random() * LOCAL_PET_SUMMARIES.length)];
+        lastChatAssistantSource = 'local';
+        lastChatAssistantWarning = '';
         return (generator ? generator(contact) : fallback) || 'No recent pet update yet.';
       }
       if (!contactId) return fallback || 'Message received.';
@@ -4319,6 +5543,9 @@
             const note = m.media.src?.startsWith('data:image/')
               ? 'Shared image attachment from device upload.'
               : `Shared image link: ${m.media.src || ''}`;
+            content = content ? `${content}\n${note}` : note;
+          } else if (m.media?.type === 'sticker') {
+            const note = `Sent sticker: ${m.media.label || m.content || 'pet sticker'}.`;
             content = content ? `${content}\n${note}` : note;
           }
           return {
@@ -4339,9 +5566,13 @@
         if (!response.ok) throw new Error('AI request failed');
         const data = await response.json();
         if (!data.reply) throw new Error('Empty reply');
+        lastChatAssistantSource = data.source || 'unknown';
+        lastChatAssistantWarning = data.warning || '';
         return data.reply.trim();
       } catch (error) {
         console.warn('Assistant bridge failed', error);
+        lastChatAssistantSource = 'frontend-local';
+        lastChatAssistantWarning = String(error);
         const fallbackReply = LOCAL_CHAT_REPLIES[Math.floor(Math.random() * LOCAL_CHAT_REPLIES.length)];
         return fallbackReply || fallback || 'Message received.';
       }
@@ -4385,6 +5616,13 @@
       const profileSideFriendCount = document.getElementById('profile-side-friend-count');
       const chatScrollUp = document.getElementById('chat-scroll-up');
       const chatScrollDown = document.getElementById('chat-scroll-down');
+      const chatStickerTrigger = document.getElementById('chat-open-stickers');
+      const chatStickerPanel = document.getElementById('chat-sticker-panel');
+      const chatStickerGrid = document.getElementById('chat-sticker-grid');
+      const chatStickerCount = document.getElementById('chat-sticker-count');
+      const chatStickerSizeInput = document.getElementById('chat-sticker-size');
+      const chatStickerSizeValue = document.getElementById('chat-sticker-size-value');
+      const chatStickerClose = document.getElementById('chat-close-stickers');
       if (!chatHoverCard) {
         chatHoverCard = document.createElement('div');
         chatHoverCard.className = 'contact-hover-card';
@@ -4422,6 +5660,42 @@
         chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
       };
       const switchToChatTab = () => document.querySelector('[data-tab="chat"]')?.click();
+      const greetingForContact = (contact) => ({
+        role: 'assistant',
+        content: `Hi! I'm ${contact.name} and this is ${contact.petName}.`
+      });
+
+      function normalizeSavedChatHistory(rows = [], contact) {
+        const normalized = (Array.isArray(rows) ? rows : [])
+          .map((message) => ({
+            role: message?.role === 'assistant' ? 'assistant' : 'user',
+            content: String(message?.content || '').trim()
+          }))
+          .filter((message) => message.content);
+        return normalized.length ? normalized : [greetingForContact(contact)];
+      }
+
+      async function loadSavedChatHistory(contactId, contact) {
+        if (!getAuthToken() || isGuestSession() || CHAT_STATE.historyLoaded[contactId]) return false;
+        try {
+          const response = await authJsonFetch(`/api/chat/history/${encodeURIComponent(contactId)}`);
+          if (!response.ok) throw new Error('Chat history unavailable');
+          const data = await response.json().catch(() => ({}));
+          if (Array.isArray(data.history) && data.history.length) {
+            CHAT_STATE.history[contactId] = normalizeSavedChatHistory(data.history, contact);
+            const latest = CHAT_STATE.history[contactId].at(-1);
+            if (latest?.content) contact.lastPreview = latest.content.slice(0, 96);
+          } else if (!CHAT_STATE.history[contactId]) {
+            CHAT_STATE.history[contactId] = [greetingForContact(contact)];
+          }
+          CHAT_STATE.historyLoaded[contactId] = true;
+          return true;
+        } catch (err) {
+          console.warn('Chat history load failed', err);
+          CHAT_STATE.historyLoaded[contactId] = true;
+          return false;
+        }
+      }
 
       function renderContacts(filter = '') {
         if (!listEl) return;
@@ -4457,7 +5731,7 @@
               const summaryEl = hoverCard.querySelector('#hover-summary');
               const healthEl = hoverCard.querySelector('#hover-health');
               const tagsEl = hoverCard.querySelector('#hover-tags');
-              setPreviewImageSource(avatarEl, data.avatar);
+              setPreviewImageSource(avatarEl, data.avatar, DEFAULT_USER_AVATAR);
               if (nameEl) nameEl.textContent = data.name || 'Friend';
               if (petTagEl) petTagEl.textContent = `${data.petName || 'Pet'} · ${data.petType || ''}`.trim() || 'Pet info';
               if (summaryEl) summaryEl.textContent = data.petNotes || data.lastPreview || '';
@@ -4486,6 +5760,58 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
+      function setStickerPanelOpen(isOpen) {
+        if (!chatStickerPanel) return;
+        chatStickerPanel.classList.toggle('hidden', !isOpen);
+        chatStickerPanel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        chatStickerTrigger?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      }
+
+      function getSavedStickerSize() {
+        try {
+          return clampNumber(
+            localStorage.getItem(CHAT_STICKER_SIZE_KEY),
+            CHAT_STICKER_SIZE_MIN,
+            CHAT_STICKER_SIZE_MAX,
+            CHAT_STICKER_SIZE_DEFAULT
+          );
+        } catch (err) {
+          return CHAT_STICKER_SIZE_DEFAULT;
+        }
+      }
+
+      function applyStickerSize(value) {
+        const size = Math.round(clampNumber(
+          value,
+          CHAT_STICKER_SIZE_MIN,
+          CHAT_STICKER_SIZE_MAX,
+          CHAT_STICKER_SIZE_DEFAULT
+        ));
+        chatStickerPanel?.style.setProperty('--chat-sticker-size', `${size}px`);
+        if (chatStickerSizeInput) chatStickerSizeInput.value = String(size);
+        if (chatStickerSizeValue) chatStickerSizeValue.textContent = String(size);
+        return size;
+      }
+
+      function renderStickerPanel() {
+        if (!chatStickerGrid) return;
+        chatStickerGrid.innerHTML = '';
+        if (chatStickerCount) chatStickerCount.textContent = String(CHAT_STICKERS.length);
+        CHAT_STICKERS.forEach((sticker) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'chat-sticker-item';
+          button.setAttribute('aria-label', sticker.label);
+          button.innerHTML = `
+            <img src="${escapeHtml(sticker.src)}" loading="lazy" decoding="async" alt="" />
+          `;
+          button.addEventListener('click', () => {
+            sendStickerMessage(sticker);
+          });
+          chatStickerGrid.appendChild(button);
+        });
+      }
+
       function appendMessageBubble(message, contactId, scroll = true) {
         if (!message || !chatMessages) return;
         const role = message.role;
@@ -4504,6 +5830,13 @@
             <img src="${mediaSrc}" class="w-full h-auto object-cover rounded-sm border-2 border-dark mb-1" />
             ${safeContent ? `<p class="text-[11px]">${safeContent}</p>` : ''}
           `;
+        } else if (media?.type === 'sticker') {
+          bubble.className += ' bubble-sticker';
+          const mediaSrc = escapeHtml(safeImageSrc(media.src, ''));
+          const stickerLabel = escapeHtml(media.label || content || 'Sticker');
+          bubble.innerHTML = `
+            <img src="${mediaSrc}" class="chat-sticker-image" alt="${stickerLabel}" />
+          `;
         } else {
           bubble.innerHTML = `<p class="text-[11px]">${safeContent}</p>`;
         }
@@ -4511,10 +5844,12 @@
         const contact = CHAT_STATE.contacts.find(x => x.id === contactId);
         avatar.loading = 'lazy';
         avatar.decoding = 'async';
-        avatar.src = isUser
-          ? (document.getElementById('current-user-avatar')?.src || '')
-          : (contact?.avatar || '');
         avatar.className = 'w-7 h-7 rounded-full object-cover pixel-border bg-secondary';
+        setPreviewImageSource(
+          avatar,
+          isUser ? normalizeUserAvatar(getCurrentUser()?.avatar || document.getElementById('current-user-avatar')?.src) : safeImageSrc(contact?.avatar, DEFAULT_USER_AVATAR),
+          DEFAULT_USER_AVATAR
+        );
         if (isUser) {
           wrapper.appendChild(bubble);
           wrapper.appendChild(avatar);
@@ -4567,7 +5902,12 @@
         history.push(assistantMessage);
         CHAT_STATE.history[contactId] = history;
         appendMessageBubble(assistantMessage, contactId);
-        if (chatStatus) chatStatus.textContent = `Online · ${contact.petType} owner`;
+        if (chatStatus) {
+          chatStatus.textContent = lastChatAssistantSource === 'qwen'
+            ? `Online · ${contact.petType} owner · AI`
+            : `Online · ${contact.petType} owner · Local fallback`;
+          chatStatus.title = lastChatAssistantWarning || '';
+        }
       };
 
       function activateContact(id) {
@@ -4578,7 +5918,7 @@
           chatPane.classList.remove('open');
           setChatToggleLabel(chatToggle, 'Show friends');
         }
-        setPreviewImageSource(chatAvatar, c.avatar);
+        setPreviewImageSource(chatAvatar, c.avatar, DEFAULT_USER_AVATAR);
         if (chatName) chatName.textContent = c.name;
         if (chatPetTag) {
           chatPetTag.textContent = c.petName + ' · ' + c.petType;
@@ -4588,11 +5928,14 @@
         updateOwnerPetPanel(c);
         renderContacts(searchEl?.value || '');
         if (!CHAT_STATE.history[id]) {
-          CHAT_STATE.history[id] = [
-            { role: 'assistant', content: `Hi! I'm ${c.name} and this is ${c.petName}.` }
-          ];
+          CHAT_STATE.history[id] = [greetingForContact(c)];
         }
         renderHistory(id);
+        loadSavedChatHistory(id, c).then((loaded) => {
+          if (!loaded || CHAT_STATE.activeId !== id) return;
+          renderContacts(searchEl?.value || '');
+          renderHistory(id);
+        });
       }
 
       async function sendMessage() {
@@ -4641,6 +5984,29 @@
         await handleAssistantReply(contact, contact.id, `${contact.petName} got a new photo!`);
       }
 
+      async function sendStickerMessage(sticker) {
+        const contact = getActiveContact();
+        if (!contact) {
+          if (chatError) chatError.textContent = 'Select a friend first.';
+          return;
+        }
+        const stickerMessage = {
+          role: 'user',
+          content: sticker.label || 'Sent a sticker',
+          media: { type: 'sticker', src: sticker.src, label: sticker.label }
+        };
+        const history = CHAT_STATE.history[contact.id] || [];
+        history.push(stickerMessage);
+        CHAT_STATE.history[contact.id] = history;
+        contact.lastPreview = `[Sticker] ${sticker.label || 'Pet sticker'}`;
+        appendMessageBubble(stickerMessage, contact.id);
+        renderContacts(searchEl?.value || '');
+        setStickerPanelOpen(false);
+        await handleAssistantReply(contact, contact.id, `${contact.petName} likes that sticker.`);
+      }
+
+      applyStickerSize(getSavedStickerSize());
+      renderStickerPanel();
       renderContacts();
 
       chatScrollUp?.addEventListener('click', () => {
@@ -4664,8 +6030,32 @@
         chatPane.classList.remove('open');
         setChatToggleLabel(chatToggle, 'Show friends');
       });
+      chatStickerTrigger?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const nextOpen = chatStickerPanel?.classList.contains('hidden') ?? true;
+        setStickerPanelOpen(nextOpen);
+      });
+      chatStickerClose?.addEventListener('click', () => {
+        setStickerPanelOpen(false);
+      });
+      chatStickerSizeInput?.addEventListener('input', () => {
+        const size = applyStickerSize(chatStickerSizeInput.value);
+        try {
+          localStorage.setItem(CHAT_STICKER_SIZE_KEY, String(size));
+        } catch (err) {
+          // Ignore storage failures; the live control still works for this session.
+        }
+      });
+      document.addEventListener('click', (event) => {
+        if (chatStickerPanel?.classList.contains('hidden')) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest('#chat-sticker-panel') || target.closest('#chat-open-stickers')) return;
+        setStickerPanelOpen(false);
+      });
       const chatAttachImage = document.getElementById('chat-attach-image');
       chatAttachImage?.addEventListener('click', () => {
+        setStickerPanelOpen(false);
         openShareImageModal();
       });
       chatSend?.addEventListener('click', sendMessage);

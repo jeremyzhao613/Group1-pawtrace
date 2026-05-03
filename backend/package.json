@@ -12,6 +12,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:monitor-demo": "tsx prisma/seedMonitorDemo.ts",
     "db:import-json": "tsx scripts/importFromJson.ts"
   },
   "prisma": {

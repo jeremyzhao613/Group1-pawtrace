@@ -35,6 +35,12 @@ The app should not directly claim conditions such as ear mites, bacterial infect
 - Showcase app: `http://localhost:3001/`
 - Python YOLO service: `http://127.0.0.1:8008/analyze-video`
 
+Same Wi-Fi / phone-hotspot demos use the computer LAN IP instead of `localhost`:
+
+- Main web app: `http://<computer-lan-ip>:5173/`
+- Backend API: `http://<computer-lan-ip>:3000/api/status`
+- Showcase app: `http://<computer-lan-ip>:3001/`
+
 ## Tech Stack
 
 - Frontend: Vite + Tailwind CSS
@@ -79,6 +85,34 @@ Stop services:
 npm run stop
 ```
 
+## Cloudflare Pages Deployment
+
+The main Vite frontend can be deployed directly to Cloudflare Pages with Wrangler.
+The Node/Express backend still needs a separate Node runtime or an exposed API URL
+because it depends on Express, Prisma, and PostgreSQL.
+
+Check Cloudflare auth:
+
+```bash
+npm run cloudflare:whoami
+```
+
+Deploy the frontend:
+
+```bash
+PAWTRACE_API_BASE_URL=https://your-api.example.com npm run deploy:cloudflare
+```
+
+Preview deploy:
+
+```bash
+PAWTRACE_API_BASE_URL=https://your-api.example.com npm run deploy:cloudflare:preview
+```
+
+If `PAWTRACE_API_BASE_URL` is omitted, the built app keeps using relative `/api`
+requests. For a Cloudflare Pages-only deployment, set it to a reachable backend
+URL and include the Pages domain in the backend `CORS_ORIGIN` value.
+
 ## Local Development Without Docker Desktop
 
 Install dependencies:
@@ -114,6 +148,8 @@ Then open:
 - Backend API: `http://localhost:3000/api/status`
 - Monitor: `http://localhost:3000/monitor/index.html`
 
+For another phone/computer on the same Wi-Fi, find this computer's LAN IP and open `http://<computer-lan-ip>:5173/` or `http://<computer-lan-ip>:3001/`. The 3001 showcase page proxies `/api` to the backend on port `3000`, so it shows the same M5Stack Wi-Fi telemetry as the main app.
+
 ## Environment Variables
 
 Copy `backend/.env.example` to `backend/.env`.
@@ -138,13 +174,14 @@ Important variables:
 - `VIDEO_AI_TIMEOUT_MS`: backend timeout for video analysis requests.
 - `MONITOR_API_TOKEN`: optional protection for `/api/monitor/*`.
 - `DEVICE_INGEST_TOKEN`: shared token for M5Stack `/api/device/telemetry` ingest.
+- `DEVICE_INGEST_ALLOW_LAN=true`: local hotspot/LAN demo mode that lets private-network M5Stack clients upload without a token.
 - `SERVE_WEB=0`: default API-only backend.
 - `SERVE_WEB=1`: serve built frontend assets from the backend for single-port deployment.
 - `WEB_APP=frontend | glass`: selects which built web app to serve when `SERVE_WEB=1`.
 
 ## M5Stack Telemetry
 
-M5StickC Plus 1.1 with GPS v1.1 and Heart Rate HAT can POST JSON telemetry to:
+M5StickC Plus 1.1 with GPS v1.1 and Heart Rate HAT now uses Wi-Fi as the primary transport. After joining the same hotspot/LAN as the backend, it can POST JSON telemetry to:
 
 ```text
 POST /api/device/telemetry
@@ -157,6 +194,10 @@ GET /api/device/telemetry/latest
 ```
 
 and merges the latest device data into the map, health panel, and pet cards. The backend persists telemetry to PostgreSQL and keeps a temporary latest-value cache for fast display. See `docs/pawtrace-m5stack-telemetry.md`.
+
+BLE is provisioning-only: use `Health -> BLE WiFi Setup` to send the M5 Wi-Fi SSID, password, backend host, and token. BLE packets are not stored as telemetry.
+
+The Wi-Fi firmware also exposes a same-network M5 API at `http://<m5-ip>:8080/status`, `/message`, and `/upload` for local demos without Bluetooth.
 
 ## Pet Video Behavior Analysis
 
@@ -273,6 +314,15 @@ Guest access is also available from the login screen.
 - Build backend: `npm run build --prefix backend`
 - Build frontend: `npm run build --prefix frontend`
 
+Same Wi-Fi check:
+
+```bash
+ipconfig getifaddr en0
+npm run dev:glass
+```
+
+Then open `http://<computer-lan-ip>:3001/` from a device on the same Wi-Fi.
+
 ## Verification Checklist
 
 Recommended checks before presenting or pushing:
@@ -287,7 +337,9 @@ git diff --check
 Manual checks:
 
 - `http://localhost:5173/` opens the main PawTrace app.
+- `http://<computer-lan-ip>:3001/` opens the showcase app from another same-Wi-Fi device.
 - `http://localhost:3000/api/status` returns backend status JSON.
+- `POST /api/device/telemetry` rejects BLE telemetry and accepts Wi-Fi telemetry.
 - `POST /api/ai/video-behavior` without a file returns a clear validation error.
 - Mobile width around `390px` has no page-level horizontal scrolling.
 - `Map / Pets / Chat / Health / Video Check / AI Assist / Profile` are accessible.

@@ -1,7 +1,9 @@
 {
   "name": "pawtrace",
   "private": true,
+  "version": "10.0.0",
   "description": "PawTrace monorepo：Vite 单页前端 + Express+Prisma+Postgres 后端",
+  "main": "desktop/main.cjs",
   "scripts": {
     "run": "npm run local:dev",
     "init": "npm run local:prepare",
@@ -11,12 +13,22 @@
     "dev:glass": "npm run dev --prefix pawtrace-glass",
     "build": "npm run build --prefix frontend && npm run build --prefix pawtrace-glass && npm run build --prefix backend",
     "build:web": "npm run build --prefix frontend",
+    "build:cloudflare": "npm run build:web && node ./scripts/write-runtime-config.mjs frontend/dist/app/runtime-config.js",
     "build:glass": "npm run build --prefix pawtrace-glass",
+    "cloudflare:whoami": "wrangler whoami",
+    "cloudflare:preview": "npm run build:cloudflare && wrangler pages dev frontend/dist",
+    "deploy": "npm run deploy:cloudflare",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy frontend/dist --project-name pawtrace --branch main",
+    "deploy:cloudflare:preview": "npm run build:cloudflare && wrangler pages deploy frontend/dist --project-name pawtrace --branch preview",
     "package:web": "npm run build:web",
     "package:mobile": "npm run build:web && npm run cap:sync --prefix frontend",
     "package:android": "npm run build:web && npm run cap:sync:android --prefix frontend",
     "package:ios": "npm run build:web && npm run cap:sync:ios --prefix frontend",
-    "package:exe:prepare": "npm run build:web",
+    "package:desktop:prepare": "npm run build:web",
+    "package:desktop:dir": "npm run package:desktop:prepare && electron-builder --dir",
+    "package:exe:prepare": "npm run package:desktop:prepare",
+    "package:exe": "npm run package:exe:prepare && electron-builder --win nsis --x64",
+    "package:dmg": "npm run package:desktop:prepare && electron-builder --mac dmg --arm64",
     "release:check": "npm run build",
     "start": "npm start --prefix backend",
     "db:up": "docker compose up -d",
@@ -35,6 +47,44 @@
     "local:dev": "npm run local:prepare && npm run dev"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1",
+    "wrangler": "^4.87.0"
+  },
+  "build": {
+    "appId": "com.pawtrace.desktop",
+    "productName": "PawTrace",
+    "artifactName": "PawTrace-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release/desktop"
+    },
+    "files": [
+      "desktop/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.lifestyle"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

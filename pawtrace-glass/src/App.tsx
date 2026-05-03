@@ -124,22 +124,6 @@ const demoPacket = {
   upload_code: 0,
 };
 
-const demoBlePacket = {
-  id: 'pawtrace_001',
-  source: 'm5stickc-plus-ble',
-  transport: 'ble',
-  bat: 82,
-  bpm: 92,
-  lat: 31.2983,
-  lon: 120.5853,
-  alert: 0,
-  ble_connected: true,
-  ble_rssi: -58,
-  ble_mtu: 185,
-  service_uuid: '7b9f0001-6f3a-4f8a-9f4d-111111111111',
-  characteristic_uuid: '7b9f0002-6f3a-4f8a-9f4d-222222222222',
-};
-
 const emptyState: DashboardState = {
   token: '',
   user: null,
@@ -151,6 +135,19 @@ const emptyState: DashboardState = {
   loading: true,
   lastRefresh: '',
 };
+
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+
+function apiUrl(path: string) {
+  const target = String(path || '');
+  if (!target || /^(?:[a-z][a-z\d+\-.]*:)?\/\//i.test(target) || /^(data|blob):/i.test(target)) return target;
+  if (!API_BASE_URL) return target;
+  const normalizedPath = target.startsWith('/') ? target : `/${target}`;
+  if (API_BASE_URL.endsWith('/api') && normalizedPath.startsWith('/api/')) {
+    return `${API_BASE_URL}${normalizedPath.slice('/api'.length)}`;
+  }
+  return `${API_BASE_URL}${normalizedPath}`;
+}
 
 function formatDate(value?: string) {
   if (!value) return 'No timestamp';
@@ -178,17 +175,12 @@ function boolLabel(value: unknown) {
   return '--';
 }
 
-function isBleTelemetry(latest: Telemetry | null) {
-  const source = `${latest?.source || latest?.metadata?.source || ''} ${latest?.transport || latest?.metadata?.transport || ''}`;
-  return /ble/i.test(source);
-}
-
 function telemetrySourceLabel(latest: Telemetry | null) {
   if (!latest) return 'Waiting';
   const source = String(latest.source || latest.metadata?.source || '');
   const transport = String(latest.transport || latest.metadata?.transport || '');
   const joined = `${source} ${transport}`.toLowerCase();
-  if (joined.includes('ble')) return 'BLE sync';
+  if (joined.includes('ble')) return 'BLE WiFi setup';
   if (joined.includes('wifi') || joined.includes('http')) return 'Wi-Fi HTTP';
   return source || transport || 'M5Stack';
 }
@@ -221,7 +213,7 @@ function hasLiveCoordinateLock(telemetry: Telemetry | null) {
   if (!telemetry || !hasValidCoordinate(telemetry.lat, telemetry.lon)) return false;
   const explicitGpsValid = telemetry.locationValid ?? telemetry.gpsValid;
   if (explicitGpsValid === false) return false;
-  if (!isBleTelemetry(telemetry) && Number(telemetry.gpsFix ?? 1) === 0) return false;
+  if (Number(telemetry.gpsFix ?? 1) === 0) return false;
   return true;
 }
 
@@ -241,7 +233,7 @@ function getActiveCoordinate(latest: Telemetry | null, points: LocationPoint[], 
       lat: Number(latest?.lat),
       lon: Number(latest?.lon),
       live: true,
-      source: isBleTelemetry(latest) ? 'Live BLE sync GPS' : 'Live Wi-Fi GPS',
+      source: 'Live Wi-Fi GPS',
       timestamp: latest?.receivedAt || latest?.timestamp,
     };
   }
@@ -283,7 +275,7 @@ export default function App() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     };
-    const response = await fetch(path, { ...options, headers });
+    const response = await fetch(apiUrl(path), { ...options, headers });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(data.error || `Request failed: ${path}`);
@@ -293,7 +285,7 @@ export default function App() {
 
   const ensureToken = useCallback(async () => {
     if (state.token) return state.token;
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(apiUrl('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'demo', password: 'demo123' }),
@@ -367,7 +359,6 @@ export default function App() {
   }, [apiFetch, ensureToken, refresh]);
 
   const sendDemoPacket = useCallback(() => sendPacket(demoPacket), [sendPacket]);
-  const sendBlePacket = useCallback(() => sendPacket(demoBlePacket), [sendPacket]);
 
   const latest = state.latest;
   const sourceLabel = telemetrySourceLabel(latest);
@@ -415,16 +406,13 @@ export default function App() {
             <p className="eyebrow">PawTrace hardware database</p>
             <h1>GPS & Pet Health Telemetry Hub</h1>
             <p className="topbar-copy">
-              M5StickC Plus BLE sync or Wi-Fi packets, PostgreSQL telemetry, user records, pet cards, GPS validity,
+              M5StickC Plus Wi-Fi packets, PostgreSQL telemetry, user records, pet cards, GPS validity,
               geofence state, and health prototype signals in one operational view.
             </p>
           </div>
           <div className="topbar-actions">
             <button type="button" onClick={sendDemoPacket} disabled={posting}>
               {posting ? 'Posting packet...' : 'Send demo Wi-Fi packet'}
-            </button>
-            <button type="button" onClick={sendBlePacket} disabled={posting}>
-              {posting ? 'Posting packet...' : 'Send demo BLE packet'}
             </button>
             <span className={`status-pill ${state.error ? 'bad' : 'good'}`}>
               {state.error ? 'Backend warning' : 'Backend linked'}
@@ -480,9 +468,7 @@ export default function App() {
                 <p className="eyebrow">GPS status</p>
                 <h2>
                   {liveGpsValid
-                    ? isBleTelemetry(latest)
-                      ? 'Live BLE sync GPS on real map'
-                      : 'Live Wi-Fi GPS on real map'
+                    ? 'Live Wi-Fi GPS on real map'
                     : mapPoint
                       ? 'Showing last valid GPS point'
                       : 'Waiting for valid GPS fix'}
@@ -593,9 +579,7 @@ export default function App() {
                       <td>{numberLabel(row.batteryPct, '%')} · {numberLabel(row.batteryMv, 'mV')}</td>
                       <td>{numberLabel(row.heartRateBpm)} BPM · {numberLabel(row.tempC, '°C', 1)}</td>
                       <td>
-                        {telemetrySourceLabel(row)} · {isBleTelemetry(row)
-                          ? `RSSI ${numberLabel(row.bleRssi, ' dBm')}`
-                          : `code ${numberLabel(row.uploadCode)}`}
+                        {telemetrySourceLabel(row)} · code {numberLabel(row.uploadCode)}
                       </td>
                     </tr>
                   ))}
@@ -608,7 +592,7 @@ export default function App() {
             <div className="section-head">
               <div>
                 <p className="eyebrow">Raw packet model</p>
-                <h3>{latest && isBleTelemetry(latest) ? 'BLE JSON payload' : 'Wi-Fi JSON payload'}</h3>
+                <h3>Wi-Fi JSON payload</h3>
               </div>
               <span>{formatDate(state.lastRefresh)}</span>
             </div>

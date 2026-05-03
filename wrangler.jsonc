@@ -1,0 +1,6 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pawtrace",
+  "compatibility_date": "2026-05-03",
+  "pages_build_output_dir": "./frontend/dist"
+}

@@ -31,6 +31,13 @@ async function main() {
   const metrics = createMetrics();
 
   const app = express();
+  const isProduction = config.NODE_ENV === 'production';
+  const cspConnectSrc = config.CORS_ORIGINS.length
+    ? ["'self'", ...config.CORS_ORIGINS]
+    : (isProduction ? ["'self'"] : ["'self'", 'http:', 'https:', 'ws:', 'wss:']);
+  const corsOptions = !config.CORS_ORIGIN || config.CORS_ORIGIN === '*'
+    ? undefined
+    : { origin: config.CORS_ORIGINS.length > 1 ? config.CORS_ORIGINS : config.CORS_ORIGIN };
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
@@ -43,11 +50,11 @@ async function main() {
         fontSrc: ["'self'", 'https://cdn.bootcdn.net', 'data:'],
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
         mediaSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: config.CORS_ORIGIN ? ["'self'", config.CORS_ORIGIN] : ["'self'"],
+        connectSrc: cspConnectSrc,
       },
     },
   }));
-  app.use(cors(config.CORS_ORIGIN ? { origin: config.CORS_ORIGIN } : undefined));
+  app.use(cors(corsOptions));
   app.use(express.json({ limit: '10mb' }));
   app.use(compression());
   app.set('etag', 'strong');
@@ -112,8 +119,9 @@ async function main() {
     res.status(500).json({ error: 'Internal Server Error', requestId });
   });
 
-  const server = app.listen(config.PORT, () => {
-    console.log(`PawTrace API at http://localhost:${config.PORT}`);
+  const server = app.listen(config.PORT, config.HOST, () => {
+    console.log(`PawTrace API at http://${config.HOST}:${config.PORT}`);
+    console.log(`PawTrace API local alias http://localhost:${config.PORT}`);
     if (fs.existsSync(config.monitorPath)) {
       console.log(`[monitor] http://localhost:${config.PORT}/monitor/index.html`);
       if (config.MONITOR_API_TOKEN) {

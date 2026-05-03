@@ -19,13 +19,22 @@ const publicPath = hasFrontendDist ? frontendDist : fallbackPublicPath;
 const usingFrontendDist = hasFrontendDist;
 const serveWeb = process.env.SERVE_WEB === '1' || process.env.SERVE_WEB === 'true';
 const corsOrigin = String(process.env.CORS_ORIGIN || '').trim();
+const corsOrigins = corsOrigin
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const deviceIngestAllowLan = ['1', 'true', 'yes', 'on'].includes(
+  String(process.env.DEVICE_INGEST_ALLOW_LAN || '').trim().toLowerCase()
+);
 
 export const config = {
   PORT: Number(process.env.PORT || 3000),
+  HOST: String(process.env.HOST || '0.0.0.0').trim(),
   NODE_ENV: process.env.NODE_ENV || 'development',
   JWT_SECRET: process.env.JWT_SECRET || 'dev-only-change-me',
   JWT_EXPIRES: process.env.JWT_EXPIRES || '7d',
   CORS_ORIGIN: corsOrigin,
+  CORS_ORIGINS: corsOrigins,
 
   DASHSCOPE_API_KEY: keys.DASHSCOPE_API_KEY,
   DASHSCOPE_BASE_URL: String(process.env.DASHSCOPE_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1').trim(),
@@ -39,6 +48,7 @@ export const config = {
   MONITOR_MAX: Number(process.env.MONITOR_MAX || 500),
   MONITOR_API_TOKEN: String(process.env.MONITOR_API_TOKEN || '').trim(),
   DEVICE_INGEST_TOKEN: String(process.env.DEVICE_INGEST_TOKEN || '').trim(),
+  DEVICE_INGEST_ALLOW_LAN: deviceIngestAllowLan,
   DEVICE_DEFAULT_USER: String(process.env.DEVICE_DEFAULT_USER || 'demo').trim(),
 
   repoRoot,

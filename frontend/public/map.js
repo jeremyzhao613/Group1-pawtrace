@@ -17,7 +17,6 @@
   const FENCE_RADIUS_MIN_M = 60;
   const FENCE_RADIUS_MAX_M = 650;
   const MAP_CONTROL_STORAGE_KEY = 'pawtrace_map_controls_v2';
-  const TRACK_EXTRA_LIMIT = 24;
   const MAP_TILE_URL_TEMPLATES = [
     '/api/map/tile/{z}/{x}/{y}.png',
     'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -83,20 +82,18 @@
     try {
       const parsed = JSON.parse(localStorage.getItem(MAP_CONTROL_STORAGE_KEY) || '{}');
       return {
-        trackScope: parsed?.trackScope === 'all' ? 'all' : 'active',
         petSettings: parsed && typeof parsed.petSettings === 'object' && parsed.petSettings
           ? parsed.petSettings
           : {},
       };
     } catch {
-      return { trackScope: 'active', petSettings: {} };
+      return { petSettings: {} };
     }
   }
 
   function writeMapPreferences(preferences = {}) {
     try {
       localStorage.setItem(MAP_CONTROL_STORAGE_KEY, JSON.stringify({
-        trackScope: preferences.trackScope === 'all' ? 'all' : 'active',
         petSettings: preferences.petSettings && typeof preferences.petSettings === 'object'
           ? preferences.petSettings
           : {},
@@ -126,22 +123,6 @@
     if (!coordinate) return '';
     if (!hasValidCoordinate(coordinate.lat, coordinate.lon)) return '';
     return `${Number(coordinate.lat).toFixed(5)}, ${Number(coordinate.lon).toFixed(5)}`;
-  }
-
-  function formatDistanceMeters(value) {
-    const meters = Number(value);
-    if (!Number.isFinite(meters) || meters <= 0) return '0m';
-    if (meters >= 1000) return `${(meters / 1000).toFixed(meters >= 10000 ? 0 : 1)}km`;
-    return `${Math.round(meters)}m`;
-  }
-
-  function formatDurationMs(value) {
-    const ms = Number(value);
-    if (!Number.isFinite(ms) || ms <= 0) return 'now';
-    const minutes = Math.max(1, Math.round(ms / 60000));
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.round((minutes / 60) * 10) / 10;
-    return `${hours}h`;
   }
 
   function formatRelativeTime(timestamp) {
@@ -195,30 +176,6 @@
     const sinLon = Math.sin(deltaLon / 2);
     const h = (sinLat * sinLat) + Math.cos(lat1) * Math.cos(lat2) * (sinLon * sinLon);
     return radius * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
-  }
-
-  function interpolateCoordinate(start = {}, end = {}, ratio = 0) {
-    if (!hasValidCoordinate(start.lat, start.lon) || !hasValidCoordinate(end.lat, end.lon)) return null;
-    const t = clampNumber(ratio, 0, 1, 0);
-    return {
-      lat: Number(start.lat) + ((Number(end.lat) - Number(start.lat)) * t),
-      lon: Number(start.lon) + ((Number(end.lon) - Number(start.lon)) * t),
-    };
-  }
-
-  function trackPoint(coordinate, meta = {}) {
-    if (!coordinate || !hasValidCoordinate(coordinate.lat, coordinate.lon)) return null;
-    return {
-      lat: Number(coordinate.lat),
-      lon: Number(coordinate.lon),
-      timestamp: meta.timestamp || '',
-      source: meta.source || 'gps',
-      accuracyM: finiteNumber(meta.accuracyM, null),
-    };
-  }
-
-  function timestampFromEntry(entry = {}) {
-    return entry.timestamp || entry.createdAt || entry.measuredAt || entry.time || '';
   }
 
   function mercatorY(lat) {
@@ -431,70 +388,6 @@
     return normalizeCoordinate(lat, lon);
   }
 
-  function coordinateKey(coordinate = {}) {
-    if (!hasValidCoordinate(coordinate.lat, coordinate.lon)) return '';
-    return `${Number(coordinate.lat).toFixed(6)},${Number(coordinate.lon).toFixed(6)}`;
-  }
-
-  function smoothSvgPath(points = []) {
-    if (!points.length) return '';
-    if (points.length === 1) return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-    const tension = 0.18;
-    const commands = [`M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`];
-    for (let index = 0; index < points.length - 1; index += 1) {
-      const p0 = points[Math.max(0, index - 1)];
-      const p1 = points[index];
-      const p2 = points[index + 1];
-      const p3 = points[Math.min(points.length - 1, index + 2)];
-      const cp1 = {
-        x: p1.x + ((p2.x - p0.x) * tension),
-        y: p1.y + ((p2.y - p0.y) * tension),
-      };
-      const cp2 = {
-        x: p2.x - ((p3.x - p1.x) * tension),
-        y: p2.y - ((p3.y - p1.y) * tension),
-      };
-      commands.push(`C ${cp1.x.toFixed(2)} ${cp1.y.toFixed(2)} ${cp2.x.toFixed(2)} ${cp2.y.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`);
-    }
-    return commands.join(' ');
-  }
-
-  function routeArrowPath(from = {}, to = {}, size = 1.15) {
-    if (![from.x, from.y, to.x, to.y].every((value) => Number.isFinite(Number(value)))) return '';
-    const angle = Math.atan2(Number(to.y) - Number(from.y), Number(to.x) - Number(from.x));
-    const tip = { x: Number(to.x), y: Number(to.y) };
-    const baseDistance = size * 1.05;
-    const wing = size * 0.55;
-    const base = {
-      x: tip.x - Math.cos(angle) * baseDistance,
-      y: tip.y - Math.sin(angle) * baseDistance,
-    };
-    const left = {
-      x: base.x + Math.cos(angle + Math.PI / 2) * wing,
-      y: base.y + Math.sin(angle + Math.PI / 2) * wing,
-    };
-    const right = {
-      x: base.x + Math.cos(angle - Math.PI / 2) * wing,
-      y: base.y + Math.sin(angle - Math.PI / 2) * wing,
-    };
-    return `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} Z`;
-  }
-
-  function trackPointFromEntry(entry = {}) {
-    const coordinate = normalizeCoordinate(entry.lat, entry.lon)
-      || normalizeCoordinate(entry.latitude, entry.longitude)
-      || coordsToCoordinate(entry.mapCoords || entry.coords);
-    return trackPoint(coordinate, {
-      timestamp: timestampFromEntry(entry),
-      source: entry.source || entry.transport || 'telemetry',
-      accuracyM: entry.accuracyM ?? entry.accuracy_m ?? entry.gpsAccuracyM ?? entry.hdop,
-    });
-  }
-
-  function trackCoordinateFromEntry(entry = {}) {
-    const point = trackPointFromEntry(entry);
-    return point ? { lat: point.lat, lon: point.lon } : null;
-  }
   const DEMO_LOCATIONS = [
     {
       id: 'canal-paw-cafe',
@@ -620,75 +513,8 @@
     }
   ];
 
-  const DEMO_TRACK_ROUTES = {
-    Bao: [
-      { lat: 31.48592, lon: 121.15234, label: 'Residence path' },
-      { lat: 31.48533, lon: 121.15412, label: 'Canal turn' },
-      { lat: 31.48446, lon: 121.15526, label: 'Inner road' },
-      { lat: 31.48374, lon: 121.15648, label: 'Ring path' },
-      { lat: 31.48345, lon: 121.15731, label: 'Central Ring' },
-    ],
-    Mochi: [
-      { lat: 31.48657, lon: 121.156626, label: 'Learning Hub' },
-      { lat: 31.48602, lon: 121.15588, label: 'North walk' },
-      { lat: 31.48562, lon: 121.15536, label: 'Bridge approach' },
-      { lat: 31.485214, lon: 121.15497, label: 'Canal Paw Cafe' },
-    ],
-    Nimbus: [
-      { lat: 31.48205, lon: 121.15372, label: 'South service road' },
-      { lat: 31.48152, lon: 121.15436, label: 'Track corner' },
-      { lat: 31.48102, lon: 121.15488, label: 'Trackside' },
-      { lat: 31.48081, lon: 121.15527, label: 'Trackside Play Zone' },
-    ],
-  };
-
   function getTrackedFallback(index = 0) {
     return TRACKED_ZONE_FALLBACKS[index % TRACKED_ZONE_FALLBACKS.length];
-  }
-
-  function buildDemoTrackPoints(pet = {}) {
-    const current = getPetMapCoordinate(pet);
-    if (!current) return [];
-    const template = DEMO_TRACK_ROUTES[pet.name] || DEMO_TRACK_ROUTES.Bao || [];
-    const anchors = [
-      ...template.map((point) => normalizeCoordinate(point.lat, point.lon)).filter(Boolean),
-      current,
-    ];
-    const points = [];
-    const now = Date.now();
-    let index = 0;
-
-    for (let segment = 0; segment < anchors.length - 1; segment += 1) {
-      const start = anchors[segment];
-      const end = anchors[segment + 1];
-      const segmentDistance = distanceMeters(start, end) || 0;
-      const steps = Math.max(2, Math.min(5, Math.ceil(segmentDistance / 95)));
-      for (let step = 0; step < steps; step += 1) {
-        if (segment > 0 && step === 0) continue;
-        const ratio = step / steps;
-        const interpolated = interpolateCoordinate(start, end, ratio);
-        if (!interpolated) continue;
-        const curve = Math.sin(ratio * Math.PI) * 14;
-        const coordinate = offsetCoordinateMeters(
-          interpolated,
-          curve * (segment % 2 === 0 ? 1 : -0.55),
-          curve * (segment % 2 === 0 ? 0.25 : -0.2)
-        ) || interpolated;
-        points.push(trackPoint(coordinate, {
-          timestamp: new Date(now - ((18 - index) * 60000)).toISOString(),
-          source: 'demo-gps',
-          accuracyM: 8 + ((index % 4) * 2),
-        }));
-        index += 1;
-      }
-    }
-
-    points.push(trackPoint(current, {
-      timestamp: new Date(now).toISOString(),
-      source: 'live-demo',
-      accuracyM: 6,
-    }));
-    return points.filter(Boolean);
   }
 
   function readStoredPets() {
@@ -777,11 +603,8 @@
       this.realMapView = buildRealMapView([], this.locations, '', '', REAL_MAP_DEFAULT_ASPECT);
       this.zoomLevel = 0;
       this.showGeofence = true;
-      this.showTracks = true;
       this.preferences = readMapPreferences();
-      this.trackScope = this.preferences.trackScope === 'all' ? 'all' : 'active';
       this.centerPickPetId = '';
-      this.trackPointPickPetId = '';
       this.mapToolMessage = '';
       this.mapToolTone = 'ready';
       this.handleResize = null;
@@ -1004,13 +827,6 @@
           this.renderOverlay();
         });
       }
-      if (controls.tracksToggle) {
-        controls.tracksToggle.addEventListener('click', () => {
-          this.showTracks = !this.showTracks;
-          this.updateControls();
-          this.renderOverlay();
-        });
-      }
       if (controls.fenceEnabled) {
         controls.fenceEnabled.addEventListener('change', () => {
           this.setFenceEnabledForCurrent(controls.fenceEnabled.checked);
@@ -1027,33 +843,11 @@
       if (controls.fenceCenterCurrent) {
         controls.fenceCenterCurrent.addEventListener('click', () => this.centerFenceOnCurrentPet());
       }
-      if (controls.trackActiveOnly) {
-        controls.trackActiveOnly.addEventListener('change', () => {
-          this.trackScope = controls.trackActiveOnly.checked ? 'active' : 'all';
-          this.preferences.trackScope = this.trackScope;
-          this.savePreferences();
-          if (this.trackScope === 'active' && !this.activeTrackedPetId) {
-            const pet = this.getControlPet();
-            if (pet) this.activeTrackedPetId = pet.id;
-          }
-          this.updateControls();
-          this.renderOverlay();
-        });
-      }
-      if (controls.trackAddPoint) {
-        controls.trackAddPoint.addEventListener('click', () => this.startTrackPointPick());
-      }
-      if (controls.trackClear) {
-        controls.trackClear.addEventListener('click', () => this.clearTrackForCurrentPet());
-      }
-      if (controls.trackRestore) {
-        controls.trackRestore.addEventListener('click', () => this.restoreTrackForCurrentPet());
-      }
       if (this.container) {
         this.container.addEventListener('click', (event) => this.handleMapClick(event));
         this.container.addEventListener('dblclick', (event) => {
           if (event.target?.closest?.('.map-control-panel, .real-map-link')) return;
-          if (this.centerPickPetId || this.trackPointPickPetId) return;
+          if (this.centerPickPetId) return;
           event.preventDefault();
           this.setZoomLevel(this.zoomLevel + 1);
         });
@@ -1070,10 +864,6 @@
       if (controls.fenceToggle) {
         controls.fenceToggle.classList.toggle('active', this.showGeofence);
         controls.fenceToggle.setAttribute('aria-pressed', this.showGeofence ? 'true' : 'false');
-      }
-      if (controls.tracksToggle) {
-        controls.tracksToggle.classList.toggle('active', this.showTracks);
-        controls.tracksToggle.setAttribute('aria-pressed', this.showTracks ? 'true' : 'false');
       }
       this.updateMapToolPanel();
     }
@@ -1099,7 +889,6 @@
       };
       this.preferences = {
         ...this.preferences,
-        trackScope: this.trackScope,
         petSettings,
       };
       this.savePreferences();
@@ -1129,22 +918,6 @@
       const distanceM = center && current ? distanceMeters(center, current) : null;
       const alert = pet.lostAlert === true || (enabled && Number.isFinite(distanceM) && distanceM > radiusM);
       return { enabled, radiusM, center, current, distanceM, alert };
-    }
-
-    getTrackSettings(pet = {}) {
-      const settings = this.getPetSettings(pet.id);
-      return {
-        trackCleared: settings.trackCleared === true,
-        extraTrackPoints: Array.isArray(settings.extraTrackPoints)
-          ? settings.extraTrackPoints
-              .map((point) => trackPoint(normalizeCoordinate(point?.lat, point?.lon), {
-                timestamp: point?.timestamp || '',
-                source: point?.source || 'manual',
-                accuracyM: point?.accuracyM,
-              }))
-              .filter(Boolean)
-          : [],
-      };
     }
 
     setFenceEnabledForCurrent(enabled) {
@@ -1197,32 +970,15 @@
         this.setMapToolMessage('Select a pet first', 'alert');
         return;
       }
-      this.trackPointPickPetId = '';
       this.centerPickPetId = this.centerPickPetId === pet.id ? '' : pet.id;
       this.container?.classList.toggle('map-container--picking-fence', Boolean(this.centerPickPetId));
-      this.container?.classList.remove('map-container--picking-route');
       this.setMapToolMessage(this.centerPickPetId ? 'Click the map to set fence center' : 'Fence center pick cancelled', this.centerPickPetId ? 'editing' : 'ready');
-      this.updateMapToolPanel();
-    }
-
-    startTrackPointPick() {
-      const pet = this.getControlPet();
-      if (!pet) {
-        this.setMapToolMessage('Select a pet first', 'alert');
-        return;
-      }
-      this.centerPickPetId = '';
-      this.trackPointPickPetId = this.trackPointPickPetId === pet.id ? '' : pet.id;
-      this.container?.classList.remove('map-container--picking-fence');
-      this.container?.classList.toggle('map-container--picking-route', Boolean(this.trackPointPickPetId));
-      this.setMapToolMessage(this.trackPointPickPetId ? 'Click the map to add a GPS sample' : 'Route point pick cancelled', this.trackPointPickPetId ? 'editing' : 'ready');
       this.updateMapToolPanel();
     }
 
     stopPickModes() {
       this.centerPickPetId = '';
-      this.trackPointPickPetId = '';
-      this.container?.classList.remove('map-container--picking-fence', 'map-container--picking-route');
+      this.container?.classList.remove('map-container--picking-fence');
     }
 
     pointFromMapClick(event) {
@@ -1234,7 +990,7 @@
     }
 
     handleMapClick(event) {
-      if (!this.centerPickPetId && !this.trackPointPickPetId) return;
+      if (!this.centerPickPetId) return;
       if (event.target?.closest?.('.map-control-panel, .map-marker, .map-pet, .real-map-link')) return;
       const coordinate = this.pointFromMapClick(event);
       if (!coordinate) {
@@ -1248,57 +1004,6 @@
         this.setFenceCenterForPet(pet, coordinate, 'Fence center set on map');
         return;
       }
-      if (this.trackPointPickPetId) {
-        this.addTrackPointForPet(this.trackPointPickPetId, coordinate);
-      }
-    }
-
-    addTrackPointForPet(petId, coordinate) {
-      const pet = this.trackedPets.find((entry) => entry.id === petId) || this.getControlPet();
-      if (!pet || !coordinate) return;
-      const settings = this.getTrackSettings(pet);
-      const extraTrackPoints = [
-        ...settings.extraTrackPoints,
-        {
-          lat: Number(coordinate.lat),
-          lon: Number(coordinate.lon),
-          timestamp: new Date().toISOString(),
-          source: 'manual',
-          accuracyM: 12,
-        },
-      ].slice(-TRACK_EXTRA_LIMIT);
-      this.updatePetSettings(pet.id, {
-        trackCleared: false,
-        extraTrackPoints,
-      });
-      this.setMapToolMessage('GPS sample added', 'ready');
-      this.stopPickModes();
-      this.renderOverlay();
-      this.updateMapToolPanel();
-    }
-
-    clearTrackForCurrentPet() {
-      const pet = this.getControlPet();
-      if (!pet) return;
-      this.updatePetSettings(pet.id, {
-        trackCleared: true,
-        extraTrackPoints: [],
-      });
-      this.setMapToolMessage('Route cleared for this pet', 'off');
-      this.renderOverlay();
-      this.updateMapToolPanel();
-    }
-
-    restoreTrackForCurrentPet() {
-      const pet = this.getControlPet();
-      if (!pet) return;
-      this.updatePetSettings(pet.id, {
-        trackCleared: false,
-        extraTrackPoints: [],
-      });
-      this.setMapToolMessage('Route restored from history', 'ready');
-      this.renderOverlay();
-      this.updateMapToolPanel();
     }
 
     setMapToolMessage(message = '', tone = 'ready') {
@@ -1311,8 +1016,6 @@
       const pet = this.getControlPet();
       const hasPet = Boolean(pet);
       const fence = hasPet ? this.getFenceState(pet) : null;
-      const trackSummary = hasPet ? this.getPetTrackSummary(pet) : null;
-      const totalTrackPoints = this.trackedPets.reduce((sum, entry) => sum + this.getPetTrackPoints(entry).length, 0);
 
       if (controls.toolPetName) {
         controls.toolPetName.textContent = hasPet
@@ -1349,23 +1052,6 @@
       }
       if (controls.fenceCenterCurrent) {
         controls.fenceCenterCurrent.disabled = !hasPet || !getPetMapCoordinate(pet);
-      }
-      if (controls.trackActiveOnly) {
-        controls.trackActiveOnly.checked = this.trackScope === 'active';
-        controls.trackActiveOnly.disabled = !hasPet;
-      }
-      if (controls.trackAddPoint) {
-        controls.trackAddPoint.disabled = !hasPet;
-        controls.trackAddPoint.classList.toggle('active', Boolean(this.trackPointPickPetId));
-      }
-      if (controls.trackClear) controls.trackClear.disabled = !hasPet;
-      if (controls.trackRestore) controls.trackRestore.disabled = !hasPet;
-      if (controls.trackStatus) {
-        controls.trackStatus.textContent = !this.showTracks
-          ? 'Routes hidden'
-          : this.trackScope === 'active'
-            ? (trackSummary ? `${formatDistanceMeters(trackSummary.distanceM)} · ${formatDurationMs(trackSummary.durationMs)}` : 'No route')
-            : `${totalTrackPoints} pts`;
       }
     }
 
@@ -1582,75 +1268,6 @@
       this.updateMapToolPanel();
     }
 
-    getPetTrackPoints(pet = {}) {
-      const trackSettings = this.getTrackSettings(pet);
-      if (trackSettings.trackCleared) return [];
-      const points = [];
-      const history = Array.isArray(pet.vitalsHistory) ? pet.vitalsHistory : [];
-      history
-        .slice()
-        .reverse()
-        .forEach((entry) => {
-          const point = trackPointFromEntry(entry);
-          if (point) points.push(point);
-        });
-
-      const current = getPetMapCoordinate(pet);
-      if (current) {
-        points.push(trackPoint(current, {
-          timestamp: pet.telemetryUpdatedAt || pet.latestVitals?.timestamp || '',
-          source: isLiveGpsPet(pet) ? 'live-gps' : 'saved-point',
-          accuracyM: pet.gpsHdop,
-        }));
-      }
-      trackSettings.extraTrackPoints.forEach((point) => points.push(point));
-
-      const unique = [];
-      const seen = new Set();
-      points.forEach((point) => {
-        const key = coordinateKey(point);
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        unique.push(point);
-      });
-
-      if (unique.length >= 2) return unique.slice(-TRACK_EXTRA_LIMIT);
-      if (current && String(pet.id || '').startsWith('demo-')) {
-        return buildDemoTrackPoints(pet).slice(-TRACK_EXTRA_LIMIT);
-      }
-      return unique;
-    }
-
-    getPetTrackCoordinates(pet = {}) {
-      return this.getPetTrackPoints(pet).map((point) => ({ lat: point.lat, lon: point.lon }));
-    }
-
-    getPetTrackSummary(pet = {}) {
-      const points = this.getPetTrackPoints(pet);
-      if (points.length < 2) {
-        return {
-          count: points.length,
-          distanceM: 0,
-          durationMs: 0,
-          latestTimestamp: points[0]?.timestamp || '',
-          source: points[0]?.source || '',
-        };
-      }
-      let distanceM = 0;
-      for (let index = 1; index < points.length; index += 1) {
-        distanceM += distanceMeters(points[index - 1], points[index]) || 0;
-      }
-      const startTime = new Date(points[0].timestamp || '').getTime();
-      const endTime = new Date(points[points.length - 1].timestamp || '').getTime();
-      return {
-        count: points.length,
-        distanceM,
-        durationMs: Number.isFinite(startTime) && Number.isFinite(endTime) && endTime > startTime ? endTime - startTime : 0,
-        latestTimestamp: points[points.length - 1]?.timestamp || '',
-        source: points.some((point) => String(point.source || '').includes('demo')) ? 'demo' : 'gps',
-      };
-    }
-
     geofenceRadiusForPet(pet = {}) {
       return this.getFenceState(pet).radiusM;
     }
@@ -1697,44 +1314,6 @@
           parts.push(`<text class="map-geofence-label" x="${labelX.toFixed(2)}" y="${labelY.toFixed(2)}">${escapeHtml(isAlert ? `Alert ${Math.round(fence.distanceM || 0)}m` : `${Math.round(fence.radiusM)}m fence`)}</text>`);
         });
       }
-
-      if (this.showTracks) {
-        const visibleTrackPets = this.trackScope === 'active'
-          ? [this.getControlPet()].filter(Boolean)
-          : this.trackedPets;
-        visibleTrackPets.forEach((pet) => {
-          const trackPoints = this.getPetTrackPoints(pet);
-          const points = trackPoints
-            .map((point) => {
-              const projected = projectCoordinateToRealMap(point, this.realMapView);
-              return projected ? { ...projected, source: point.source, timestamp: point.timestamp } : null;
-            })
-            .filter(Boolean);
-          if (points.length < 2) return;
-          const path = smoothSvgPath(points);
-          const isActive = pet.id === activeId;
-          const summary = this.getPetTrackSummary(pet);
-          const trackClass = [
-            'map-track-path',
-            isActive ? 'map-track-path--active' : '',
-            summary.source === 'demo' ? 'map-track-path--demo' : '',
-          ].filter(Boolean).join(' ');
-          parts.push(`<path class="map-track-underlay" d="${path}"></path>`);
-          parts.push(`<path class="${trackClass}" d="${path}"></path>`);
-
-          const start = points[0];
-          const end = points[points.length - 1];
-          parts.push(`<circle class="map-track-point map-track-point--start" cx="${start.x.toFixed(2)}" cy="${start.y.toFixed(2)}" r="${isActive ? '0.82' : '0.62'}"></circle>`);
-          points.slice(1, -1).filter((_, index) => index % 2 === 0).slice(-4).forEach((point) => {
-            parts.push(`<circle class="map-track-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="${isActive ? '0.48' : '0.38'}"></circle>`);
-          });
-          const arrowIndex = Math.max(1, Math.floor(points.length * 0.66));
-          const arrowPath = routeArrowPath(points[arrowIndex - 1], points[arrowIndex], isActive ? 1.25 : 1.05);
-          if (arrowPath) parts.push(`<path class="map-track-arrow ${isActive ? 'map-track-arrow--active' : ''}" d="${arrowPath}"></path>`);
-          parts.push(`<circle class="map-track-point map-track-point--end ${isActive ? 'map-track-point--end-active' : ''}" cx="${end.x.toFixed(2)}" cy="${end.y.toFixed(2)}" r="${isActive ? '1.05' : '0.78'}"></circle>`);
-        });
-      }
-
       this.overlayLayer.innerHTML = parts.join('');
     }
 
@@ -1755,7 +1334,7 @@
       });
     }
 
-    focusTrackedPet(petId) {
+    focusTrackedPet(petId, options = {}) {
       this.activeTrackedPetId = petId;
       this.activeLocationId = null;
       this.renderTrackedPets();
@@ -1802,13 +1381,11 @@
         this.cardElements.status.textContent = statusParts.filter(Boolean).join(' · ');
       }
       const fenceState = this.getFenceState(pet);
-      const trackSummary = this.getPetTrackSummary(pet);
       this.cardElements.tags.innerHTML = [
         '<span class="location-tag">Tracked</span>',
         `<span class="location-tag">Card ${escapeHtml(pet.nfcId || 'pending')}</span>`,
         `<span class="location-tag">Location ${escapeHtml(statusLabel(pet.locationValid))}</span>`,
         `<span class="location-tag">Fence ${escapeHtml(fenceState.enabled ? `${Math.round(fenceState.radiusM)}m` : 'OFF')}</span>`,
-        `<span class="location-tag">Route ${escapeHtml(trackSummary.count >= 2 ? formatDistanceMeters(trackSummary.distanceM) : 'pending')}</span>`,
       ].join('');
       this.cardElements.pets.innerHTML = pet.latestVitals
         ? `<span class="location-tag location-tag--emphasis">Temp ${escapeHtml(pet.latestVitals.temperature)}°C</span><span class="location-tag location-tag--emphasis">BPM ${escapeHtml(pet.latestVitals.heartRate)}</span><span class="location-tag location-tag--emphasis">SpO2 ${Number.isFinite(Number(pet.latestVitals.spo2Pct)) ? `${Math.round(Number(pet.latestVitals.spo2Pct))}%` : '--'}</span>${Number.isFinite(Number(pet.latestVitals.batteryPct)) ? `<span class="location-tag location-tag--emphasis">Battery ${Math.round(Number(pet.latestVitals.batteryPct))}%</span>` : ''}`
@@ -1825,7 +1402,7 @@
           : () => global.document.querySelector('[data-tab="pets"]')?.click();
       }
       this.updateMapToolPanel();
-      this.revealDetailCard();
+      if (options.reveal !== false) this.revealDetailCard();
     }
 
     renderTrackedPetList() {
@@ -1848,13 +1425,9 @@
             ? `Saved GPS ${formatCoordinatePair(getPetMapCoordinate(pet))}`
             : `GPS ${statusLabel(pet.locationValid)} · Wi-Fi ${statusLabel(pet.wifiConnected)}`;
         const fence = this.getFenceState(pet);
-        const trackSummary = this.getPetTrackSummary(pet);
         const fenceLine = fence.enabled
           ? `Fence ${Math.round(fence.radiusM)}m · ${fence.alert ? 'outside' : 'inside'}${Number.isFinite(fence.distanceM) ? ` ${Math.round(fence.distanceM)}m` : ''}`
           : 'Fence off';
-        const routeLine = trackSummary.count >= 2
-          ? `Route ${formatDistanceMeters(trackSummary.distanceM)} · ${formatDurationMs(trackSummary.durationMs)}`
-          : 'Route waiting for GPS';
         row.innerHTML = `
           <span class="tracked-pet-row__avatar">${avatarMarkup}</span>
           <span class="tracked-pet-row__meta">
@@ -1862,7 +1435,7 @@
             <span class="tracked-pet-row__subtitle">${escapeHtml(pet.location)}</span>
             <span class="tracked-pet-row__subtitle">${escapeHtml(vitals)}</span>
             <span class="tracked-pet-row__subtitle">${escapeHtml(gpsLine)}</span>
-            <span class="tracked-pet-row__subtitle">${escapeHtml(fenceLine)} · ${escapeHtml(routeLine)}</span>
+            <span class="tracked-pet-row__subtitle">${escapeHtml(fenceLine)}</span>
           </span>
         `;
         row.addEventListener('click', () => this.focusTrackedPet(pet.id));
@@ -1882,11 +1455,12 @@
     }
 
     refreshTrackedPets() {
+      if (this.activeTrackedPetId) {
+        this.focusTrackedPet(this.activeTrackedPetId, { reveal: false });
+        return;
+      }
       this.renderTrackedPets();
       this.renderMarkers();
-      if (this.activeTrackedPetId) {
-        this.focusTrackedPet(this.activeTrackedPetId);
-      }
     }
 
     showLocationCard(location, marker) {

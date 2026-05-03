@@ -16,6 +16,7 @@ import { requireMonitorAuth } from './middleware/monitorAuth.js';
 import { requireAuth } from './middleware/jwtAuth.js';
 
 type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
+type LocalChatMessage = { role?: string; content?: string };
 const VIDEO_UPLOAD_MAX_BYTES = 150 * 1024 * 1024;
 const VIDEO_UPLOAD_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.webm']);
 const VIDEO_UPLOAD_MIME_TYPES = new Set([
@@ -82,6 +83,14 @@ function validMapTile(z: number, x: number, y: number): boolean {
   return x >= 0 && x < maxTile && y >= 0 && y < maxTile;
 }
 
+function boundedPositiveInt(input: unknown, fallback: number, max: number): number {
+  const value = Array.isArray(input) ? input[0] : input;
+  if (value === undefined || value === null || value === '') return fallback;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(Math.max(Math.trunc(numeric), 1), max);
+}
+
 function toIsoTimestamp(input?: string): string {
   if (!input) return new Date().toISOString();
   const d = new Date(input);
@@ -102,6 +111,7 @@ function mapUser(u: UserRow) {
   return {
     id: u.id, username: u.username, displayName: u.displayName,
     avatar: u.avatar, bio: u.bio, campus: u.campus, contact: u.contact,
+    createdAt: u.createdAt.toISOString(), updatedAt: u.updatedAt.toISOString(),
   };
 }
 
@@ -144,9 +154,75 @@ function compactRecord(record: Record<string, unknown>): Record<string, unknown>
   );
 }
 
-function getLocalChatReply(contactProfile = ''): string {
-  const profileHint = contactProfile ? ' I will keep the pet profile in mind.' : '';
-  return `Thanks for the update.${profileHint} Please keep notes on appetite, energy, and behavior changes so the owner can compare later.`;
+function stableHash(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function latestUserChatText(messages: LocalChatMessage[]): string {
+  return [...messages].reverse().find((message) => message.role === 'user' && message.content)?.content?.trim() || '';
+}
+
+function contactPetName(contactProfile = ''): string {
+  const match = contactProfile.match(/^Pet:\s*([^(,\n]+)/im);
+  return match?.[1]?.trim() || 'your pet';
+}
+
+function localChatTopic(text: string): 'appetite' | 'health' | 'meetup' | 'training' | 'media' | 'greeting' | 'default' {
+  const normalized = text.toLowerCase();
+  if (/不吃|没胃口|食欲|饭|food|eat|appetite|meal|vomit|吐|拉肚|diarrhea/.test(normalized)) return 'appetite';
+  if (/病|疼|痛|发烧|咳|vet|doctor|health|sick|pain|fever|cough/.test(normalized)) return 'health';
+  if (/见面|散步|一起|约|meet|walk|playdate|weekend|tomorrow|咖啡|草坪/.test(normalized)) return 'meetup';
+  if (/训练|叫不回|乱叫|咬|拉绳|training|bark|bite|leash|recall/.test(normalized)) return 'training';
+  if (/image|photo|picture|sticker|照片|图片|贴纸/.test(normalized)) return 'media';
+  if (/^(hi|hello|hey|你好|在吗|嗨)(\b|$)/.test(normalized.trim())) return 'greeting';
+  return 'default';
+}
+
+function pickReply(replies: string[], seed: string): string {
+  return replies[stableHash(seed) % replies.length];
+}
+
+function getLocalChatReply(contactProfile = '', messages: LocalChatMessage[] = []): string {
+  const latestText = latestUserChatText(messages);
+  const petName = contactPetName(contactProfile);
+  const topic = localChatTopic(latestText);
+  const seed = `${topic}:${petName}:${latestText}:${contactProfile}`;
+
+  const replies: Record<ReturnType<typeof localChatTopic>, string[]> = {
+    appetite: [
+      `${petName} skipping food is worth watching with water intake, energy, vomiting, and stool changes. Try a small amount of familiar food without forcing it; if it lasts more than a day or energy drops, a vet check is safer. Is ${petName} still drinking and moving normally today?`,
+      `I would note when ${petName} last ate normally and whether anything changed, like treats, heat, stress, or a new food. If they refuse every food rather than just being picky, I would take it more seriously. How long has this been going on?`,
+    ],
+    health: [
+      `That sounds worth checking carefully. I would watch ${petName}'s energy, breathing, stool, drinking, and any pain signs; if it continues or gets worse, a vet is the right next step. When did you first notice it?`,
+      `If ${petName} seems clearly different from normal, I would keep activity gentle, offer water, and track the timing of symptoms. Online chat can only help you triage, so persistent discomfort needs a vet. Are they still responding and walking normally?`,
+    ],
+    meetup: [
+      `That works. I would keep the first meetup short and relaxed, with enough open space so ${petName} can step back if needed. Would the lawn or the cafe area be easier for you?`,
+      `A short walk sounds better than jumping straight into close play. It gives ${petName} time to settle and lets us read the mood. Are you thinking today or tomorrow?`,
+    ],
+    training: [
+      `I would train this in tiny rounds with a high-value reward, then stop while ${petName} is still succeeding. Consistency will matter more than one long session. Are you working on recall, leash manners, or waiting calmly?`,
+      `The trigger matters here, so I would first note where it happens and what comes right before it. For ${petName}, a noisy place or a long session could make it harder. What situation brings it out most often?`,
+    ],
+    media: [
+      `I saw the image or sticker. The useful clues are posture, eyes, and energy, but I would still pair that with ${petName}'s eating, stool, and activity today. Was this taken just now?`,
+      `That helps, but the scene around it matters too. Had ${petName} just exercised, eaten, or woken up when you captured it?`,
+    ],
+    greeting: [
+      `Hi, I'm here. How is ${petName} doing today? We can talk walks, food, training, or a pet-friendly place to meet.`,
+      `Hey. I was just thinking about ${petName}'s routine. Any new update today, or are we planning a campus pet route?`,
+    ],
+    default: [
+      `Got it. For ${petName}, I would look at this together with appetite, energy, and activity rather than judging one detail alone. Is this the first time today, or has it been happening for a few days?`,
+      `Thanks for telling me. I would jot down the time, place, and what happened afterward so patterns are easier to spot for ${petName}. Did things go back to normal after that?`,
+    ],
+  };
+  return pickReply(replies[topic], seed);
 }
 
 function normalizeRecordList(value: unknown): Record<string, unknown>[] {
@@ -255,6 +331,23 @@ function isBleTelemetryPayload(payload: Record<string, unknown>): boolean {
     || payload.ble_name !== undefined;
 }
 
+function isBleTelemetryRow(row: DeviceTelemetry): boolean {
+  const metadata = isRecord(row.metadata) ? row.metadata : {};
+  const source = `${row.source || ''} ${row.transport || ''} ${metadata.source || ''} ${metadata.transport || ''}`.toLowerCase();
+  return source.includes('ble')
+    || row.bleConnected !== null
+    || row.bleRssi !== undefined
+    || row.bleMtu !== undefined
+    || row.bleName !== null
+    || row.bleServiceUuid !== null
+    || row.bleTelemetryUuid !== null
+    || row.bleMessageUuid !== null;
+}
+
+function isWifiTelemetryRow(row: DeviceTelemetry): boolean {
+  return !isBleTelemetryRow(row);
+}
+
 function telemetryDeviceId(payload: Record<string, unknown>): string {
   const explicit = firstTextField(payload, [
     'deviceId',
@@ -300,6 +393,42 @@ function safeTokenEquals(a: string, b: string): boolean {
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
+function normalizeRemoteAddress(value: string): string {
+  let address = String(value || '').trim().toLowerCase();
+  if (!address) return '';
+  if (address.startsWith('::ffff:')) address = address.slice('::ffff:'.length);
+  const zoneIndex = address.indexOf('%');
+  if (zoneIndex >= 0) address = address.slice(0, zoneIndex);
+  return address;
+}
+
+function isPrivateIpv4(address: string): boolean {
+  const parts = address.split('.').map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a, b] = parts;
+  return a === 10
+    || a === 127
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 169 && b === 254);
+}
+
+function isPrivateRemoteAddress(value: string): boolean {
+  const address = normalizeRemoteAddress(value);
+  if (!address) return false;
+  if (isPrivateIpv4(address)) return true;
+  return address === '::1'
+    || address === 'localhost'
+    || address.startsWith('fc')
+    || address.startsWith('fd')
+    || address.startsWith('fe80:');
+}
+
+function isLanDeviceIngestRequest(req: Request): boolean {
+  const candidates = [req.ip, req.socket.remoteAddress].filter(Boolean) as string[];
+  return candidates.some(isPrivateRemoteAddress);
+}
+
 function requireDeviceIngestAuth(req: Request, res: Response, next: NextFunction) {
   if (req.authUser) return next();
 
@@ -311,9 +440,12 @@ function requireDeviceIngestAuth(req: Request, res: Response, next: NextFunction
   if (configuredToken && (safeTokenEquals(deviceToken, configuredToken) || safeTokenEquals(bearerToken, configuredToken))) {
     return next();
   }
+  if (config.DEVICE_INGEST_ALLOW_LAN && isLanDeviceIngestRequest(req)) {
+    return next();
+  }
 
   if (!configuredToken) {
-    return res.status(401).json({ error: 'Device ingest token is not configured; use a user JWT or set DEVICE_INGEST_TOKEN.' });
+    return res.status(401).json({ error: 'Device ingest token is not configured; use a user JWT, set DEVICE_INGEST_TOKEN, or enable DEVICE_INGEST_ALLOW_LAN for local hotspot demos.' });
   }
   return res.status(401).json({ error: 'Unauthorized device telemetry request' });
 }
@@ -334,7 +466,7 @@ function telemetryMetadata(payload: Record<string, unknown>, source: string): Re
     gpsValid: firstBooleanField(payload, ['gpsValid', 'gps_valid', 'location_valid']),
     gpsFix: firstNumericField(payload, ['gpsFix', 'gps_fix']),
     gpsSatsUsed: firstNumericField(payload, ['gpsSatsUsed', 'gps_sats_used']),
-    gpsVisible: firstNumericField(payload, ['gpsVisible', 'gps_visible']),
+    gpsVisible: firstNumericField(payload, ['gpsVisible', 'gps_visible', 'sat', 'sats', 'satellites']),
     gpsHdop: firstNumericField(payload, ['gpsHdop', 'gps_hdop']),
     locationValid: firstBooleanField(payload, ['locationValid', 'location_valid']),
     lastLocationValid: firstBooleanField(payload, ['lastLocationValid', 'last_location_valid']),
@@ -358,12 +490,26 @@ function telemetryMetadata(payload: Record<string, unknown>, source: string): Re
     bleBridgeReceivedAt: firstTextField(payload, ['bleBridgeReceivedAt', 'ble_bridge_received_at']),
     bleBridgeStoredBy: firstTextField(payload, ['bleBridgeStoredBy', 'ble_bridge_stored_by']),
     notifySeq: firstNumericField(payload, ['notifySeq', 'notify_seq', 'seq']),
+    uptimeMs: firstNumericField(payload, ['uptimeMs', 'uptime_ms']),
     activityScore: firstNumericField(payload, ['activityScore', 'activity_score']),
     wifiConnected: firstBooleanField(payload, ['wifiConnected', 'wifi_connected']),
+    wifiSsid: firstTextField(payload, ['wifiSsid', 'wifi_ssid']),
+    wifiIp: firstTextField(payload, ['wifiIp', 'wifi_ip']),
     wifiRssi: firstNumericField(payload, ['wifiRssi', 'wifi_rssi']),
+    wifiRetryCount: firstNumericField(payload, ['wifiRetryCount', 'wifi_retry_count']),
+    lanServerEnabled: firstBooleanField(payload, ['lanServerEnabled', 'lan_server_enabled']),
+    lanServerPort: firstNumericField(payload, ['lanServerPort', 'lan_server_port']),
+    lanBaseUrl: firstTextField(payload, ['lanBaseUrl', 'lan_base_url']),
+    lanMessageSeq: firstNumericField(payload, ['lanMessageSeq', 'lan_message_seq']),
+    lanLastMessage: firstTextField(payload, ['lanLastMessage', 'lan_last_message']),
+    queueDepth: firstNumericField(payload, ['queueDepth', 'queue_depth']),
+    queueCapacity: firstNumericField(payload, ['queueCapacity', 'queue_capacity']),
+    queueDropped: firstNumericField(payload, ['queueDropped', 'queue_dropped']),
     uploadEnabled: firstBooleanField(payload, ['uploadEnabled', 'upload_enabled']),
     uploadOk: firstBooleanField(payload, ['uploadOk', 'upload_ok']),
     uploadCode: firstNumericField(payload, ['uploadCode', 'upload_code']),
+    uploadAttemptSeq: firstNumericField(payload, ['uploadAttemptSeq', 'upload_attempt_seq']),
+    httpFailCount: firstNumericField(payload, ['httpFailCount', 'http_fail_count']),
     ir: firstNumericField(payload, ['ir', 'irValue', 'irRaw']),
     red: firstNumericField(payload, ['red', 'redValue', 'redRaw']),
     spo2Pct: firstNumericField(payload, ['spo2Pct', 'spo2', 'bloodOxygenPct']),
@@ -433,12 +579,26 @@ function mapTelemetryRow(row: HealthMeasurementRow) {
     bleBridgeReceivedAt: typeof metadata.bleBridgeReceivedAt === 'string' ? metadata.bleBridgeReceivedAt : null,
     bleBridgeStoredBy: typeof metadata.bleBridgeStoredBy === 'string' ? metadata.bleBridgeStoredBy : null,
     notifySeq: numericField(metadata, 'notifySeq'),
+    uptimeMs: numericField(metadata, 'uptimeMs'),
     activityScore: numericField(metadata, 'activityScore'),
     wifiConnected: typeof metadata.wifiConnected === 'boolean' ? metadata.wifiConnected : null,
+    wifiSsid: typeof metadata.wifiSsid === 'string' ? metadata.wifiSsid : null,
+    wifiIp: typeof metadata.wifiIp === 'string' ? metadata.wifiIp : null,
     wifiRssi: numericField(metadata, 'wifiRssi'),
+    wifiRetryCount: numericField(metadata, 'wifiRetryCount'),
+    lanServerEnabled: typeof metadata.lanServerEnabled === 'boolean' ? metadata.lanServerEnabled : null,
+    lanServerPort: numericField(metadata, 'lanServerPort'),
+    lanBaseUrl: typeof metadata.lanBaseUrl === 'string' ? metadata.lanBaseUrl : null,
+    lanMessageSeq: numericField(metadata, 'lanMessageSeq'),
+    lanLastMessage: typeof metadata.lanLastMessage === 'string' ? metadata.lanLastMessage : null,
+    queueDepth: numericField(metadata, 'queueDepth'),
+    queueCapacity: numericField(metadata, 'queueCapacity'),
+    queueDropped: numericField(metadata, 'queueDropped'),
     uploadEnabled: typeof metadata.uploadEnabled === 'boolean' ? metadata.uploadEnabled : null,
     uploadOk: typeof metadata.uploadOk === 'boolean' ? metadata.uploadOk : null,
     uploadCode: numericField(metadata, 'uploadCode'),
+    uploadAttemptSeq: numericField(metadata, 'uploadAttemptSeq'),
+    httpFailCount: numericField(metadata, 'httpFailCount'),
     mapCoords: mapX !== undefined && mapY !== undefined ? { x: mapX, y: mapY } : undefined,
     metadata,
   };
@@ -464,6 +624,7 @@ function telemetryCacheKey(row: DeviceTelemetry): string {
 }
 
 function cacheLatestTelemetry(row: DeviceTelemetry) {
+  if (!isWifiTelemetryRow(row)) return;
   latestDeviceTelemetry.set(telemetryCacheKey(row), row);
   if (latestDeviceTelemetry.size <= DEVICE_TELEMETRY_CACHE_MAX) return;
 
@@ -477,6 +638,7 @@ function getCachedTelemetry(userId: string, deviceId: string, limit: number): De
   return [...latestDeviceTelemetry.values()]
     .filter((row) => row.userId === userId)
     .filter((row) => !deviceId || row.deviceId === deviceId)
+    .filter(isWifiTelemetryRow)
     .sort((a, b) => telemetryTimeMs(b) - telemetryTimeMs(a))
     .slice(0, limit);
 }
@@ -484,7 +646,7 @@ function getCachedTelemetry(userId: string, deviceId: string, limit: number): De
 function uniqueLatestTelemetry(rows: DeviceTelemetry[], limit: number): DeviceTelemetry[] {
   const seen = new Set<string>();
   const latest: DeviceTelemetry[] = [];
-  for (const row of rows.sort((a, b) => telemetryTimeMs(b) - telemetryTimeMs(a))) {
+  for (const row of rows.filter(isWifiTelemetryRow).sort((a, b) => telemetryTimeMs(b) - telemetryTimeMs(a))) {
     const key = telemetryCacheKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -621,7 +783,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
   app.get('/api/chat/history/:contactId', requireAuth, asyncHandler(async (req, res) => {
     const contactId = scopedContactId(req.authUser!.sub, req.params.contactId);
     const rows = await prisma.chatMessage.findMany({
-      where: { contactId }, orderBy: { id: 'asc' },
+      where: { contactId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: { role: true, content: true },
     });
     res.json({ history: rows });
@@ -643,23 +805,33 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
 
     try {
       const sysPrompt = ai.getSystemPrompt(contactId, contactProfile);
-      const generatedReply = ai.hasDashScopeKey()
-        ? await ai.callQwen([{ role: 'system', content: sysPrompt }, ...normalizedMessages])
-        : undefined;
-      const reply = generatedReply || getLocalChatReply(contactProfile);
+      let generatedReply: string | undefined;
+      let aiWarning = '';
+      if (ai.hasDashScopeKey()) {
+        try {
+          generatedReply = await ai.callQwen([{ role: 'system', content: sysPrompt }, ...normalizedMessages]);
+        } catch (err) {
+          aiWarning = err instanceof Error ? err.message : String(err);
+          console.error('Chat AI request failed:', err);
+        }
+      } else {
+        aiWarning = 'DASHSCOPE_API_KEY missing';
+      }
+      const reply = generatedReply || getLocalChatReply(contactProfile, normalizedMessages);
       const source = generatedReply ? 'qwen' : 'local';
 
       if (scopedId) {
         const now = new Date().toISOString();
-        for (const m of normalizedMessages) {
-          await prisma.chatMessage.create({ data: { contactId: scopedId, role: m.role, content: m.content, createdAt: new Date(now) } });
+        const latestUserMessage = [...normalizedMessages].reverse().find((m) => m.role === 'user');
+        if (latestUserMessage) {
+          await prisma.chatMessage.create({ data: { contactId: scopedId, role: 'user', content: latestUserMessage.content, createdAt: new Date(now) } });
         }
         await prisma.chatMessage.create({ data: { contactId: scopedId, role: 'assistant', content: reply, createdAt: new Date(now) } });
       }
-      res.json({ reply, source, saved: Boolean(scopedId) });
+      res.json({ reply, source, saved: Boolean(scopedId), ...(aiWarning && !generatedReply ? { warning: aiWarning } : {}) });
     } catch (err) {
       console.error('Chat backend error:', err);
-      res.json({ reply: getLocalChatReply(contactProfile), source: 'local', warning: String(err) });
+      res.json({ reply: getLocalChatReply(contactProfile, normalizedMessages), source: 'local', warning: String(err) });
     }
   });
 
@@ -752,14 +924,15 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
   // ─── Location (simplified, JWT-auth only) ───
   app.get('/api/location/points', requireAuth, asyncHandler(async (req, res) => {
     const { userId, limit } = req.query || {};
-    const max = Math.min(Number(limit || 100), 500);
+    const max = boundedPositiveInt(limit, 100, 500);
     const normalizedUserId = userId ? await resolveUserId(String(userId)) : req.authUser!.sub;
     if (normalizedUserId !== req.authUser!.sub) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const where: Prisma.LocationPointWhereInput = { userId: req.authUser!.sub };
-    const points = await prisma.locationPoint.findMany({ where, orderBy: { createdAt: 'desc' }, take: max });
-    res.json({ points: points.reverse().map((r) => ({ id: r.id, source: r.source, userId: r.userId, timestamp: r.timestamp, lat: r.lat, lon: r.lon })) });
+    const points = await prisma.locationPoint.findMany({ where, orderBy: { createdAt: 'desc' }, take: max * 3 });
+    const wifiPoints = points.filter((r) => !String(r.source || '').toLowerCase().includes('ble')).slice(0, max);
+    res.json({ points: wifiPoints.reverse().map((r) => ({ id: r.id, source: r.source, userId: r.userId, timestamp: r.timestamp, lat: r.lat, lon: r.lon })) });
   }));
 
   app.post('/api/location/last', requireAuth, asyncHandler(async (req, res) => {
@@ -779,6 +952,11 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
   // ─── M5Stack Device Telemetry ───
   app.post('/api/device/telemetry', express.text({ type: ['text/csv', 'text/plain'], limit: '16kb' }), requireDeviceIngestAuth, asyncHandler(async (req, res) => {
     const payload = parseTelemetryPayload(req.body);
+    if (isBleTelemetryPayload(payload)) {
+      return res.status(400).json({
+        error: 'BLE telemetry is disabled. Use BLE only for WiFi provisioning; device data must be uploaded over WiFi.',
+      });
+    }
     const deviceId = telemetryDeviceId(payload);
     if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
 
@@ -790,7 +968,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
     const userId = req.authUser?.sub || payloadUserId || defaultUserId || null;
 
     const tagId = firstTextField(payload, ['tagId', 'tagID', 'tag_id', 'nfcId', 'nfc_id']);
-    const source = firstTextField(payload, ['source']) || (isBleTelemetryPayload(payload) ? 'm5stickc-plus-ble' : 'm5stack-http');
+    const source = firstTextField(payload, ['source']) || 'm5stack-wifi-http';
     const timestamp = toIsoTimestamp(firstTextField(payload, ['timestamp', 'capturedAt', 'time']));
     const receivedAt = new Date().toISOString();
     const heartRateBpm = firstNumericField(payload, ['heartRateBpm', 'heart_rate_bpm', 'heartRate', 'pet_bpm', 'bpm']);
@@ -894,7 +1072,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
 
   app.get('/api/device/telemetry/latest', requireAuth, asyncHandler(async (req, res) => {
     const deviceId = String(req.query.deviceId || '').trim();
-    const max = Math.min(Math.max(Number(req.query.limit || 6), 1), 25);
+    const max = boundedPositiveInt(req.query.limit, 6, 25);
     const cachedTelemetry = getCachedTelemetry(req.authUser!.sub, deviceId, max);
     const rows = await prisma.healthMeasurement.findMany({
       where: {
@@ -902,7 +1080,7 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
         ...(deviceId ? { deviceId } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: 300,
     });
 
     const telemetry = uniqueLatestTelemetry([...cachedTelemetry, ...rows.map(mapTelemetryRow)], max);
@@ -911,17 +1089,26 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
 
   app.get('/api/device/telemetry/history', requireAuth, asyncHandler(async (req, res) => {
     const deviceId = String(req.query.deviceId || '').trim();
-    const max = Math.min(Math.max(Number(req.query.limit || 50), 1), 200);
+    const max = boundedPositiveInt(req.query.limit, 120, 500);
+    const fromRaw = String(req.query.from || req.query.since || '').trim();
+    const toRaw = String(req.query.to || req.query.until || '').trim();
+    const fromDate = fromRaw ? new Date(fromRaw) : null;
+    const toDate = toRaw ? new Date(toRaw) : null;
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (fromDate && !Number.isNaN(fromDate.getTime())) createdAt.gte = fromDate;
+    if (toDate && !Number.isNaN(toDate.getTime())) createdAt.lte = toDate;
+    const where: Prisma.HealthMeasurementWhereInput = {
+      userId: req.authUser!.sub,
+      ...(deviceId ? { deviceId } : {}),
+      ...(Object.keys(createdAt).length ? { createdAt } : {}),
+    };
     const rows = await prisma.healthMeasurement.findMany({
-      where: {
-        userId: req.authUser!.sub,
-        ...(deviceId ? { deviceId } : {}),
-      },
+      where,
       orderBy: { createdAt: 'desc' },
-      take: max,
+      take: max * 3,
     });
 
-    res.json({ telemetry: rows.map(mapTelemetryRow) });
+    res.json({ telemetry: rows.map(mapTelemetryRow).filter(isWifiTelemetryRow).slice(0, max), range: { from: fromRaw || null, to: toRaw || null }, limit: max });
   }));
 
   // ─── AI (Qwen only) ───
@@ -1168,18 +1355,76 @@ Provide a structured Markdown response:
   }));
 
   app.get('/api/monitor/overview', requireMonitorAuth, asyncHandler(async (_req, res) => {
-    const [userProfiles, petProfiles, purchases, chatLogs, contacts, recentUsers, recentPets, recentPurchases, recentChatLogs] = await Promise.all([
+    const [
+      userProfiles,
+      petProfiles,
+      purchases,
+      chatLogs,
+      contacts,
+      recentUsers,
+      recentPets,
+      recentPurchases,
+      recentChatLogs,
+      appUsers,
+      appPets,
+      healthMeasurements,
+      locationPoints,
+      chatMessages,
+      deviceRows,
+      recentAppUsers,
+      recentAppPets,
+      recentTelemetry,
+      recentAppChatMessages,
+    ] = await Promise.all([
       prisma.monitoringUserProfile.count(), prisma.monitoringPetProfile.count(),
       prisma.monitoringPurchase.count(), prisma.monitoringChatLog.count(),
       prisma.monitoringChatLog.findMany({ distinct: ['contactId'], select: { contactId: true } }),
-      prisma.monitoringUserProfile.findMany({ orderBy: { capturedAt: 'desc' }, take: 50 }),
-      prisma.monitoringPetProfile.findMany({ orderBy: { capturedAt: 'desc' }, take: 100 }),
-      prisma.monitoringPurchase.findMany({ orderBy: { capturedAt: 'desc' }, take: 100 }),
-      prisma.monitoringChatLog.findMany({ orderBy: { capturedAt: 'desc' }, take: 100 }),
+      prisma.monitoringUserProfile.findMany({ orderBy: { capturedAt: 'desc' }, take: 140 }),
+      prisma.monitoringPetProfile.findMany({ orderBy: { capturedAt: 'desc' }, take: 160 }),
+      prisma.monitoringPurchase.findMany({ orderBy: { capturedAt: 'desc' }, take: 160 }),
+      prisma.monitoringChatLog.findMany({ orderBy: { capturedAt: 'desc' }, take: 180 }),
+      prisma.user.count(),
+      prisma.pet.count(),
+      prisma.healthMeasurement.count(),
+      prisma.locationPoint.count(),
+      prisma.chatMessage.count(),
+      prisma.healthMeasurement.findMany({ where: { deviceId: { not: null } }, distinct: ['deviceId'], select: { deviceId: true } }),
+      prisma.user.findMany({ orderBy: { updatedAt: 'desc' }, take: 140 }),
+      prisma.pet.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 160,
+        include: { owner: true },
+      }),
+      prisma.healthMeasurement.findMany({ orderBy: { createdAt: 'desc' }, take: 360 }),
+      prisma.chatMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 140 }),
     ]);
     res.json({
       capturedAt: new Date().toISOString(),
       summary: { userProfiles, petProfiles, purchases, chatLogs, contactsTracked: contacts.length },
+      appData: {
+        summary: {
+          users: appUsers,
+          pets: appPets,
+          healthMeasurements,
+          locationPoints,
+          chatMessages,
+          devicesTracked: deviceRows.filter((row) => row.deviceId).length,
+        },
+        users: recentAppUsers.map(mapUser),
+        pets: recentAppPets.map((row) => ({
+          pet: mapPet(row),
+          owner: row.owner ? mapUser(row.owner) : null,
+          createdAt: row.createdAt.toISOString(),
+        })),
+        telemetry: recentTelemetry.map(mapTelemetryRow).filter(isWifiTelemetryRow).slice(0, 120),
+        chatMessages: recentAppChatMessages.map((row) => ({
+          id: row.id,
+          contactId: row.contactId,
+          role: row.role,
+          content: row.content,
+          createdAt: row.createdAt.toISOString(),
+        })),
+      },
       monitoring: {
         userProfiles: recentUsers.map((row) => ({
           id: row.id,

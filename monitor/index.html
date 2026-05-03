@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PawTrace · Revenue & Customer Intelligence</title>
+  <title>PawTrace · User & Operations Intelligence</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M20 36c-3 0-6-3-6-6s2-5 5-5c4 0 5 5 7 5s3-5 7-5c3 0 5 2 5 5s-3 6-6 6h-12Z' fill='%23f97316'/%3E%3Ccircle cx='22' cy='21' r='4' fill='%23facc15'/%3E%3Ccircle cx='34' cy='21' r='4' fill='%235eead4'/%3E%3Cpath d='M26 39c0-4 3-7 7-7s7 3 7 7-3 7-7 7-7-3-7-7Z' fill='%2334d399'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./assets/monitor.css" />
   <style>
@@ -63,6 +63,10 @@
       margin-bottom: 18px;
     }
 
+    .topbar > * {
+      min-width: 0;
+    }
+
     .eyebrow {
       margin: 0 0 8px;
       color: #fdba74;
@@ -83,6 +87,10 @@
       font-size: clamp(30px, 4vw, 58px);
       line-height: 1.02;
       letter-spacing: 0;
+    }
+
+    .headline-break {
+      display: block;
     }
 
     .lede {
@@ -150,7 +158,7 @@
       display: grid;
       grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
       gap: 16px;
-      align-items: start;
+      align-items: stretch;
       margin-bottom: 16px;
     }
 
@@ -159,6 +167,7 @@
       border-radius: 8px;
       background: var(--panel);
       box-shadow: var(--shadow);
+      min-width: 0;
     }
 
     .hero-panel {
@@ -167,6 +176,9 @@
         linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.94)),
         linear-gradient(320deg, rgba(249, 115, 22, 0.12), transparent 42%),
         var(--panel-strong);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
     }
 
     .hero-metrics {
@@ -223,6 +235,32 @@
       color: var(--blue);
     }
 
+    .hero-context {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      flex: 1;
+    }
+
+    .context-card {
+      min-height: 112px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(2, 6, 23, 0.28);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .context-card strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 21px;
+      line-height: 1.1;
+    }
+
     .command-panel {
       padding: 18px;
       display: flex;
@@ -255,7 +293,7 @@
 
     .mini-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -271,6 +309,37 @@
       display: block;
       margin-top: 6px;
       font-size: 22px;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      grid-auto-flow: dense;
+      grid-auto-rows: 8px;
+      align-items: start;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .dashboard-grid > .section-grid {
+      display: contents;
+    }
+
+    .dashboard-grid .panel {
+      grid-column: 1 / -1;
+      align-self: start;
+    }
+
+    .dashboard-grid .grid-2 > .panel {
+      grid-column: span 6;
+    }
+
+    .dashboard-grid .grid-wide > .panel:first-child {
+      grid-column: span 7;
+    }
+
+    .dashboard-grid .grid-wide > .panel:last-child {
+      grid-column: span 5;
     }
 
     .section-grid {
@@ -332,6 +401,10 @@
 
     .chart-frame.compact {
       height: 228px;
+    }
+
+    .chart-frame.tall {
+      height: 320px;
     }
 
     .legend-row {
@@ -539,15 +612,32 @@
         grid-template-columns: 1fr;
       }
 
+      .dashboard-grid .panel,
+      .dashboard-grid .grid-2 > .panel,
+      .dashboard-grid .grid-wide > .panel:first-child,
+      .dashboard-grid .grid-wide > .panel:last-child {
+        grid-column: 1 / -1;
+      }
+
       .hero-metrics {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hero-context {
+        grid-template-columns: 1fr;
       }
     }
 
     @media (max-width: 720px) {
       .page-shell {
-        width: min(100% - 20px, 1440px);
-        padding-top: 18px;
+        width: 100%;
+        padding: 18px 10px 42px;
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+        grid-auto-rows: auto;
+        gap: 12px;
       }
 
       .topbar {
@@ -559,6 +649,7 @@
       }
 
       .hero-metrics,
+      .hero-context,
       .mini-grid {
         grid-template-columns: 1fr;
       }
@@ -574,6 +665,21 @@
       .panel-head {
         flex-direction: column;
       }
+
+      h1 {
+        max-width: 100%;
+        font-size: clamp(24px, 7.2vw, 32px);
+      }
+
+      .headline-word {
+        display: block;
+      }
+
+      .lede {
+        max-width: 34ch;
+        font-size: 13px;
+        overflow-wrap: break-word;
+      }
     }
   </style>
 </head>
@@ -581,10 +687,10 @@
   <main class="page-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">PawTrace Revenue Intelligence</p>
-        <h1>Revenue, Subscriptions & Customer Intelligence</h1>
+        <p class="eyebrow">PawTrace Intelligence Monitor</p>
+        <h1><span class="headline-word">User,</span> <span class="headline-word">City</span> <span class="headline-break"><span class="headline-word">& Operations</span> <span class="headline-word">Intelligence</span></span></h1>
         <p class="lede">
-          A refined commercial command center for product revenue, app subscriptions, client profiles, pet records, reliance signals, and post-consult AI care intelligence.
+          A refined command center for realistic user cohorts, Suzhou concentration, telemetry density, pet records, reliance signals, and post-consult AI care intelligence.
         </p>
       </div>
       <div class="status-cluster">
@@ -597,14 +703,14 @@
       <div class="panel hero-panel">
         <div class="hero-metrics">
           <article class="metric-card" data-tone="sales">
-            <p class="metric-label">Product Revenue</p>
-            <p id="product-sales" class="metric-value">¥0.00</p>
-            <p id="product-sales-note" class="metric-note">0 product orders</p>
+            <p class="metric-label">Active User Base</p>
+            <p id="product-sales" class="metric-value">0</p>
+            <p id="product-sales-note" class="metric-note">0 mapped Suzhou users</p>
           </article>
           <article class="metric-card" data-tone="subs">
-            <p class="metric-label">App Subscription Revenue</p>
-            <p id="subscription-sales" class="metric-value">¥0.00</p>
-            <p id="subscription-note" class="metric-note">0 subscription orders</p>
+            <p class="metric-label">Suzhou User Share</p>
+            <p id="subscription-sales" class="metric-value">0.0%</p>
+            <p id="subscription-note" class="metric-note">0 of 0 profile-mapped users</p>
           </article>
           <article class="metric-card" data-tone="depend">
             <p class="metric-label">Client Reliance Index</p>
@@ -612,10 +718,33 @@
             <p id="dependency-note" class="metric-note">Weighted by purchases, pets, AI consults, and profile depth</p>
           </article>
           <article class="metric-card" data-tone="ai">
-            <p class="metric-label">AI Care Consults</p>
+            <p class="metric-label">AI Care Sessions</p>
             <p id="ai-consult-count" class="metric-value">0</p>
             <p id="ai-note" class="metric-note">0 client touchpoints</p>
           </article>
+        </div>
+        <div class="hero-context">
+          <div class="context-card">
+            <p class="small-label">Suzhou Cohort</p>
+            <div>
+              <strong id="hero-suzhou-count">0 users</strong>
+              <p id="hero-suzhou-note" class="metric-note">0.0% of mapped base</p>
+            </div>
+          </div>
+          <div class="context-card">
+            <p class="small-label">Sensor Density</p>
+            <div>
+              <strong id="hero-density">0.0/user</strong>
+              <p id="hero-density-note" class="metric-note">0 packets across 0 devices</p>
+            </div>
+          </div>
+          <div class="context-card">
+            <p class="small-label">City Spread</p>
+            <div>
+              <strong id="hero-city-spread">0 cities</strong>
+              <p id="hero-city-note" class="metric-note">No mapped city distribution yet</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -634,42 +763,112 @@
             <strong id="summary-users">0</strong>
           </div>
           <div class="mini-stat">
+            <p class="small-label">Suzhou Share</p>
+            <strong id="summary-suzhou">0.0%</strong>
+          </div>
+          <div class="mini-stat">
             <p class="small-label">Pet Profiles</p>
             <strong id="summary-pets">0</strong>
           </div>
           <div class="mini-stat">
-            <p class="small-label">Sales Orders</p>
+            <p class="small-label">Telemetry Packets</p>
             <strong id="summary-orders">0</strong>
           </div>
         </div>
       </aside>
     </section>
 
-    <section class="section-grid grid-wide">
+    <section id="dashboard-grid" class="dashboard-grid" aria-label="Operational dashboard panels">
+    <section class="section-grid grid-2">
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Revenue Mix Trend</h2>
-            <p class="panel-subtitle">Daily product revenue and app subscription revenue, classified from item names, notes, plans, and source metadata.</p>
+            <h2 class="panel-title">Operational Data Scale</h2>
+            <p class="panel-subtitle">Quantifies real PawTrace records from users, pets, telemetry, map points, chat messages, and tracked devices.</p>
           </div>
-          <div class="legend-row">
-            <span><span class="legend-dot" style="color: var(--amber);"></span>Product</span>
-            <span><span class="legend-dot" style="color: var(--mint);"></span>Subscription</span>
-          </div>
+          <span id="data-scale-total" class="tag">0 records</span>
         </div>
         <div class="panel-body">
-          <div class="chart-frame">
-            <canvas id="revenue-chart"></canvas>
+          <div class="chart-frame tall">
+            <canvas id="data-scale-chart"></canvas>
           </div>
-          <p id="trend-empty" class="empty-state" hidden>No purchase data yet. Revenue signals will appear once the app or backend submits sales events.</p>
         </div>
       </article>
 
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Subscription & Retention Signals</h2>
-            <p class="panel-subtitle">Track app monetization intent, plan performance, and renewal-ready customer segments.</p>
+            <h2 class="panel-title">M5Stack Telemetry Trend</h2>
+            <p class="panel-subtitle">Recent temperature, heart rate, and battery readings from the backend health-measurement stream.</p>
+          </div>
+          <span id="telemetry-sample-count" class="tag">0 samples</span>
+        </div>
+        <div class="panel-body">
+          <div class="legend-row">
+            <span><span class="legend-dot" style="color: var(--orange);"></span>Temp C</span>
+            <span><span class="legend-dot" style="color: var(--rose);"></span>Heart bpm</span>
+            <span><span class="legend-dot" style="color: var(--blue);"></span>Battery %</span>
+          </div>
+          <div class="chart-frame tall">
+            <canvas id="telemetry-trend-chart"></canvas>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section-grid grid-2">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">API Latency Ranking</h2>
+            <p class="panel-subtitle">Ranks monitored routes by maximum response time, with request counts and status-code signals.</p>
+          </div>
+          <span id="route-count" class="tag">0 routes</span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-frame compact">
+            <canvas id="route-latency-chart"></canvas>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">City Distribution</h2>
+            <p class="panel-subtitle">Shows the realistic demo cohort by city, with the requested Suzhou-heavy base called out directly.</p>
+          </div>
+          <span id="city-share" class="tag good">0.0% Suzhou</span>
+        </div>
+        <div class="panel-body split-list" id="city-list"></div>
+      </article>
+    </section>
+
+    <section class="section-grid grid-wide">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Operational Mix Trend</h2>
+            <p class="panel-subtitle">Daily telemetry and AI/chat activity, with revenue data layered in automatically when purchase records exist.</p>
+          </div>
+          <div class="legend-row">
+            <span><span class="legend-dot" style="color: var(--amber);"></span>Telemetry</span>
+            <span><span class="legend-dot" style="color: var(--mint);"></span>AI / chat</span>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="chart-frame">
+            <canvas id="revenue-chart"></canvas>
+          </div>
+          <p id="trend-empty" class="empty-state" hidden>No timeline data yet. Telemetry, AI chat, or purchase records will populate this trend.</p>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Platform Health Signals</h2>
+            <p class="panel-subtitle">Track telemetry coverage, engagement depth, route health, and app-data readiness.</p>
           </div>
           <span id="subscription-status" class="tag">Sync pending</span>
         </div>
@@ -681,14 +880,14 @@
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Product Revenue Ranking</h2>
-            <p class="panel-subtitle">Ranked by revenue after separating orders identified as app subscriptions.</p>
+            <h2 class="panel-title">Device Signal Ranking</h2>
+            <p class="panel-subtitle">Ranks live devices by recent telemetry presence, average vitals, battery level, and activity signal quality.</p>
           </div>
-          <span id="product-rank-count" class="tag">0 SKUs</span>
+          <span id="product-rank-count" class="tag">0 devices</span>
         </div>
         <div class="panel-body">
           <div id="product-ranking" class="split-list"></div>
-          <p id="product-ranking-empty" class="empty-state" hidden>No product sales have been captured yet.</p>
+          <p id="product-ranking-empty" class="empty-state" hidden>No ranked signals are available yet.</p>
         </div>
       </article>
 
@@ -765,8 +964,8 @@
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Order Ledger</h2>
-            <p class="panel-subtitle">The latest product and subscription orders for revenue, plan, and source reconciliation.</p>
+            <h2 class="panel-title">Operational Ledger</h2>
+            <p class="panel-subtitle">Recent orders, telemetry packets, and AI/chat events for fast reconciliation.</p>
           </div>
           <span id="order-count" class="tag">0 orders</span>
         </div>
@@ -776,9 +975,9 @@
               <tr>
                 <th>Time</th>
                 <th>Type</th>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Amount</th>
+                <th>Signal</th>
+                <th>Count</th>
+                <th>Value</th>
                 <th>Source / Note</th>
               </tr>
             </thead>
@@ -786,6 +985,8 @@
           </table>
         </div>
       </article>
+    </section>
+
     </section>
 
     <nav class="dock" aria-label="Monitor quick actions">
@@ -803,6 +1004,7 @@
       params.get('backend') ||
       (window.location.protocol === 'file:' ? 'http://localhost:3000' : window.location.origin);
     const overviewUrl = `${backendHost}/api/monitor/overview`;
+    const metricsUrl = `${backendHost}/api/monitor/metrics`;
     const monitorToken = params.get('token') || params.get('monitor_token') || '';
     const moneyFormatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -831,7 +1033,14 @@
       dependencyNote: document.getElementById('dependency-note'),
       aiConsultCount: document.getElementById('ai-consult-count'),
       aiNote: document.getElementById('ai-note'),
+      heroSuzhouCount: document.getElementById('hero-suzhou-count'),
+      heroSuzhouNote: document.getElementById('hero-suzhou-note'),
+      heroDensity: document.getElementById('hero-density'),
+      heroDensityNote: document.getElementById('hero-density-note'),
+      heroCitySpread: document.getElementById('hero-city-spread'),
+      heroCityNote: document.getElementById('hero-city-note'),
       summaryUsers: document.getElementById('summary-users'),
+      summarySuzhou: document.getElementById('summary-suzhou'),
       summaryPets: document.getElementById('summary-pets'),
       summaryOrders: document.getElementById('summary-orders'),
       subscriptionStatus: document.getElementById('subscription-status'),
@@ -840,6 +1049,11 @@
       productRanking: document.getElementById('product-ranking'),
       productRankingEmpty: document.getElementById('product-ranking-empty'),
       aiTopicLeader: document.getElementById('ai-topic-leader'),
+      dataScaleTotal: document.getElementById('data-scale-total'),
+      telemetrySampleCount: document.getElementById('telemetry-sample-count'),
+      routeCount: document.getElementById('route-count'),
+      cityShare: document.getElementById('city-share'),
+      cityList: document.getElementById('city-list'),
       customerCount: document.getElementById('customer-count'),
       customerCards: document.getElementById('customer-cards'),
       customerEmpty: document.getElementById('customer-empty'),
@@ -855,10 +1069,40 @@
     };
 
     let currentRevenueSeries = [];
+    let currentRevenueMode = 'activity';
     let currentAiTopics = [];
+    let currentDataScale = [];
+    let currentTelemetrySeries = [];
+    let currentRoutes = [];
     let latestSnapshot = null;
+    let latestMetrics = null;
+    const dashboardGrid = document.getElementById('dashboard-grid');
+    let dashboardLayoutFrame = 0;
 
     if (els.endpoint) els.endpoint.textContent = overviewUrl;
+
+    function layoutDashboardGrid() {
+      if (!dashboardGrid) return;
+      const panels = Array.from(dashboardGrid.querySelectorAll('.panel'));
+      panels.forEach(panel => {
+        panel.style.gridRowEnd = 'auto';
+      });
+      if (window.matchMedia('(max-width: 720px)').matches) return;
+
+      const styles = window.getComputedStyle(dashboardGrid);
+      const rowHeight = Number.parseFloat(styles.gridAutoRows) || 8;
+      const rowGap = Number.parseFloat(styles.rowGap) || 16;
+      panels.forEach(panel => {
+        const height = panel.getBoundingClientRect().height;
+        const span = Math.max(1, Math.ceil((height + rowGap) / (rowHeight + rowGap)));
+        panel.style.gridRowEnd = `span ${span}`;
+      });
+    }
+
+    function scheduleDashboardLayout() {
+      window.cancelAnimationFrame(dashboardLayoutFrame);
+      dashboardLayoutFrame = window.requestAnimationFrame(layoutDashboardGrid);
+    }
 
     function monitorAuthHeaders() {
       const headers = {};
@@ -925,7 +1169,7 @@
         meta.plan,
         meta.channel
       );
-      return /app|subscription|member|membership|premium|pro|plus|care\+|plan|renewal|mrr|arr/.test(text);
+      return /\b(app|subscription|member|membership|premium|plus|plan|renewal|mrr|arr)\b|care\+/.test(text);
     }
 
     function normalizeOrders(records = []) {
@@ -1046,8 +1290,29 @@
     }
 
     function buildCustomers(data, orders, aiInsights) {
-      const profiles = Array.isArray(data.monitoring?.userProfiles) ? data.monitoring.userProfiles : [];
-      const pets = Array.isArray(data.monitoring?.petProfiles) ? data.monitoring.petProfiles : [];
+      const monitorProfiles = Array.isArray(data.monitoring?.userProfiles) ? data.monitoring.userProfiles : [];
+      const appProfiles = Array.isArray(data.appData?.users)
+        ? data.appData.users.map(user => ({
+            id: user.id,
+            capturedAt: user.updatedAt || '',
+            profile: {
+              username: user.username,
+              displayName: user.displayName,
+              campus: user.campus,
+              contact: user.contact,
+              mainPetName: '',
+              mainPetType: ''
+            },
+            personalInfo: {
+              username: user.username,
+              displayName: user.displayName,
+              contact: user.contact
+            },
+            metadata: { source: 'User table', userId: user.id, username: user.username }
+          }))
+        : [];
+      const profiles = [...appProfiles, ...monitorProfiles];
+      const pets = combinedPetRecords(data);
       const customers = new Map();
       const customerAliases = new Map();
 
@@ -1055,6 +1320,7 @@
         const key = getProfileKey(record);
         const profile = record.profile || {};
         const personal = record.personalInfo || {};
+        const metadata = record.metadata || {};
         const label = getProfileLabel(record);
         const completenessFields = [
           profile.displayName || personal.displayName,
@@ -1081,10 +1347,14 @@
           orderRevenue: 0,
           aiCount: 0,
           topics: new Set(),
-          source: record.metadata?.source || '',
+          source: metadata.source || '',
           capturedAt: record.capturedAt || ''
         });
         [
+          record.id,
+          metadata.userId,
+          metadata.username,
+          metadata.contactId,
           key,
           label,
           profile.displayName,
@@ -1101,8 +1371,10 @@
 
       pets.forEach(record => {
         const ownerLabel = record.ownerLabel || record.owner || record.metadata?.username || 'Unlinked owner';
-        const ownerAlias = canonicalKey(ownerLabel);
-        const ownerKey = customerAliases.get(ownerAlias) || ownerAlias || 'unlinked-owner';
+        const ownerAliases = [record.metadata?.userId, record.metadata?.username, ownerLabel]
+          .map(canonicalKey)
+          .filter(Boolean);
+        const ownerKey = ownerAliases.map(alias => customerAliases.get(alias)).find(Boolean) || ownerAliases[0] || 'unlinked-owner';
         if (!customers.has(ownerKey)) {
           customers.set(ownerKey, {
             key: ownerKey,
@@ -1122,7 +1394,7 @@
             source: record.metadata?.source || '',
             capturedAt: record.capturedAt || ''
           });
-          if (ownerAlias) customerAliases.set(ownerAlias, ownerKey);
+          ownerAliases.forEach(alias => customerAliases.set(alias, ownerKey));
         }
         customers.get(ownerKey).petCount += 1;
       });
@@ -1138,8 +1410,10 @@
       });
 
       aiInsights.contacts.forEach(contact => {
-        const contactAlias = canonicalKey(contact.contactId);
-        const key = customerAliases.get(contactAlias) || contactAlias || 'unknown';
+        const rawContactId = String(contact.contactId || '');
+        const contactAlias = canonicalKey(rawContactId);
+        const ownerAlias = canonicalKey(rawContactId.split(':')[0]);
+        const key = customerAliases.get(contactAlias) || customerAliases.get(ownerAlias) || contactAlias || 'unknown';
         if (!customers.has(key)) {
           customers.set(key, {
             key,
@@ -1167,7 +1441,7 @@
 
       return Array.from(customers.values())
         .map(customer => {
-          const score = Math.round(clamp(
+          const score = Number(clamp(
             customer.profileCompleteness * 22 +
               customer.petCount * 12 +
               customer.orderCount * 10 +
@@ -1176,7 +1450,7 @@
               customer.topics.size * 5,
             0,
             100
-          ));
+          ).toFixed(1));
           return {
             ...customer,
             score,
@@ -1229,15 +1503,18 @@
       });
     }
 
-    function renderRevenueChart(series) {
+    function renderRevenueChart(series, mode = currentRevenueMode) {
       currentRevenueSeries = series;
+      currentRevenueMode = mode;
       const canvas = document.getElementById('revenue-chart');
       if (!canvas) return;
+      const frame = canvas.closest('.chart-frame');
       if (!series.length) {
+        if (frame) frame.hidden = true;
         els.trendEmpty.hidden = false;
-        prepareCanvas(canvas);
         return;
       }
+      if (frame) frame.hidden = false;
       els.trendEmpty.hidden = true;
       const labels = series.map(point => point.date);
       const productData = series.map(point => Number(point.product.toFixed(2)));
@@ -1264,7 +1541,7 @@
         ctx.lineTo(plot.right, y);
         ctx.stroke();
         ctx.textAlign = 'right';
-        ctx.fillText(`¥${Math.round(value)}`, plot.left - 8, y);
+        ctx.fillText(mode === 'money' ? `¥${Math.round(value)}` : String(Math.round(value)), plot.left - 8, y);
       }
 
       const labelStep = Math.max(1, Math.ceil(labels.length / 5));
@@ -1328,44 +1605,473 @@
       });
     }
 
-    function renderSubscriptionPanel(subscriptionOrders, allOrders) {
-      const total = subscriptionOrders.reduce((sum, order) => sum + order.amount, 0);
-      const ratio = allOrders.length ? Math.round((subscriptionOrders.length / allOrders.length) * 100) : 0;
-      if (els.subscriptionStatus) {
-        els.subscriptionStatus.textContent = subscriptionOrders.length ? `${ratio}% subscription mix` : 'Subscription signal pending';
-        els.subscriptionStatus.className = `tag ${subscriptionOrders.length ? 'good' : ''}`;
-      }
-      if (!els.subscriptionList) return;
-      if (!subscriptionOrders.length) {
-        els.subscriptionList.innerHTML = `
-          <div class="empty-state">
-            No subscription-classified orders yet. Submit subscription, premium, member, renewal, or plan signals through purchase.name, purchase.type, metadata.plan, or metadata.source to classify revenue automatically.
-          </div>
-          <div class="list-row">
-            <div class="row-main">
-              <p class="row-title">Subscription revenue</p>
-              <p class="row-sub">${allOrders.length} orders ingested · 0 subscriptions identified</p>
-            </div>
-            <span class="tag">${formatMoney(total)}</span>
-          </div>
-        `;
-        return;
-      }
-      const ranking = buildProductRanking(subscriptionOrders).slice(0, 4);
-      els.subscriptionList.innerHTML = ranking.map(item => `
-        <div class="list-row">
-          <div class="row-main">
-            <p class="row-title">${escapeHtml(item.name)}</p>
-            <p class="row-sub">${item.count} orders · ${item.quantity} plans</p>
-          </div>
-          <span class="tag good">${formatMoney(item.revenue)}</span>
-        </div>
-      `).join('');
+    function drawEmptyCanvas(canvas, message) {
+      const { ctx, width, height } = prepareCanvas(canvas);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '13px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(message, width / 2, height / 2);
     }
 
-    function renderProductRanking(productOrders) {
+    function numberValue(value) {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : 0;
+    }
+
+    function getAppSummary(data = {}) {
+      return data.appData?.summary || {};
+    }
+
+    function safeExcerpt(value, max = 110) {
+      const text = String(value || '')
+        .replace(/\bfuck\b/gi, 'f***')
+        .replace(/\bshit\b/gi, 's***')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return text.length > max ? `${text.slice(0, max)}...` : text;
+    }
+
+    function normalizeAppChatLogs(data = {}) {
+      const rows = Array.isArray(data.appData?.chatMessages) ? data.appData.chatMessages : [];
+      return rows.map(row => ({
+        id: row.id,
+        capturedAt: row.createdAt,
+        contactId: row.contactId || 'app-chat',
+        messages: [{ role: row.role || 'message', content: row.content || '' }],
+        reply: row.role === 'assistant' ? row.content || '' : '',
+        source: 'ChatMessage'
+      }));
+    }
+
+    function combinedChatLogs(data = {}) {
+      const monitorLogs = Array.isArray(data.monitoring?.chatLogs) ? data.monitoring.chatLogs : [];
+      return [...monitorLogs, ...normalizeAppChatLogs(data)]
+        .sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt));
+    }
+
+    function combinedPetRecords(data = {}) {
+      const monitorPets = Array.isArray(data.monitoring?.petProfiles) ? data.monitoring.petProfiles : [];
+      const appPets = Array.isArray(data.appData?.pets)
+        ? data.appData.pets.map(row => ({
+            id: row.pet?.id || row.id,
+            capturedAt: row.createdAt || '',
+            ownerLabel: row.owner?.displayName || row.owner?.username || 'App profile',
+            pet: row.pet || {},
+            metadata: { source: 'Pet table' }
+          }))
+        : [];
+      const map = new Map();
+      [...appPets, ...monitorPets].forEach(record => {
+        const pet = record.pet || {};
+        const key = canonicalKey(pet.id || record.id || `${record.ownerLabel || record.owner || ''}:${pet.name || ''}`);
+        if (!key) return;
+        if (!map.has(key)) {
+          map.set(key, record);
+          return;
+        }
+        const previous = map.get(key);
+        map.set(key, {
+          ...previous,
+          ...record,
+          metadata: { ...(previous.metadata || {}), ...(record.metadata || {}) }
+        });
+      });
+      return Array.from(map.values());
+    }
+
+    function buildOperationalSeries(data = {}) {
+      const byDate = new Map();
+      const ensure = value => {
+        const key = dateKey(value);
+        if (!byDate.has(key)) byDate.set(key, { date: key, product: 0, subscription: 0 });
+        return byDate.get(key);
+      };
+      (Array.isArray(data.appData?.telemetry) ? data.appData.telemetry : []).forEach(record => {
+        ensure(record.receivedAt || record.timestamp).product += 1;
+      });
+      (Array.isArray(data.appData?.chatMessages) ? data.appData.chatMessages : []).forEach(record => {
+        ensure(record.createdAt).subscription += 1;
+      });
+      return Array.from(byDate.values())
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-7);
+    }
+
+    function buildTelemetryDeviceRanking(data = {}) {
+      const map = new Map();
+      (Array.isArray(data.appData?.telemetry) ? data.appData.telemetry : []).forEach(record => {
+        const key = record.deviceId || 'unknown-device';
+        if (!map.has(key)) {
+          map.set(key, {
+            name: key,
+            count: 0,
+            tempSum: 0,
+            tempCount: 0,
+            heartSum: 0,
+            heartCount: 0,
+            batterySum: 0,
+            batteryCount: 0,
+            signalScore: 0,
+            source: record.source || record.transport || 'telemetry',
+            lastAt: ''
+          });
+        }
+        const item = map.get(key);
+        item.count += 1;
+        const temp = numberValue(record.tempC ?? record.temperature);
+        const heart = numberValue(record.heartRateBpm ?? record.heartRate);
+        const battery = numberValue(record.batteryPct);
+        if (temp) {
+          item.tempSum += temp;
+          item.tempCount += 1;
+        }
+        if (heart) {
+          item.heartSum += heart;
+          item.heartCount += 1;
+        }
+        if (battery) {
+          item.batterySum += battery;
+          item.batteryCount += 1;
+        }
+        item.signalScore += numberValue(record.activityScore) || (record.quality === 'stable' ? 72 : 48);
+        if (!item.lastAt || new Date(record.receivedAt || record.timestamp) > new Date(item.lastAt)) {
+          item.lastAt = record.receivedAt || record.timestamp;
+        }
+      });
+      return Array.from(map.values())
+        .map(item => {
+          const avgBattery = item.batteryCount ? item.batterySum / item.batteryCount : 0;
+          const avgSignal = item.count ? item.signalScore / item.count : 0;
+          return {
+            ...item,
+            temp: item.tempCount ? item.tempSum / item.tempCount : null,
+            heart: item.heartCount ? item.heartSum / item.heartCount : null,
+            battery: item.batteryCount ? avgBattery : null,
+            score: item.count * 12 + avgBattery * 0.35 + avgSignal * 0.28
+          };
+        })
+        .sort((a, b) => b.score - a.score);
+    }
+
+    function buildDataScale(data) {
+      const app = getAppSummary(data);
+      return [
+        { label: 'Telemetry', value: numberValue(app.healthMeasurements), color: '#7dd3fc' },
+        { label: 'Map points', value: numberValue(app.locationPoints), color: '#34d399' },
+        { label: 'Chat messages', value: numberValue(app.chatMessages), color: '#facc15' },
+        { label: 'Devices', value: numberValue(app.devicesTracked), color: '#5eead4' },
+        { label: 'Pets', value: numberValue(app.pets), color: '#f97316' },
+        { label: 'Users', value: numberValue(app.users), color: '#fb7185' }
+      ].filter(item => item.value > 0);
+    }
+
+    function cityFromCampus(value) {
+      const text = String(value || '').trim();
+      if (!text || /not provided|touchpoint/i.test(text)) return 'Unspecified';
+      const lower = text.toLowerCase();
+      if (lower.includes('suzhou')) return 'Suzhou';
+      if (lower.includes('shanghai')) return 'Shanghai';
+      if (lower.includes('nanjing')) return 'Nanjing';
+      if (lower.includes('hangzhou')) return 'Hangzhou';
+      if (lower.includes('wuxi')) return 'Wuxi';
+      if (lower.includes('taicang')) return 'Taicang';
+      if (lower.includes('beijing')) return 'Beijing';
+      if (lower.includes('chengdu')) return 'Chengdu';
+      return text.split(/[,\-/]/)[0].trim() || 'Unspecified';
+    }
+
+    function buildCityDistribution(customers = []) {
+      const cityMap = new Map();
+      const seedScoped = customers.some(customer => String(customer.source || '').includes('demo-monitor-seed'));
+      const source = seedScoped
+        ? customers.filter(customer => String(customer.source || '').includes('demo-monitor-seed'))
+        : customers;
+      source.forEach(customer => {
+        const city = cityFromCampus(customer.campus);
+        if (city === 'Unspecified') return;
+        cityMap.set(city, (cityMap.get(city) || 0) + 1);
+      });
+      return Array.from(cityMap.entries())
+        .map(([city, count]) => ({ city, count }))
+        .sort((a, b) => b.count - a.count || a.city.localeCompare(b.city));
+    }
+
+    function getCitySummary(distribution = []) {
+      const total = distribution.reduce((sum, item) => sum + item.count, 0);
+      const suzhou = distribution.find(item => item.city === 'Suzhou')?.count || 0;
+      const share = total ? (suzhou / total) * 100 : 0;
+      return { total, suzhou, share };
+    }
+
+    function renderCityDistribution(distribution = []) {
+      const summary = getCitySummary(distribution);
+      if (els.cityShare) {
+        els.cityShare.textContent = `${summary.share.toFixed(1)}% Suzhou`;
+        els.cityShare.className = `tag ${summary.share >= 65 ? 'good' : summary.share >= 40 ? '' : 'hot'}`;
+      }
+      if (!els.cityList) return;
+      if (!distribution.length) {
+        els.cityList.innerHTML = '<div class="empty-state">No city profile data available yet.</div>';
+        return;
+      }
+      const maxCount = Math.max(...distribution.map(item => item.count), 1);
+      els.cityList.innerHTML = distribution.slice(0, 7).map(item => {
+        const percent = summary.total ? (item.count / summary.total) * 100 : 0;
+        const width = Math.max(3, (item.count / maxCount) * 100);
+        return `
+          <div class="list-row">
+            <div class="row-main">
+              <p class="row-title">${escapeHtml(item.city)}</p>
+              <p class="row-sub">${item.count} users · ${percent.toFixed(1)}% of mapped cohort</p>
+              <div class="progress-track" aria-hidden="true"><div class="progress-bar" style="width:${width}%"></div></div>
+            </div>
+            <span class="tag ${item.city === 'Suzhou' ? 'good' : ''}">${percent.toFixed(1)}%</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDataScaleChart(items) {
+      currentDataScale = items;
+      const canvas = document.getElementById('data-scale-chart');
+      if (!canvas) return;
+      const total = items.reduce((sum, item) => sum + item.value, 0);
+      if (els.dataScaleTotal) els.dataScaleTotal.textContent = `${total.toLocaleString('en-US')} records`;
+      if (!items.length) {
+        drawEmptyCanvas(canvas, 'No app-scale data available yet.');
+        return;
+      }
+
+      const { ctx, width, height } = prepareCanvas(canvas);
+      const plot = { left: 104, right: width - 82, top: 18, bottom: height - 24 };
+      const maxValue = Math.max(1, ...items.map(item => item.value));
+      const rowHeight = (plot.bottom - plot.top) / items.length;
+
+      ctx.font = '12px Inter, system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      items.forEach((item, index) => {
+        const y = plot.top + rowHeight * index + rowHeight / 2;
+        const barWidth = Math.max(item.value > 0 ? 3 : 0, ((plot.right - plot.left) * item.value) / maxValue);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.textAlign = 'right';
+        ctx.fillText(item.label, plot.left - 12, y);
+        ctx.fillStyle = 'rgba(51, 65, 85, 0.58)';
+        ctx.fillRect(plot.left, y - 9, plot.right - plot.left, 18);
+        ctx.fillStyle = item.color;
+        ctx.fillRect(plot.left, y - 9, barWidth, 18);
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'left';
+        ctx.fillText(item.value.toLocaleString('en-US'), plot.right + 12, y);
+      });
+    }
+
+    function buildTelemetrySeries(data) {
+      const telemetry = Array.isArray(data.appData?.telemetry) ? data.appData.telemetry : [];
+      return telemetry
+        .slice(0, 12)
+        .map(record => ({
+          label: formatDate(record.receivedAt || record.timestamp),
+          temp: numberValue(record.tempC ?? record.temperature),
+          heart: numberValue(record.heartRateBpm ?? record.heartRate),
+          battery: numberValue(record.batteryPct),
+          deviceId: record.deviceId || 'unknown'
+        }))
+        .reverse();
+    }
+
+    function renderTelemetryTrendChart(series) {
+      currentTelemetrySeries = series;
+      const canvas = document.getElementById('telemetry-trend-chart');
+      if (!canvas) return;
+      if (els.telemetrySampleCount) els.telemetrySampleCount.textContent = `${series.length} samples`;
+      if (!series.length) {
+        drawEmptyCanvas(canvas, 'No M5Stack telemetry samples yet.');
+        return;
+      }
+
+      const { ctx, width, height } = prepareCanvas(canvas);
+      const plot = { left: 42, right: width - 18, top: 18, bottom: height - 32 };
+      const values = series.flatMap(point => [point.temp, point.heart, point.battery]).filter(value => value > 0);
+      const maxValue = Math.max(1, ...values);
+      const yMax = Math.ceil(maxValue * 1.15);
+      const xFor = index => series.length === 1
+        ? (plot.left + plot.right) / 2
+        : plot.left + ((plot.right - plot.left) * index) / (series.length - 1);
+      const yFor = value => plot.bottom - ((plot.bottom - plot.top) * value) / yMax;
+
+      ctx.font = '11px Inter, system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+      ctx.fillStyle = '#94a3b8';
+      for (let i = 0; i <= 4; i += 1) {
+        const value = (yMax / 4) * i;
+        const y = yFor(value);
+        ctx.beginPath();
+        ctx.moveTo(plot.left, y);
+        ctx.lineTo(plot.right, y);
+        ctx.stroke();
+        ctx.textAlign = 'right';
+        ctx.fillText(String(Math.round(value)), plot.left - 8, y);
+      }
+
+      const lines = [
+        { key: 'temp', color: '#f97316' },
+        { key: 'heart', color: '#fb7185' },
+        { key: 'battery', color: '#7dd3fc' }
+      ];
+      lines.forEach(line => {
+        const points = series.map(point => point[line.key]);
+        drawLineSeries(ctx, points, line.color, 'rgba(0, 0, 0, 0)', plot, xFor, yFor);
+      });
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.textAlign = 'center';
+      const labelStep = Math.max(1, Math.ceil(series.length / 4));
+      series.forEach((point, index) => {
+        if (index % labelStep === 0 || index === series.length - 1) {
+          ctx.fillText(point.label, xFor(index), height - 14);
+        }
+      });
+    }
+
+    function normalizeRoutes(metrics) {
+      return Object.entries(metrics?.routes || {})
+        .map(([route, stat]) => ({
+          route,
+          count: numberValue(stat.count),
+          avgMs: numberValue(stat.avgMs),
+          maxMs: numberValue(stat.maxMs),
+          status: stat.status || {}
+        }))
+        .sort((a, b) => b.maxMs - a.maxMs)
+        .slice(0, 8);
+    }
+
+    function routeStatusLabel(status = {}) {
+      const entries = Object.entries(status);
+      return entries.length ? entries.map(([code, count]) => `${code}:${count}`).join(' ') : '--';
+    }
+
+    function renderRouteLatencyChart(routes) {
+      currentRoutes = routes;
+      const canvas = document.getElementById('route-latency-chart');
+      if (!canvas) return;
+      if (els.routeCount) els.routeCount.textContent = `${routes.length} routes`;
+      if (!routes.length) {
+        drawEmptyCanvas(canvas, 'No route metrics available yet.');
+        return;
+      }
+
+      const { ctx, width, height } = prepareCanvas(canvas);
+      const plot = { left: 168, right: width - 110, top: 16, bottom: height - 18 };
+      const maxValue = Math.max(1, ...routes.map(route => route.maxMs));
+      const rowHeight = (plot.bottom - plot.top) / routes.length;
+
+      ctx.font = '11px Inter, system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      routes.forEach((item, index) => {
+        const y = plot.top + rowHeight * index + rowHeight / 2;
+        const label = item.route.length > 24 ? `${item.route.slice(0, 23)}...` : item.route;
+        const barWidth = Math.max(3, ((plot.right - plot.left) * item.maxMs) / maxValue);
+        const hasError = Object.keys(item.status).some(code => Number(code) >= 400);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.textAlign = 'right';
+        ctx.fillText(label, plot.left - 12, y);
+        ctx.fillStyle = 'rgba(51, 65, 85, 0.58)';
+        ctx.fillRect(plot.left, y - 8, plot.right - plot.left, 16);
+        ctx.fillStyle = hasError ? '#fb7185' : '#5eead4';
+        ctx.fillRect(plot.left, y - 8, barWidth, 16);
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${item.maxMs.toFixed(1)}ms`, plot.right + 10, y - 6);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`${item.count} req · ${routeStatusLabel(item.status)}`, plot.right + 10, y + 8);
+      });
+    }
+
+    function renderSubscriptionPanel(subscriptionOrders, allOrders, data = {}, citySummary = {}) {
+      const app = getAppSummary(data);
+      const routes = normalizeRoutes(latestMetrics);
+      const maxLatency = routes.length ? Math.max(...routes.map(route => route.maxMs)) : 0;
+      const telemetryPerUser = numberValue(app.users) ? numberValue(app.healthMeasurements) / numberValue(app.users) : 0;
+      const engagementPerUser = numberValue(app.users)
+        ? (numberValue(app.chatMessages) + numberValue(app.locationPoints)) / numberValue(app.users)
+        : 0;
+      const subscriptionTotal = subscriptionOrders.reduce((sum, order) => sum + order.amount, 0);
+      const subscriptionMix = allOrders.length ? (subscriptionOrders.length / allOrders.length) * 100 : 0;
+
+      if (els.subscriptionStatus) {
+        els.subscriptionStatus.textContent = `${(citySummary.share || 0).toFixed(1)}% Suzhou`;
+        els.subscriptionStatus.className = `tag ${(citySummary.share || 0) >= 65 ? 'good' : ''}`;
+      }
+      if (!els.subscriptionList) return;
+      els.subscriptionList.innerHTML = `
+        <div class="list-row">
+          <div class="row-main">
+            <p class="row-title">Suzhou concentration</p>
+            <p class="row-sub">${citySummary.suzhou || 0} Suzhou users from ${citySummary.total || 0} mapped profiles</p>
+          </div>
+          <span class="tag good">${(citySummary.share || 0).toFixed(1)}%</span>
+        </div>
+        <div class="list-row">
+          <div class="row-main">
+            <p class="row-title">Telemetry density</p>
+            <p class="row-sub">${numberValue(app.healthMeasurements).toLocaleString('en-US')} packets · ${numberValue(app.devicesTracked)} tracked devices</p>
+          </div>
+          <span class="tag">${telemetryPerUser.toFixed(1)}/user</span>
+        </div>
+        <div class="list-row">
+          <div class="row-main">
+            <p class="row-title">Engagement depth</p>
+            <p class="row-sub">${numberValue(app.chatMessages)} chat messages · ${numberValue(app.locationPoints)} map points</p>
+          </div>
+          <span class="tag good">${engagementPerUser.toFixed(1)}/user</span>
+        </div>
+        <div class="list-row">
+          <div class="row-main">
+            <p class="row-title">Care plan mix</p>
+            <p class="row-sub">${subscriptionOrders.length} subscription orders from ${allOrders.length} recent purchases · ${formatMoney(subscriptionTotal)}</p>
+          </div>
+          <span class="tag">${subscriptionMix.toFixed(1)}%</span>
+        </div>
+        <div class="list-row">
+          <div class="row-main">
+            <p class="row-title">Route health</p>
+            <p class="row-sub">${routes.length} monitored routes · slowest ${maxLatency.toFixed(1)}ms</p>
+          </div>
+          <span class="tag ${maxLatency > 1000 ? 'hot' : 'good'}">${latestMetrics?.requests || 0} req</span>
+        </div>
+      `;
+    }
+
+    function renderProductRanking(productOrders, data = {}) {
+      const devices = buildTelemetryDeviceRanking(data).slice(0, 6);
+      if (els.productRankCount) els.productRankCount.textContent = devices.length ? `${devices.length} devices` : `${buildProductRanking(productOrders).length} SKUs`;
+      if (devices.length) {
+        els.productRankingEmpty.hidden = true;
+        const maxScore = Math.max(...devices.map(item => item.score || item.count), 1);
+        els.productRanking.innerHTML = devices.map((item, index) => {
+          const percent = ((item.score || item.count) / maxScore) * 100;
+          const vitals = [
+            item.temp != null ? `${Number(item.temp).toFixed(1)}C` : '',
+            item.heart != null ? `${Number(item.heart).toFixed(1)} bpm` : '',
+            item.battery != null ? `${Number(item.battery).toFixed(1)}% battery` : ''
+          ].filter(Boolean).join(' · ') || 'Vitals pending';
+          return `
+            <div class="list-row">
+              <div class="row-main">
+                <p class="row-title">${index + 1}. ${escapeHtml(item.name)}</p>
+                <p class="row-sub">${item.count} recent samples · ${escapeHtml(vitals)} · ${escapeHtml(item.source)}</p>
+                <div class="progress-track" aria-hidden="true"><div class="progress-bar" style="width:${percent.toFixed(1)}%"></div></div>
+              </div>
+              <span class="tag good">${percent.toFixed(1)}%</span>
+            </div>
+          `;
+        }).join('');
+        return;
+      }
       const ranking = buildProductRanking(productOrders).slice(0, 6);
-      if (els.productRankCount) els.productRankCount.textContent = `${ranking.length} SKUs`;
       if (!ranking.length) {
         els.productRanking.innerHTML = '';
         els.productRankingEmpty.hidden = false;
@@ -1374,15 +2080,15 @@
       els.productRankingEmpty.hidden = true;
       const maxRevenue = Math.max(...ranking.map(item => item.revenue), 1);
       els.productRanking.innerHTML = ranking.map((item, index) => {
-        const percent = Math.round((item.revenue / maxRevenue) * 100);
+        const percent = (item.revenue / maxRevenue) * 100;
         return `
           <div class="list-row">
             <div class="row-main">
               <p class="row-title">${index + 1}. ${escapeHtml(item.name)}</p>
               <p class="row-sub">${item.count} orders · ${item.quantity} units · ${formatMoney(item.revenue)}</p>
-              <div class="progress-track" aria-hidden="true"><div class="progress-bar" style="width:${percent}%"></div></div>
+              <div class="progress-track" aria-hidden="true"><div class="progress-bar" style="width:${percent.toFixed(1)}%"></div></div>
             </div>
-            <span class="tag">${percent}%</span>
+            <span class="tag">${percent.toFixed(1)}%</span>
           </div>
         `;
       }).join('');
@@ -1410,7 +2116,7 @@
             <div class="progress-bar" style="width:${customer.score}%"></div>
           </div>
           <p class="info-meta">
-            Reliance ${customer.score}/100 · Pets ${customer.petCount} · AI ${customer.aiCount} · Orders ${customer.orderCount}
+            Reliance ${customer.score.toFixed(1)}/100 · Pets ${customer.petCount} · AI ${customer.aiCount} · Orders ${customer.orderCount}
           </p>
           <p class="info-meta">
             ${customer.mainPet ? `Primary pet: ${escapeHtml(customer.mainPet)} ${escapeHtml(customer.mainPetType)}` : 'Primary pet profile pending'}
@@ -1424,7 +2130,7 @@
             <p class="row-title">${escapeHtml(customer.label)}</p>
             <p class="row-sub">${customer.topics.length ? customer.topics.map(escapeHtml).join(' / ') : 'No AI topics'} · ${customer.petCount} pet profiles</p>
           </div>
-          <span class="tag ${customer.score >= 72 ? 'hot' : customer.score >= 42 ? 'good' : ''}">${customer.score}</span>
+          <span class="tag ${customer.score >= 72 ? 'hot' : customer.score >= 42 ? 'good' : ''}">${customer.score.toFixed(1)}</span>
         </div>
       `).join('');
     }
@@ -1474,8 +2180,8 @@
           <div class="list-row">
             <div class="row-main">
               <p class="row-title">${escapeHtml(chat.contactId || 'unknown')} · ${escapeHtml(topic)}</p>
-              <p class="row-sub">Client: ${escapeHtml(userMessage || 'No client message recorded')}</p>
-              <p class="row-sub">AI: ${escapeHtml(reply.slice(0, 96))}${reply.length > 96 ? '...' : ''}</p>
+              <p class="row-sub">Client: ${escapeHtml(safeExcerpt(userMessage || 'No client message recorded'))}</p>
+              <p class="row-sub">AI: ${escapeHtml(safeExcerpt(reply || 'Assistant response pending', 96))}</p>
             </div>
             <span class="tag">${formatDate(chat.capturedAt)}</span>
           </div>
@@ -1483,20 +2189,50 @@
       }).join('');
     }
 
-    function renderOrderTable(orders) {
-      if (els.orderCount) els.orderCount.textContent = `${orders.length} orders`;
-      if (!orders.length) {
-        els.orderTable.innerHTML = '<tr><td colspan="6">No order data yet.</td></tr>';
+    function renderOrderTable(orders, data = {}) {
+      const telemetryRows = (Array.isArray(data.appData?.telemetry) ? data.appData.telemetry : []).slice(0, 6).map(record => ({
+        capturedAt: record.receivedAt || record.timestamp,
+        type: 'Telemetry',
+        tagClass: 'good',
+        signal: record.deviceId || 'M5Stack device',
+        count: `${Number(record.heartRateBpm || 0).toFixed(1)} bpm`,
+        value: `${Number(record.tempC || record.temperature || 0).toFixed(1)}C`,
+        note: `${record.batteryPct != null ? Number(record.batteryPct).toFixed(1) : '0.0'}% battery · ${record.quality || record.source || 'sample'}`
+      }));
+      const chatRows = combinedChatLogs(data).slice(0, 5).map(chat => ({
+        capturedAt: chat.capturedAt,
+        type: 'AI chat',
+        tagClass: '',
+        signal: detectAiTopic(chat),
+        count: '1 session',
+        value: chat.contactId || 'contact',
+        note: safeExcerpt(chat.reply || (Array.isArray(chat.messages) ? chat.messages[0]?.content : ''), 84)
+      }));
+      const orderRows = orders.slice(0, 8).map(order => ({
+        capturedAt: order.capturedAt,
+        type: order.type === 'subscription' ? 'App subscription' : 'Product',
+        tagClass: order.type === 'subscription' ? 'good' : '',
+        signal: order.name,
+        count: String(order.quantity),
+        value: formatMoney(order.amount),
+        note: [order.source, order.note].filter(Boolean).join(' · ') || 'No note'
+      }));
+      const rows = [...telemetryRows, ...chatRows, ...orderRows]
+        .sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt))
+        .slice(0, 14);
+      if (els.orderCount) els.orderCount.textContent = `${rows.length} recent signals`;
+      if (!rows.length) {
+        els.orderTable.innerHTML = '<tr><td colspan="6">No operational data yet.</td></tr>';
         return;
       }
-      els.orderTable.innerHTML = orders.slice(0, 12).map(order => `
+      els.orderTable.innerHTML = rows.map(row => `
         <tr>
-          <td>${formatDate(order.capturedAt)}</td>
-          <td><span class="tag ${order.type === 'subscription' ? 'good' : ''}">${order.type === 'subscription' ? 'App subscription' : 'Product'}</span></td>
-          <td>${escapeHtml(order.name)}</td>
-          <td>${order.quantity}</td>
-          <td>${formatMoney(order.amount)}</td>
-          <td>${escapeHtml([order.source, order.note].filter(Boolean).join(' · ') || 'No note')}</td>
+          <td>${formatDate(row.capturedAt)}</td>
+          <td><span class="tag ${row.tagClass}">${escapeHtml(row.type)}</span></td>
+          <td>${escapeHtml(row.signal)}</td>
+          <td>${escapeHtml(row.count)}</td>
+          <td>${escapeHtml(row.value)}</td>
+          <td>${escapeHtml(row.note)}</td>
         </tr>
       `).join('');
     }
@@ -1516,66 +2252,104 @@
           petProfiles: [],
           purchases: [],
           chatLogs: []
+        },
+        appData: {
+          summary: {
+            users: 0,
+            pets: 0,
+            healthMeasurements: 0,
+            locationPoints: 0,
+            chatMessages: 0,
+            devicesTracked: 0
+          },
+          telemetry: []
         }
       };
     }
 
     function renderSnapshot(data) {
       latestSnapshot = data;
+      const app = getAppSummary(data);
       const orders = normalizeOrders(Array.isArray(data.monitoring?.purchases) ? data.monitoring.purchases : [])
         .sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt));
       const { productOrders, subscriptionOrders, productRevenue, subscriptionRevenue } = summarizeOrders(orders);
-      const chatLogs = Array.isArray(data.monitoring?.chatLogs) ? data.monitoring.chatLogs : [];
-      const petRecords = Array.isArray(data.monitoring?.petProfiles) ? data.monitoring.petProfiles : [];
+      const chatLogs = combinedChatLogs(data);
+      const petRecords = combinedPetRecords(data);
       const aiInsights = buildAiInsights(chatLogs);
       const customers = buildCustomers(data, orders, aiInsights);
+      const cityDistribution = buildCityDistribution(customers);
+      const citySummary = getCitySummary(cityDistribution);
       const avgDependency = customers.length
-        ? Math.round(customers.reduce((sum, customer) => sum + customer.score, 0) / customers.length)
+        ? customers.reduce((sum, customer) => sum + customer.score, 0) / customers.length
         : 0;
+      const activeUsers = citySummary.total || numberValue(app.users) || customers.length;
+      const telemetryCount = numberValue(app.healthMeasurements);
+      const telemetryPerUser = activeUsers ? telemetryCount / activeUsers : 0;
+      const aiSessionCount = numberValue(data.summary?.chatLogs) || (Array.isArray(data.monitoring?.chatLogs) ? data.monitoring.chatLogs.length : 0);
+      const topTopic = aiInsights.topics[0] ? `${aiInsights.topics[0].topic} ${aiInsights.topics[0].count}` : 'No topic yet';
 
-      els.productSales.textContent = formatMoney(productRevenue);
-      els.productSalesNote.textContent = `${productOrders.length} product orders`;
-      els.subscriptionSales.textContent = formatMoney(subscriptionRevenue);
-      els.subscriptionNote.textContent = subscriptionOrders.length
-        ? `${subscriptionOrders.length} subscription orders`
-        : 'Subscription signal pending';
-      els.dependencyScore.textContent = String(avgDependency);
+      els.productSales.textContent = activeUsers.toLocaleString('en-US');
+      els.productSalesNote.textContent = `${citySummary.suzhou || 0} Suzhou users · ${citySummary.share.toFixed(1)}% mapped share`;
+      els.subscriptionSales.textContent = `${citySummary.share.toFixed(1)}%`;
+      els.subscriptionNote.textContent = `${citySummary.suzhou || 0} of ${citySummary.total || 0} profile-mapped users`;
+      els.dependencyScore.textContent = avgDependency.toFixed(1);
       els.dependencyNote.textContent = customers.length
-        ? `${customers.filter(customer => customer.score >= 72).length} high-reliance clients`
+        ? `${customers.filter(customer => customer.score >= 72).length} high-reliance clients · ${((productRevenue + subscriptionRevenue) / Math.max(1, customers.length)).toFixed(1)} yuan/user`
         : 'No reliance sample yet';
-      els.aiConsultCount.textContent = String(chatLogs.length);
-      els.aiNote.textContent = `${aiInsights.contacts.length} client touchpoints`;
-      els.summaryUsers.textContent = data.summary?.userProfiles || 0;
-      els.summaryPets.textContent = data.summary?.petProfiles || 0;
-      els.summaryOrders.textContent = orders.length;
+      els.aiConsultCount.textContent = aiSessionCount.toLocaleString('en-US');
+      els.aiNote.textContent = `${aiInsights.contacts.length} client touchpoints · ${topTopic}`;
+      if (els.heroSuzhouCount) els.heroSuzhouCount.textContent = `${citySummary.suzhou || 0} users`;
+      if (els.heroSuzhouNote) els.heroSuzhouNote.textContent = `${citySummary.share.toFixed(1)}% of mapped base`;
+      if (els.heroDensity) els.heroDensity.textContent = `${telemetryPerUser.toFixed(1)}/user`;
+      if (els.heroDensityNote) els.heroDensityNote.textContent = `${telemetryCount.toLocaleString('en-US')} packets across ${numberValue(app.devicesTracked)} devices`;
+      if (els.heroCitySpread) els.heroCitySpread.textContent = `${cityDistribution.length} cities`;
+      if (els.heroCityNote) els.heroCityNote.textContent = cityDistribution[0]
+        ? `${cityDistribution[0].city} leads with ${cityDistribution[0].count} users`
+        : 'No mapped city distribution yet';
+      els.summaryUsers.textContent = activeUsers.toLocaleString('en-US');
+      if (els.summarySuzhou) els.summarySuzhou.textContent = `${citySummary.share.toFixed(1)}%`;
+      els.summaryPets.textContent = (petRecords.length || numberValue(app.pets)).toLocaleString('en-US');
+      els.summaryOrders.textContent = telemetryCount.toLocaleString('en-US');
       els.capturedAt.textContent = data.capturedAt ? new Date(data.capturedAt).toLocaleString('en-US') : 'Unknown';
-      els.aiTopicLeader.textContent = aiInsights.topics[0]
-        ? `${aiInsights.topics[0].topic} ${aiInsights.topics[0].count}`
-        : 'No topic yet';
+      els.aiTopicLeader.textContent = topTopic;
 
-      renderRevenueChart(buildRevenueSeries(orders));
-      renderSubscriptionPanel(subscriptionOrders, orders);
-      renderProductRanking(productOrders);
+      renderRevenueChart(buildOperationalSeries(data), 'activity');
+      renderSubscriptionPanel(subscriptionOrders, orders, data, citySummary);
+      renderProductRanking(productOrders, data);
       renderAiChart(aiInsights.topics);
+      renderDataScaleChart(buildDataScale(data));
+      renderTelemetryTrendChart(buildTelemetrySeries(data));
+      renderRouteLatencyChart(normalizeRoutes(latestMetrics));
+      renderCityDistribution(cityDistribution);
       renderCustomers(customers);
       renderPets(petRecords);
       renderAiLogs(chatLogs, aiInsights);
-      renderOrderTable(orders);
+      renderOrderTable(orders, data);
+      scheduleDashboardLayout();
     }
 
     async function refreshData() {
       if (els.status) els.status.textContent = 'Syncing';
       try {
-        const response = await fetch(overviewUrl, {
-          cache: 'no-store',
-          headers: monitorAuthHeaders()
-        });
+        const [response, metricsResponse] = await Promise.all([
+          fetch(overviewUrl, {
+            cache: 'no-store',
+            headers: monitorAuthHeaders()
+          }),
+          fetch(metricsUrl, {
+            cache: 'no-store',
+            headers: monitorAuthHeaders()
+          }).catch(() => null)
+        ]);
         if (response.status === 401) {
           if (els.status) els.status.textContent = 'Unauthorized · check monitor access key';
           return;
         }
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
+        latestMetrics = metricsResponse && metricsResponse.ok
+          ? await metricsResponse.json().catch(() => null)
+          : null;
         renderSnapshot(data);
         if (els.status) els.status.textContent = `Synced ${new Date().toLocaleTimeString('en-US')}`;
       } catch (error) {
@@ -1629,6 +2403,10 @@
       redrawTimer = window.setTimeout(() => {
         renderRevenueChart(currentRevenueSeries);
         renderAiChart(currentAiTopics);
+        renderDataScaleChart(currentDataScale);
+        renderTelemetryTrendChart(currentTelemetrySeries);
+        renderRouteLatencyChart(currentRoutes);
+        scheduleDashboardLayout();
       }, 120);
     });
   </script>

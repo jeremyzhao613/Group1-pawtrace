@@ -21,8 +21,8 @@ GPS v1.1 + Heart Rate HAT + IMU
   -> M5StickC Plus 1.1
   -> Wi-Fi HTTP POST JSON
   -> PawTrace backend /api/device/telemetry
-  -> PostgreSQL HealthMeasurement / LocationPoint / LastLocation + temporary latest cache
-  -> Frontend fetch /api/device/telemetry/latest
+  -> PostgreSQL HealthMeasurement / LocationPoint / LastLocation + latest cache
+  -> Frontend EventSource /api/device/telemetry/stream with polling fallback
   -> Map, Health Monitoring, and Pet Cards
 ```
 
@@ -33,7 +33,7 @@ GPS v1.1 + Heart Rate HAT + IMU
   -> M5StickC Plus Wi-Fi station
   -> same hotspot / LAN
   -> HTTP POST /api/device/telemetry
-  -> PostgreSQL + latest cache + frontend polling
+  -> PostgreSQL + latest cache + frontend realtime stream
 ```
 
 Use this split:
@@ -131,6 +131,87 @@ DEVICE_INGEST_TOKEN="pawtrace-m5-dev-token"
 DEVICE_INGEST_ALLOW_LAN=true
 ```
 
+## One-Click Hotspot Connection
+
+For Jeremy's iPhone hotspot demo, use one command from the repo root:
+
+```bash
+npm run connect:m5
+```
+
+This command automatically:
+
+- starts local PostgreSQL
+- applies backend migrations
+- starts or reuses the backend on `0.0.0.0:3000`
+- starts or reuses the main frontend on `5173`
+- starts or reuses the glass dashboard on `3001`
+- detects the current hotspot LAN IP
+- sends `WIFI`, `HOST`, `TOKEN`, `UPLOAD`, and `CONFIG` to the M5 over USB serial when a M5 serial port is connected
+- runs a full telemetry test through database, latest/history APIs, frontend proxy, glass proxy, and realtime stream
+- opens the main health page and glass dashboard
+
+Current hotspot settings:
+
+```text
+SSID: Jeremy’s iphone
+Password: 00000000
+Backend: http://172.20.10.6:3000/api/device/telemetry
+```
+
+If you only want to test without opening browser windows:
+
+```bash
+npm run connect:m5 -- --no-open
+```
+
+If you need visible changing realtime values without waiting for the physical sensors to vary, run the live telemetry stream:
+
+```bash
+npm run live:m5
+```
+
+This keeps posting one changing packet per second. Heart rate, temperature, SpO2, battery, Wi-Fi RSSI, and GPS coordinates move on every packet, and the health page updates through the realtime stream without a refresh. Stop it with `Ctrl+C`.
+
+The health page link is:
+
+```text
+http://localhost:5173/?openApp=profile&m5Demo=1#health
+```
+
+## Physical M5 Wi-Fi Upload
+
+Telemetry data must be uploaded by Wi-Fi only. USB serial is only for flashing firmware and optional Wi-Fi/backend configuration commands; it is not used as a database upload path.
+
+Current physical M5 status:
+
+```text
+M5StickC Plus: detected and flashed
+Firmware: 10.2.6-white-ui-wifi-only
+Wi-Fi SSID: Jeremy’s iphone configured
+Wi-Fi connection: waiting for the iPhone hotspot to be visible to the ESP32
+GPS serial: receiving NMEA bytes
+GPS fix: no fix indoors yet
+Heart Rate HAT: not detected on the HAT I2C pins
+```
+
+For direct Wi-Fi upload, the iPhone hotspot must be visible to the ESP32. On the iPhone, enable Personal Hotspot, turn on Maximize Compatibility, keep the hotspot settings screen open, and then run:
+
+```bash
+npm run connect:m5
+```
+
+GPS needs outdoor sky view before `gps_fix` becomes `1` and map points are stored. Heart Rate HAT readings require the MAX30102 Heart Rate HAT to be physically attached and pressed against skin/contact material; if `heart_sensor_ready=false`, the M5 is not seeing the sensor on I2C.
+
+Accuracy policy:
+
+- `temp_c` is only used for real pet/body temperature sensors. The M5 IMU chip temperature is stored separately as `board_temp_c`.
+- `pet_bpm` and `spo2` are `null` unless the MAX30102 is detected, contact is present, and a valid pulse is measured.
+- `lat` and `lon` are `null` unless GPS has a fresh fix.
+- `activity_score` is movement above the 1g gravity baseline, not raw acceleration including gravity.
+
+On local and hotspot hosts, this link automatically signs in as the demo account so M5 data stored under `demo` appears without manual login.
+
 The M5StickC must send this token as either:
 
 ```http
@@ -148,7 +229,7 @@ For hotspot demos, `DEVICE_INGEST_ALLOW_LAN=true` lets private-network clients s
 For local testing, the backend runs on port `3000`. From the M5StickC, use the computer LAN IP, not `localhost`:
 
 ```text
-http://192.168.31.199:3000/api/device/telemetry
+http://172.20.10.6:3000/api/device/telemetry
 ```
 
 The included Arduino example is:
@@ -156,6 +237,13 @@ The included Arduino example is:
 ```text
 hardware/m5stack/pawtrace_wifi_telemetry.ino
 ```
+
+Current Wi-Fi firmware uses `10.4.3-stable-wifi-interface` behavior:
+
+- uploads at 1 sample per second by default, which is more reliable on phone hotspots and HTTPS than the earlier 5 Hz loop
+- keeps a local queue and may send `{"samples":[...]}` when the network was slow; both the Cloudflare Worker and local Express backend accept this batch shape
+- smooths IMU activity, heart-rate, SpO2, battery voltage, and GPS display values before publishing them
+- publishes `activity_confidence`, `filtered_accel_magnitude_g`, `signal_quality`, and `sample_interval_ms` so the app can tell whether the output is stable enough for a demo
 
 Flash the sketch once, then set the hotspot, backend host, and token over USB serial. The values are stored in ESP32 Preferences, so changing Wi-Fi networks or a Mac LAN IP does not require editing and reflashing the sketch.
 
@@ -174,15 +262,23 @@ ipconfig getifaddr en0
 Example serial setup:
 
 ```text
-WIFI MyHotspot|MyPassword
-HOST 192.168.31.199
+WIFI Jeremy’s iphone|00000000
+HOST 172.20.10.6
 TOKEN pawtrace-m5-dev-token
 CONFIG
 ```
 
-`HOST 192.168.31.199` expands to `http://192.168.31.199:3000/api/device/telemetry`. Use `URL http://<host>:<port>/api/device/telemetry` if you need a custom path or port.
+`HOST 172.20.10.6` expands to `http://172.20.10.6:3000/api/device/telemetry`. Use `URL http://<host>:<port>/api/device/telemetry` if you need a custom path or port.
 
-For a mobile hotspot demo, keep the backend bound to `0.0.0.0:3000` and use the Mac hotspot/LAN IP. The Wi-Fi firmware keeps radio sleep off, auto-reconnects to the same SSID, queues up to 24 telemetry packets while the hotspot drops, and flushes the queue after HTTP recovers.
+For a mobile hotspot demo, keep the backend bound to `0.0.0.0:3000` and use the Mac hotspot/LAN IP. The Wi-Fi firmware keeps radio sleep off, auto-reconnects to the same SSID, uploads roughly once per second, queues up to 24 telemetry packets while the hotspot drops, and flushes the queue after HTTP recovers.
+
+After each successful database write, the backend also pushes the packet to signed-in frontends over:
+
+```text
+GET /api/device/telemetry/stream?token=<jwt>&limit=1
+```
+
+The normal `/api/device/telemetry/latest` and `/api/device/telemetry/history` endpoints remain as fallback and history backfill.
 
 The 3001 glass dashboard is also LAN-ready. Start it after the backend:
 
@@ -193,7 +289,7 @@ npm run dev:glass
 Then open the dashboard from the same Wi-Fi or phone hotspot:
 
 ```text
-http://192.168.31.199:3001/
+http://172.20.10.6:3001/
 ```
 
 The 3001 Vite server listens on `0.0.0.0`, allows same-network hosts, and proxies `/api` to the backend on port `3000`, so the page reads the same Wi-Fi telemetry that the M5Stick uploads.
@@ -208,7 +304,7 @@ SCAN                    list visible Wi-Fi hotspots
 LAN                     print M5 same-network HTTP base URL
 WIFI                    force Wi-Fi reconnect to the configured hotspot
 WIFI ssid|password      save hotspot credentials and reconnect
-HOST 192.168.31.199     save backend host on the same network
+HOST 172.20.10.6     save backend host on the same network
 URL http://host:3000/... save full upload URL
 TOKEN shared-token      save ingest token
 UPLOAD                  queue and immediately try one upload
@@ -287,7 +383,7 @@ Actual M5StickC Plus snake_case packet supported by the backend:
   "activity": "REST",
   "activity_score": 0.5,
   "wifi_connected": true,
-  "wifi_ssid": "MyHotspot",
+  "wifi_ssid": "Jeremy’s iphone",
   "wifi_rssi": -51,
   "wifi_ip": "192.168.31.42",
   "lan_server_enabled": true,
@@ -320,10 +416,10 @@ Write this JSON to the WiFi Config UUID:
 ```json
 {
   "type": "wifi_config",
-  "ssid": "MyHotspot",
-  "password": "hotspot-password",
-  "host": "192.168.31.199",
-  "url": "http://192.168.31.199:3000/api/device/telemetry",
+  "ssid": "Jeremy’s iphone",
+  "password": "00000000",
+  "host": "172.20.10.6",
+  "url": "http://172.20.10.6:3000/api/device/telemetry",
   "token": "pawtrace-m5-dev-token",
   "source": "pawtrace-web"
 }
@@ -337,11 +433,11 @@ The M5 returns status JSON on the Status UUID and as the readable value of the c
   "ok": true,
   "device_id": "pawtrace_001",
   "ble_connected": true,
-  "wifi_ssid": "MyHotspot",
+  "wifi_ssid": "Jeremy’s iphone",
   "wifi_connected": true,
   "wifi_ip": "192.168.31.42",
   "wifi_rssi": -51,
-  "upload_url": "http://192.168.31.199:3000/api/device/telemetry",
+  "upload_url": "http://172.20.10.6:3000/api/device/telemetry",
   "token_set": true,
   "lan_base_url": "http://192.168.31.42:8080"
 }

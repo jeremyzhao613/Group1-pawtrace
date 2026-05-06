@@ -4,22 +4,18 @@ PawTrace is a full-stack pet community and health-management prototype. It combi
 
 The main web app is a Vite + Tailwind single-page frontend. The backend is Node.js + Express + TypeScript with Prisma + PostgreSQL and JWT auth. By default, the backend runs as an API and monitor service only. It does not serve the frontend on port 3000 unless `SERVE_WEB=1` is enabled.
 
-## Current Release: 8.0.0
+## Current Release: 10.1.0
 
-8.0.0 is the YOLO Video Check and responsive UI hardening release.
+10.1.0 is the cloud-connected, realtime telemetry, and cross-platform packaging release candidate.
 
 Important updates:
 
-- Added standalone `Video Check` for pet video behavior-risk analysis.
-- Added `POST /api/ai/video-behavior` in the Express backend.
-- Added `ai-video-service/`, a Python FastAPI service using OpenCV and Ultralytics YOLO.
-- Separated `Video Check` from `AI Assist`: `AI Assist` is for AI API features, while `Video Check` is for YOLO video analysis.
-- Added behavior-risk disclaimer language and avoided unsupported medical diagnosis claims.
-- Reworked mobile bottom navigation into `Map / Pets / Chat / Health / More`.
-- Moved `Video Check / AI Assist / Profile` into the mobile `More` panel.
-- Fixed responsive layout issues across Map, Profile, Health, AI Assist, Video Check, login, and mobile pages.
-- Fixed modal focus restore console errors.
-- Added 8.0.0 release documentation in `plans/plans/pawtrace-8.0.0.plan.md`.
+- Added Cloudflare Worker + D1 API deployment alongside the Pages frontends.
+- Added runtime API configuration for web, Android, iOS, and desktop packages.
+- Added realtime M5Stack Wi-Fi telemetry with SSE plus polling fallback.
+- Added one-command M5 demo/test tooling: `connect:m5`, `test:m5`, and `live:m5`.
+- Hardened mobile/LAN/packaged-app network behavior and Cloudflare Pages access diagnostics.
+- Kept the standalone YOLO Video Check safety wording from the 8.0.0 release line.
 
 Safety positioning:
 
@@ -60,8 +56,11 @@ ai-video-service/     Python FastAPI YOLO video behavior-analysis service
 assets/               Shared static assets, mounted as /assets in production
 monitor/              Static monitor UI, served at /monitor
 scripts/local-db.sh   Project-local PostgreSQL helper
-plans/plans/          Release notes and project logs
+plans/                Release notes and project logs
 ```
+
+For a fuller folder map, source/generated folder guide, and common task paths,
+see `docs/project-structure.md`.
 
 ## Quick Start
 
@@ -85,11 +84,10 @@ Stop services:
 npm run stop
 ```
 
-## Cloudflare Pages Deployment
+## Cloudflare Deployment
 
-The main Vite frontend can be deployed directly to Cloudflare Pages with Wrangler.
-The Node/Express backend still needs a separate Node runtime or an exposed API URL
-because it depends on Express, Prisma, and PostgreSQL.
+The fastest production-style path is Cloudflare Pages for both frontends plus a
+Cloudflare Worker API backed by D1:
 
 Check Cloudflare auth:
 
@@ -97,21 +95,37 @@ Check Cloudflare auth:
 npm run cloudflare:whoami
 ```
 
-Deploy the frontend:
+Deploy the Worker API, D1 schema, main frontend, and glass frontend:
 
 ```bash
-PAWTRACE_API_BASE_URL=https://your-api.example.com npm run deploy:cloudflare
+npm run deploy:cloudflare:full
+```
+
+Deploy only the two Pages frontends after UI-only changes:
+
+```bash
+npm run deploy:cloudflare:pages
 ```
 
 Preview deploy:
 
 ```bash
-PAWTRACE_API_BASE_URL=https://your-api.example.com npm run deploy:cloudflare:preview
+npm run deploy:cloudflare:preview
 ```
 
-If `PAWTRACE_API_BASE_URL` is omitted, the built app keeps using relative `/api`
-requests. For a Cloudflare Pages-only deployment, set it to a reachable backend
-URL and include the Pages domain in the backend `CORS_ORIGIN` value.
+Production Cloudflare builds write `PAWTRACE_API_BASE_URL` into
+`frontend/dist/app/runtime-config.js`; the default is the current Worker API.
+For a custom Node/Express API, set `PAWTRACE_API_BASE_URL` to that HTTPS URL and
+include the Pages domains in the backend `CORS_ORIGIN` value.
+See `docs/cloudflare-deployment.md` for the complete Cloudflare architecture.
+
+If `pages.dev` cannot open on a Mac with Shadowrocket/VPN enabled, check for
+fake-ip DNS and apply the local hosts fix:
+
+```bash
+npm run cloudflare:fix-access
+sudo node ./scripts/fix-cloudflare-pages-access.mjs --apply
+```
 
 ## Local Development Without Docker Desktop
 
@@ -356,7 +370,7 @@ Manual checks:
 
 ## Release Notes
 
-- 8.0.0: `plans/plans/pawtrace-8.0.0.plan.md`
-- 7.1.0: `plans/plans/pawtrace-7.1.0.plan.md`
-- 7.0.0: `plans/plans/pawtrace-7.0.0.plan.md`
-- 6.0.0: `plans/plans/pawtrace-6.0.0.plan.md`
+- 8.0.0: `plans/pawtrace-8.0.0.plan.md`
+- 7.1.0: `plans/pawtrace-7.1.0.plan.md`
+- 7.0.0: `plans/pawtrace-7.0.0.plan.md`
+- 6.0.0: `plans/pawtrace-6.0.0.plan.md`

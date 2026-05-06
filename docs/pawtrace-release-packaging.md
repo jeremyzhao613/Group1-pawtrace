@@ -39,47 +39,87 @@ NODE_ENV=production SERVE_WEB=1 WEB_APP=frontend npm start --prefix backend
 
 ## 3. Android WebView 打包
 
-前端现在支持运行时 API 地址。同步 Android 前，先在这里填后端地址：
+前端现在支持运行时 API 地址。同步 Android 时，打包脚本会自动写入
+`frontend/dist/app/runtime-config.js`，再同步到 WebView 工程。
 
-```js
-// frontend/public/app/runtime-config.js
-window.PAWTRACE_API_BASE_URL = 'https://your-api-domain.example';
+可以把公共后端地址放在根目录 `.env`：
+
+```env
+PAWTRACE_API_BASE_URL=https://your-api-domain.example
 ```
 
-然后执行：
+默认未设置 `PAWTRACE_API_BASE_URL` 时，Android/iOS 包会使用当前电脑的局域网地址：
+`http://<computer-lan-ip>:3000`。这适合同一 Wi-Fi 或手机热点调试。
+
+如果后端已经部署到线上，请显式传入 HTTPS API 地址：
+
+```bash
+PAWTRACE_API_BASE_URL=https://your-api-domain.example npm run package:android
+```
+
+本地调试执行：
 
 ```bash
 npm run package:android
 npm run cap:open:android --prefix frontend
 ```
 
-在 Android Studio 里构建 APK/AAB。注意：登录、聊天、AI 诊断和 YOLO 分析都依赖后端，安卓包不是完全离线应用。
+在 Android Studio 里构建 APK/AAB，或直接生成 debug APK：
+
+```bash
+npm run package:apk:debug
+```
+
+Android 工程已开启 `INTERNET`、网络状态权限、本地 HTTP/LAN cleartext 和 WebView mixed-content 调试策略。注意：登录、聊天、AI 诊断和 YOLO 分析都依赖后端，安卓包不是完全离线应用。
 
 ## 4. iOS WebView 打包
 
-iOS 和 Android 使用同一份 Web 产物，也需要先确认 `runtime-config.js` 指向可访问的 HTTPS 后端：
+iOS 和 Android 使用同一份 Web 产物。线上后端建议使用 HTTPS：
+
+```bash
+PAWTRACE_API_BASE_URL=https://your-api-domain.example npm run package:ios
+```
+
+本地调试执行：
 
 ```bash
 npm run package:ios
 npm run cap:open:ios --prefix frontend
 ```
 
-随后在 Xcode 中选择签名 Team，构建模拟器包或真机/TestFlight 包。iOS 真机要求后端使用 HTTPS；如果只是本机调试，需要在 Xcode/Info.plist 中单独处理 App Transport Security。
+随后在 Xcode 中选择签名 Team，构建模拟器包或真机/TestFlight 包。当前 iOS 工程已允许本地/LAN HTTP 调试；正式发布仍建议改回 HTTPS 后端。
 
-## 5. Windows EXE 方案
+## 5. 桌面 Electron 包
 
-当前仓库还没有 Electron/Tauri 打包代码。EXE 可以走两种方案：
+桌面端使用 Electron 加载同一份 `frontend/dist` 产物。
 
-- 远程后端：EXE 壳加载 `frontend/dist`，`runtime-config.js` 指向 HTTPS API 域名。
-- 内置后端：EXE 启动本机 Node 后端，`runtime-config.js` 指向本机后端地址。
+默认未设置 `PAWTRACE_API_BASE_URL` 时，桌面包会连接：
 
-现在能先准备 EXE 壳需要的网页产物：
+```text
+http://localhost:3000
+```
+
+如果后端在远程服务器：
+
+```bash
+PAWTRACE_API_BASE_URL=https://your-api-domain.example npm run package:desktop:dir
+PAWTRACE_API_BASE_URL=https://your-api-domain.example npm run package:exe
+PAWTRACE_API_BASE_URL=https://your-api-domain.example npm run package:dmg
+```
+
+只准备桌面网页产物：
 
 ```bash
 npm run package:exe:prepare
 ```
 
-要真的生成 `.exe`，还需要新增 Electron 或 Tauri 项目文件和打包依赖。当前我没有把这些依赖塞进仓库，避免在没有确认桌面方案前引入一整套桌面运行时。
+后端现在会自动放行 Electron/Capacitor 的本机 origin。若需要手动配置，至少包含：
+
+```env
+CORS_ORIGIN=https://your-web-domain.example,pawtrace://app,capacitor://localhost,ionic://localhost
+```
+
+打包后的应用里也可以点击顶部连接状态，临时改写 API 地址；该值会保存在本机 `localStorage`。
 
 ## 6. 一次性同步移动端
 

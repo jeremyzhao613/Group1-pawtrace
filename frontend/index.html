@@ -35,9 +35,201 @@
   <link rel="icon" type="image/png" href="/assets/1.png" />
   <link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
   <link rel="preload" as="image" href="/assets/m1.jpg">
-  <link rel="stylesheet" href="/app/app.css" />
-  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="/app/app.css" />
+  <style>
+    .theme-switch {
+      --toggle-size: 12px;
+      --container-width: 5.625em;
+      --container-height: 2.5em;
+      --container-radius: 6.25em;
+      --container-light-bg: #3D7EAE;
+      --container-night-bg: #1D1F2C;
+      --circle-container-diameter: 3.375em;
+      --sun-moon-diameter: 2.125em;
+      --sun-bg: #ECCA2F;
+      --moon-bg: #C4C9D1;
+      --spot-color: #959DB1;
+      --circle-container-offset: calc((var(--circle-container-diameter) - var(--container-height)) / 2 * -1);
+      --stars-color: #fff;
+      --clouds-color: #F3FDFF;
+      --back-clouds-color: #AACADF;
+      --transition: .5s cubic-bezier(0, -0.02, 0.4, 1.25);
+      --circle-transition: .3s cubic-bezier(0, -0.02, 0.35, 1.17);
+      display: inline-block;
+      flex: 0 0 auto;
+      line-height: 1;
+      position: relative;
+    }
+
+    .theme-switch,
+    .theme-switch *,
+    .theme-switch *::before,
+    .theme-switch *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-size: var(--toggle-size);
+    }
+
+    .theme-switch__container {
+      display: block;
+      width: var(--container-width);
+      height: var(--container-height);
+      background-color: var(--container-light-bg);
+      border-radius: var(--container-radius);
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: 0em -0.062em 0.062em rgba(0, 0, 0, 0.25), 0em 0.062em 0.125em rgba(255, 255, 255, 0.94);
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .theme-switch__container::before {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      box-shadow: 0em 0.05em 0.187em rgba(0, 0, 0, 0.25) inset, 0em 0.05em 0.187em rgba(0, 0, 0, 0.25) inset;
+      border-radius: var(--container-radius);
+    }
+
+    .theme-switch__checkbox {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .theme-switch__checkbox:focus-visible + .theme-switch__container {
+      outline: 2px solid rgba(153, 205, 216, 0.88);
+      outline-offset: 4px;
+    }
+
+    .theme-switch__circle-container {
+      width: var(--circle-container-diameter);
+      height: var(--circle-container-diameter);
+      background-color: rgba(255, 255, 255, 0.1);
+      position: absolute;
+      left: var(--circle-container-offset);
+      top: var(--circle-container-offset);
+      border-radius: var(--container-radius);
+      box-shadow: inset 0 0 0 3.375em rgba(255, 255, 255, 0.1), inset 0 0 0 3.375em rgba(255, 255, 255, 0.1), 0 0 0 0.625em rgba(255, 255, 255, 0.1), 0 0 0 1.25em rgba(255, 255, 255, 0.1);
+      display: flex;
+      transition: var(--circle-transition);
+      pointer-events: none;
+    }
+
+    .theme-switch__sun-moon-container {
+      pointer-events: auto;
+      position: relative;
+      z-index: 2;
+      width: var(--sun-moon-diameter);
+      height: var(--sun-moon-diameter);
+      margin: auto;
+      border-radius: var(--container-radius);
+      background-color: var(--sun-bg);
+      box-shadow: 0.062em 0.062em 0.062em 0em rgba(254, 255, 239, 0.61) inset, 0em -0.062em 0.062em 0em #a1872a inset;
+      filter: drop-shadow(0.062em 0.125em 0.125em rgba(0, 0, 0, 0.25)) drop-shadow(0em 0.062em 0.125em rgba(0, 0, 0, 0.25));
+      overflow: hidden;
+      transition: var(--transition);
+    }
+
+    .theme-switch__moon {
+      transform: translateX(100%);
+      width: 100%;
+      height: 100%;
+      background-color: var(--moon-bg);
+      border-radius: inherit;
+      box-shadow: 0.062em 0.062em 0.062em 0em rgba(254, 255, 239, 0.61) inset, 0em -0.062em 0.062em 0em #969696 inset;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .theme-switch__spot {
+      position: absolute;
+      top: 0.75em;
+      left: 0.312em;
+      width: 0.75em;
+      height: 0.75em;
+      border-radius: var(--container-radius);
+      background-color: var(--spot-color);
+      box-shadow: 0em 0.0312em 0.062em rgba(0, 0, 0, 0.25) inset;
+    }
+
+    .theme-switch__spot:nth-of-type(2) {
+      width: 0.375em;
+      height: 0.375em;
+      top: 0.937em;
+      left: 1.375em;
+    }
+
+    .theme-switch__spot:nth-last-of-type(3) {
+      width: 0.25em;
+      height: 0.25em;
+      top: 0.312em;
+      left: 0.812em;
+    }
+
+    .theme-switch__clouds {
+      width: 1.25em;
+      height: 1.25em;
+      background-color: var(--clouds-color);
+      border-radius: var(--container-radius);
+      position: absolute;
+      bottom: -0.625em;
+      left: 0.312em;
+      box-shadow: 0.937em 0.312em var(--clouds-color), -0.312em -0.312em var(--back-clouds-color), 1.437em 0.375em var(--clouds-color), 0.5em -0.125em var(--back-clouds-color), 2.187em 0 var(--clouds-color), 1.25em -0.062em var(--back-clouds-color), 2.937em 0.312em var(--clouds-color), 2em -0.312em var(--back-clouds-color), 3.625em -0.062em var(--clouds-color), 2.625em 0em var(--back-clouds-color), 4.5em -0.312em var(--clouds-color), 3.375em -0.437em var(--back-clouds-color), 4.625em -1.75em 0 0.437em var(--clouds-color), 4em -0.625em var(--back-clouds-color), 4.125em -2.125em 0 0.437em var(--back-clouds-color);
+      transition: var(--transition);
+    }
+
+    .theme-switch__stars-container {
+      position: absolute;
+      color: var(--stars-color);
+      top: -100%;
+      left: 0.312em;
+      width: 2.75em;
+      height: auto;
+      transition: var(--transition);
+    }
+
+    .theme-switch__stars-container svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .theme-switch__checkbox:checked + .theme-switch__container {
+      background-color: var(--container-night-bg);
+    }
+
+    .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__circle-container {
+      left: calc(100% - var(--circle-container-offset) - var(--circle-container-diameter));
+    }
+
+    .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__circle-container:hover {
+      left: calc(100% - var(--circle-container-offset) - var(--circle-container-diameter) - 0.187em);
+    }
+
+    .theme-switch__circle-container:hover {
+      left: calc(var(--circle-container-offset) + 0.187em);
+    }
+
+    .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__moon {
+      transform: translate(0);
+    }
+
+    .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__clouds {
+      bottom: -4.062em;
+    }
+
+    .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__stars-container {
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+  </style>
 </head>
 <body class="min-h-screen font-sans relative">
   <!-- SVG sprite (reduces icon font dependency for core nav) -->
@@ -59,6 +251,12 @@
     </symbol>
     <symbol id="ico-user" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.3 0-6 1.7-6 3.8V20h12v-2.2C18 15.7 15.3 14 12 14Z"/>
+    </symbol>
+    <symbol id="ico-store" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.3 4h13.4l1.8 5.2a3.2 3.2 0 0 1-1.5 3.7V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7.1a3.2 3.2 0 0 1-1.5-3.7L5.3 4Zm1.4 2-1.3 3.8A1.2 1.2 0 0 0 6.5 11c.7 0 1.3-.6 1.3-1.3a1 1 0 1 1 2 0c0 .7.6 1.3 1.3 1.3s1.3-.6 1.3-1.3a1 1 0 1 1 2 0c0 .7.6 1.3 1.3 1.3s1.3-.6 1.3-1.3a1 1 0 0 1 2 0c0 .7.6 1.3 1.3 1.3a1.2 1.2 0 0 0 1.1-1.6L17.3 6H6.7ZM7 13v6h10v-6a3.2 3.2 0 0 1-2.6-.9 3.2 3.2 0 0 1-4.8 0A3.2 3.2 0 0 1 7 13Zm2 2h6v2H9v-2Z"/>
+    </symbol>
+    <symbol id="ico-theme-stars" viewBox="0 0 144 55" fill="none">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M135.831 3.00688C135.055 3.85027 134.111 4.29946 133 4.35447C134.111 4.40947 135.055 4.85867 135.831 5.71123C136.607 6.55462 136.996 7.56303 136.996 8.72727C136.996 7.95722 137.172 7.25134 137.525 6.59129C137.886 5.93124 138.372 5.39954 138.98 5.00535C139.598 4.60199 140.268 4.39114 141 4.35447C139.88 4.2903 138.936 3.85027 138.16 3.00688C137.384 2.16348 136.996 1.16425 136.996 0C136.996 1.16425 136.607 2.16348 135.831 3.00688ZM31 23.3545C32.1114 23.2995 33.0551 22.8503 33.8313 22.0069C34.6075 21.1635 34.9956 20.1642 34.9956 19C34.9956 20.1642 35.3837 21.1635 36.1599 22.0069C36.9361 22.8503 37.8798 23.2903 39 23.3545C38.2679 23.3911 37.5976 23.602 36.9802 24.0053C36.3716 24.3995 35.8864 24.9312 35.5248 25.5913C35.172 26.2513 34.9956 26.9572 34.9956 27.7273C34.9956 26.563 34.6075 25.5546 33.8313 24.7112C33.0551 23.8587 32.1114 23.4095 31 23.3545ZM0 36.3545C1.11136 36.2995 2.05513 35.8503 2.83131 35.0069C3.6075 34.1635 3.99559 33.1642 3.99559 32C3.99559 33.1642 4.38368 34.1635 5.15987 35.0069C5.93605 35.8503 6.87982 36.2903 8 36.3545C7.26792 36.3911 6.59757 36.602 5.98015 37.0053C5.37155 37.3995 4.88644 37.9312 4.52481 38.5913C4.172 39.2513 3.99559 39.9572 3.99559 40.7273C3.99559 39.563 3.6075 38.5546 2.83131 37.7112C2.05513 36.8587 1.11136 36.4095 0 36.3545ZM56.8313 24.0069C56.0551 24.8503 55.1114 25.2995 54 25.3545C55.1114 25.4095 56.0551 25.8587 56.8313 26.7112C57.6075 27.5546 57.9956 28.563 57.9956 29.7273C57.9956 28.9572 58.172 28.2513 58.5248 27.5913C58.8864 26.9312 59.3716 26.3995 59.9802 26.0053C60.5976 25.602 61.2679 25.3911 62 25.3545C60.8798 25.2903 59.9361 24.8503 59.1599 24.0069C58.3837 23.1635 57.9956 22.1642 57.9956 21C57.9956 22.1642 57.6075 23.1635 56.8313 24.0069ZM81 25.3545C82.1114 25.2995 83.0551 24.8503 83.8313 24.0069C84.6075 23.1635 84.9956 22.1642 84.9956 21C84.9956 22.1642 85.3837 23.1635 86.1599 24.0069C86.9361 24.8503 87.8798 25.2903 89 25.3545C88.2679 25.3911 87.5976 25.602 86.9802 26.0053C86.3716 26.3995 85.8864 26.9312 85.5248 27.5913C85.172 28.2513 84.9956 28.9572 84.9956 29.7273C84.9956 28.563 84.6075 27.5546 83.8313 26.7112C83.0551 25.8587 82.1114 25.4095 81 25.3545ZM136 36.3545C137.111 36.2995 138.055 35.8503 138.831 35.0069C139.607 34.1635 139.996 33.1642 139.996 32C139.996 33.1642 140.384 34.1635 141.16 35.0069C141.936 35.8503 142.88 36.2903 144 36.3545C143.268 36.3911 142.598 36.602 141.98 37.0053C141.372 37.3995 140.886 37.9312 140.525 38.5913C140.172 39.2513 139.996 39.9572 139.996 40.7273C139.996 39.563 139.607 38.5546 138.831 37.7112C138.055 36.8587 137.111 36.4095 136 36.3545ZM101.831 49.0069C101.055 49.8503 100.111 50.2995 99 50.3545C100.111 50.4095 101.055 50.8587 101.831 51.7112C102.607 52.5546 102.996 53.563 102.996 54.7273C102.996 53.9572 103.172 53.2513 103.525 52.5913C103.886 51.9312 104.372 51.3995 104.98 51.0053C105.598 50.602 106.268 50.3911 107 50.3545C105.88 50.2903 104.936 49.8503 104.16 49.0069C103.384 48.1635 102.996 47.1642 102.996 46C102.996 47.1642 102.607 48.1635 101.831 49.0069Z" fill="currentColor"/>
     </symbol>
     <symbol id="ico-send" viewBox="0 0 24 24" fill="currentColor">
       <path d="M3.4 20.6 21 12 3.4 3.4l-.8 6.8L14 12 2.6 13.8l.8 6.8Z"/>
@@ -281,14 +479,33 @@
                 <p id="header-tab-subtitle" class="text-xs text-gray-600">Map · Pets · Chat · Health · AI</p>
               </div>
               <div class="flex items-center gap-3">
-                <button id="header-dark-toggle" type="button" class="dark-toggle-inline" title="Switch light/dark mode">🌙</button>
+                <label id="header-dark-toggle" class="theme-switch" title="Switch to dark mode" aria-label="Switch to dark mode">
+                  <input id="header-theme-switch-input" type="checkbox" class="theme-switch__checkbox" role="switch" aria-label="Switch to dark mode">
+                  <span class="theme-switch__container" aria-hidden="true">
+                    <span class="theme-switch__clouds"></span>
+                    <span class="theme-switch__stars-container">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 55" fill="none">
+                        <use href="#ico-theme-stars"></use>
+                      </svg>
+                    </span>
+                    <span class="theme-switch__circle-container">
+                      <span class="theme-switch__sun-moon-container">
+                        <span class="theme-switch__moon">
+                          <span class="theme-switch__spot"></span>
+                          <span class="theme-switch__spot"></span>
+                          <span class="theme-switch__spot"></span>
+                        </span>
+                      </span>
+                    </span>
+                  </span>
+                </label>
                 <div class="hidden sm:flex flex-col text-right text-sm space-y-0.5">
                   <span id="current-user-name" class="font-semibold">User</span>
                   <span id="header-connection-status" class="text-[11px] text-gray-500">Connected</span>
                 </div>
                 <div class="relative">
                   <img id="current-user-avatar" loading="lazy" decoding="async" class="w-12 h-12 rounded-2xl object-cover border border-white/70 shadow-lg cursor-pointer hover:-translate-y-0.5 transition-transform"
-                     src="/assets/avatars/avatar1.png"
+                     src="/assets/people/person1.png"
                      alt="User avatar" onclick="openProfileEditModal()" />
                   <span class="absolute -bottom-1 -right-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500 text-white shadow-lg">Online</span>
                 </div>
@@ -348,17 +565,17 @@
                     </a>
                     <div id="map-control-panel" class="map-control-panel" aria-label="Map controls">
                       <button id="map-zoom-in" class="map-control-button" type="button" aria-label="Zoom in" title="Zoom in">
-                        <i class="fas fa-plus"></i>
+                        <span class="map-control-glyph" aria-hidden="true">+</span>
                       </button>
                       <button id="map-zoom-out" class="map-control-button" type="button" aria-label="Zoom out" title="Zoom out">
-                        <i class="fas fa-minus"></i>
+                        <span class="map-control-glyph" aria-hidden="true">-</span>
                       </button>
                       <button id="map-reset-view" class="map-control-button" type="button" aria-label="Reset map view" title="Reset view">
-                        <i class="fas fa-crosshairs"></i>
+                        <span class="map-control-glyph map-control-glyph--small" aria-hidden="true">RST</span>
                       </button>
                       <span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span>
                       <button id="map-toggle-fence" class="map-control-button map-control-button--toggle active" type="button" aria-label="Toggle electronic fence" title="Electronic fence" aria-pressed="true">
-                        <i class="fas fa-draw-polygon"></i>
+                        <span class="map-control-glyph map-control-glyph--small" aria-hidden="true">FEN</span>
                       </button>
                     </div>
                     <svg id="map-overlay-layer" class="map-overlay-layer map-frame-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -444,7 +661,8 @@
                 <div class="pixel-card space-y-2 map-location-card">
                   <div class="flex items-center justify-between">
                     <h3 class="font-semibold text-sm flex items-center gap-2">
-                      <i class="fas fa-store text-primary"></i>Pet-friendly Spots
+                      <svg class="map-store-heading-icon text-primary" aria-hidden="true"><use href="#ico-store"></use></svg>
+                      <span>Pet-friendly Spots</span>
                     </h3>
                     <span id="location-count" class="text-[10px] text-gray-500"></span>
                   </div>
@@ -759,12 +977,38 @@
                 </button>
               </div>
             </div>
+            <div id="profile-mobile-theme-row" class="profile-theme-row profile-mobile-theme-row">
+              <div class="profile-theme-copy">
+                <span class="profile-theme-title">Appearance</span>
+                <span class="profile-theme-text">Switch between day and night mode.</span>
+              </div>
+              <label id="profile-dark-toggle" class="theme-switch profile-theme-switch" title="Switch to dark mode" aria-label="Switch to dark mode">
+                <input id="profile-theme-switch-input" type="checkbox" class="theme-switch__checkbox" role="switch" aria-label="Switch to dark mode">
+                <span class="theme-switch__container" aria-hidden="true">
+                  <span class="theme-switch__clouds"></span>
+                  <span class="theme-switch__stars-container">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 55" fill="none">
+                      <use href="#ico-theme-stars"></use>
+                    </svg>
+                  </span>
+                  <span class="theme-switch__circle-container">
+                    <span class="theme-switch__sun-moon-container">
+                      <span class="theme-switch__moon">
+                        <span class="theme-switch__spot"></span>
+                        <span class="theme-switch__spot"></span>
+                        <span class="theme-switch__spot"></span>
+                      </span>
+                    </span>
+                  </span>
+                </span>
+              </label>
+            </div>
 
               <div class="profile-layout text-xs">
                 <div class="profile-main-column">
                   <section class="pixel-card profile-owner-card">
                     <img id="profile-avatar" loading="lazy" decoding="async" class="profile-avatar"
-                         src="/assets/avatars/avatar1.png"
+                         src="/assets/people/person1.png"
                          alt="Profile avatar" />
                     <div class="profile-owner-body">
                       <div class="profile-name-row">
@@ -861,50 +1105,6 @@
                   </section>
                 </div>
               </div>
-              <div class="pixel-card space-y-3">
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <h4 class="font-semibold text-sm flex items-center gap-2">
-                      <i class="fas fa-bluetooth-b text-primary"></i>BLE WiFi Setup
-                    </h4>
-                    <p class="text-[11px] text-gray-500">Bluetooth only sends WiFi credentials to the M5. Telemetry is stored through WiFi.</p>
-                  </div>
-                  <span id="ble-wifi-status" class="health-status-pill">Pair</span>
-                </div>
-                <div class="grid gap-2">
-                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">WiFi SSID</label>
-                  <input id="ble-wifi-ssid" class="pixel-input text-xs" autocomplete="off" placeholder="Phone hotspot or WiFi name" />
-                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">WiFi Password</label>
-                  <input id="ble-wifi-password" class="pixel-input text-xs" type="password" autocomplete="new-password" placeholder="Hotspot password" />
-                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">Backend Host</label>
-                  <input id="ble-wifi-host" class="pixel-input text-xs" autocomplete="off" placeholder="192.168.31.199" />
-                  <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">Device Token</label>
-                  <input id="ble-wifi-token" class="pixel-input text-xs" autocomplete="off" placeholder="pawtrace-m5-dev-token" />
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <button id="ble-wifi-connect" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
-                    <i class="fas fa-link"></i><span>Connect BLE</span>
-                  </button>
-                  <button id="ble-wifi-send" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30 flex items-center justify-center gap-2" disabled>
-                    <i class="fas fa-wifi"></i><span>Send WiFi</span>
-                  </button>
-                </div>
-                <button id="ble-wifi-disconnect" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30 flex items-center justify-center gap-2" disabled>
-                  <i class="fas fa-unlink"></i><span>Disconnect BLE</span>
-                </button>
-                <div class="grid grid-cols-2 gap-2 text-[11px]">
-                  <div class="health-metric-chip">
-                    <span class="health-metric-chip__label">BLE Device</span>
-                    <span id="ble-wifi-device-name" class="health-metric-chip__value">--</span>
-                  </div>
-                  <div class="health-metric-chip">
-                    <span class="health-metric-chip__label">WiFi State</span>
-                    <span id="ble-wifi-state" class="health-metric-chip__value">--</span>
-                  </div>
-                </div>
-                <pre id="ble-wifi-result" class="ble-payload-preview text-[10px] text-gray-600">No WiFi credentials sent.</pre>
-                <p id="ble-wifi-store-status" class="text-[11px] text-gray-500">Use BLE once for provisioning, then read live data from WiFi Telemetry below.</p>
-              </div>
             </div>
           </div>
 
@@ -917,7 +1117,7 @@
                   <i class="fas fa-heart-pulse text-primary"></i>
                   Health Monitor
                 </h2>
-                <p class="text-xs text-gray-600">Temperature, heart rate, SpO2, activity, status, and recent health trends.</p>
+                <p class="text-xs text-gray-600">A quick care view with clear status, simple vitals, and visual trends.</p>
               </div>
               <div class="page-actions">
                 <button id="health-jump-manual" type="button" class="pixel-button page-action-button text-xs flex items-center gap-2">
@@ -929,167 +1129,148 @@
               </div>
             </div>
 
-            <div id="health-monitor-panel" class="health-monitor-grid health-monitor-grid--compact">
-              <div class="space-y-4">
-                <div class="pixel-card health-packet-card health-overview-card space-y-4">
-                  <div class="flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                      <h3 class="font-semibold text-base flex items-center gap-2">
-                        <i class="fas fa-notes-medical text-primary"></i>Current Health
-                      </h3>
-                      <p class="text-[11px] text-gray-600">Only the care signals that affect the pet health view.</p>
-                    </div>
-                    <div class="flex items-center gap-2 health-pet-select-row">
-                      <label for="health-pet-select" class="text-[11px] text-gray-500">Pet</label>
+            <div id="health-monitor-panel" class="health-monitor-grid health-monitor-grid--simple">
+              <div class="health-main-column">
+                <section class="health-hero-card" aria-labelledby="health-vitals-state">
+                  <div class="health-hero-copy">
+                    <div class="health-pet-picker">
+                      <label for="health-pet-select">Pet</label>
                       <select id="health-pet-select" class="pixel-input text-xs health-pet-select"></select>
                     </div>
-                  </div>
-
-                  <div class="health-summary-callout">
-                    <div class="health-summary-icon" aria-hidden="true">
-                      <i class="fas fa-heart-circle-check"></i>
+                    <p class="health-hero-label">Today's status</p>
+                    <h3 id="health-vitals-state" class="health-hero-title">Waiting</h3>
+                    <p id="health-vitals-summary" class="health-hero-summary">Add a reading to generate a quick status.</p>
+                    <div class="health-hero-actions" aria-label="What this view shows">
+                      <span class="health-glance-pill"><i class="fas fa-circle-check"></i>Normal</span>
+                      <span class="health-glance-pill"><i class="fas fa-triangle-exclamation"></i>Watch</span>
+                      <span class="health-glance-pill"><i class="fas fa-bell"></i>Needs care</span>
                     </div>
+                  </div>
+                  <div class="health-orb" aria-hidden="true">
+                    <span class="health-orb__ring health-orb__ring--outer"></span>
+                    <span class="health-orb__ring health-orb__ring--inner"></span>
+                    <span class="health-orb__core"><i class="fas fa-heart-pulse"></i></span>
+                  </div>
+                </section>
+
+                <section class="health-primary-grid" aria-label="Current vitals">
+                  <div class="health-primary-card health-primary-card--temp">
+                    <div class="health-primary-card__icon" aria-hidden="true"><i class="fas fa-temperature-half"></i></div>
                     <div>
-                      <p class="health-data-label">Health status</p>
-                      <h3 id="health-vitals-state" class="text-lg font-semibold text-dark">Waiting</h3>
-                      <p id="health-vitals-summary" class="text-[11px] text-gray-600">Add a reading to generate a quick status.</p>
+                      <p>Temperature</p>
+                      <strong id="health-latest-temp">--</strong>
+                      <span id="health-temp-status" class="health-primary-card__status">No reading yet</span>
+                      <div class="health-visual-meter" aria-hidden="true"><span id="health-temp-meter"></span></div>
                     </div>
                   </div>
-
-                  <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 health-summary-grid">
-                    <div class="metric-tile health-metric-tile space-y-1">
-                      <div class="health-metric-head">
-                        <i class="fas fa-temperature-half text-primary"></i>
-                        <p>Temperature</p>
-                      </div>
-                      <p id="health-latest-temp" class="text-2xl font-semibold text-dark">--</p>
-                      <p id="health-temp-status" class="text-[11px] text-gray-500">No reading yet</p>
-                    </div>
-                    <div class="metric-tile health-metric-tile space-y-1">
-                      <div class="health-metric-head">
-                        <i class="fas fa-heart-pulse text-primary"></i>
-                        <p>Heart Rate</p>
-                      </div>
-                      <p id="health-latest-heart" class="text-2xl font-semibold text-dark">--</p>
-                      <p id="health-heart-status" class="text-[11px] text-gray-500">No reading yet</p>
-                    </div>
-                    <div class="metric-tile health-metric-tile space-y-1">
-                      <div class="health-metric-head">
-                        <i class="fas fa-droplet text-primary"></i>
-                        <p>SpO2</p>
-                      </div>
-                      <p id="health-latest-spo2" class="text-2xl font-semibold text-dark">--</p>
-                      <p id="health-spo2-status" class="text-[11px] text-gray-500">No reading yet</p>
-                    </div>
-                    <div class="metric-tile health-metric-tile space-y-1">
-                      <div class="health-metric-head">
-                        <i class="fas fa-person-running text-primary"></i>
-                        <p>Activity</p>
-                      </div>
-                      <p id="health-activity-state" class="text-lg font-semibold text-dark">Waiting</p>
-                      <p id="health-activity-score" class="text-[11px] text-gray-500">No activity data</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="pixel-card space-y-3">
-                  <div class="flex items-center justify-between gap-3">
+                  <div class="health-primary-card health-primary-card--heart">
+                    <div class="health-primary-card__icon" aria-hidden="true"><i class="fas fa-heart-pulse"></i></div>
                     <div>
-                      <h4 class="font-semibold text-sm">Vitals Trend</h4>
-                      <p class="text-[11px] text-gray-600">Temperature and heart rate history.</p>
+                      <p>Heart rate</p>
+                      <strong id="health-latest-heart">--</strong>
+                      <span id="health-heart-status" class="health-primary-card__status">No reading yet</span>
+                      <div class="health-visual-meter" aria-hidden="true"><span id="health-heart-meter"></span></div>
                     </div>
                   </div>
-                  <div class="grid lg:grid-cols-2 gap-3 health-trend-card-grid">
-                    <div class="metric-panel health-chart-card space-y-3">
-                      <div class="flex items-start justify-between gap-3">
+                  <div class="health-primary-card health-primary-card--oxygen">
+                    <div class="health-primary-card__icon" aria-hidden="true"><i class="fas fa-droplet"></i></div>
+                    <div>
+                      <p>Oxygen</p>
+                      <strong id="health-latest-spo2">--</strong>
+                      <span id="health-spo2-status" class="health-primary-card__status">No reading yet</span>
+                      <div class="health-visual-meter" aria-hidden="true"><span id="health-spo2-meter"></span></div>
+                    </div>
+                  </div>
+                  <div class="health-primary-card health-primary-card--activity">
+                    <div class="health-primary-card__icon" aria-hidden="true"><i class="fas fa-person-running"></i></div>
+                    <div>
+                      <p>Activity</p>
+                      <strong id="health-activity-state">Waiting</strong>
+                      <span id="health-activity-score" class="health-primary-card__status">No movement yet</span>
+                      <div class="health-visual-meter" aria-hidden="true"><span id="health-activity-meter"></span></div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="health-trends-card">
+                  <div class="health-card-head">
+                    <div>
+                      <h4>Vitals Trend</h4>
+                      <p>Recent readings with clear ranges, so changes are easy to spot.</p>
+                    </div>
+                    <i class="fas fa-chart-line" aria-hidden="true"></i>
+                  </div>
+                  <div class="health-trend-card-grid">
+                    <div class="health-chart-card">
+                      <div class="health-chart-head">
                         <div>
-                          <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Temperature Trend</p>
-                          <p id="health-temp-caption" class="text-[11px] text-gray-600 health-chart-note">Waiting for recent readings</p>
+                          <p>Temperature</p>
+                          <p id="health-temp-caption" class="health-chart-note">Waiting for recent readings</p>
                         </div>
                         <span id="health-temp-badge" class="health-chart-badge">--</span>
                       </div>
                       <div id="health-temp-chart" class="health-chart-canvas" aria-label="Temperature trend chart"></div>
-                      <div class="grid grid-cols-3 gap-2">
-                        <div class="health-metric-chip">
-                          <span class="health-metric-chip__label">Low</span>
-                          <span id="health-temp-min" class="health-metric-chip__value">--</span>
-                        </div>
-                        <div class="health-metric-chip">
-                          <span class="health-metric-chip__label">Avg</span>
-                          <span id="health-temp-avg" class="health-metric-chip__value">--</span>
-                        </div>
-                        <div class="health-metric-chip">
-                          <span class="health-metric-chip__label">High</span>
-                          <span id="health-temp-max" class="health-metric-chip__value">--</span>
-                        </div>
+                      <div class="health-range-row">
+                        <span>Low<strong id="health-temp-min">--</strong></span>
+                        <span>Avg<strong id="health-temp-avg">--</strong></span>
+                        <span>High<strong id="health-temp-max">--</strong></span>
                       </div>
                     </div>
-                    <div class="metric-panel health-chart-card space-y-3">
-                      <div class="flex items-start justify-between gap-3">
+                    <div class="health-chart-card">
+                      <div class="health-chart-head">
                         <div>
-                          <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Heart Rate Trend</p>
-                          <p id="health-heart-caption" class="text-[11px] text-gray-600 health-chart-note">Waiting for recent readings</p>
+                          <p>Heart rate</p>
+                          <p id="health-heart-caption" class="health-chart-note">Waiting for recent readings</p>
                         </div>
                         <span id="health-heart-badge" class="health-chart-badge">--</span>
                       </div>
                       <div id="health-heart-chart" class="health-chart-canvas" aria-label="Heart rate trend chart"></div>
-                      <div class="grid grid-cols-3 gap-2">
-                        <div class="health-metric-chip">
-                          <span class="health-metric-chip__label">Low</span>
-                          <span id="health-heart-min" class="health-metric-chip__value">--</span>
-                        </div>
-                        <div class="health-metric-chip">
-                          <span class="health-metric-chip__label">Avg</span>
-                          <span id="health-heart-avg" class="health-metric-chip__value">--</span>
-                        </div>
-                        <div class="health-metric-chip">
-                          <span class="health-metric-chip__label">High</span>
-                          <span id="health-heart-max" class="health-metric-chip__value">--</span>
-                        </div>
+                      <div class="health-range-row">
+                        <span>Low<strong id="health-heart-min">--</strong></span>
+                        <span>Avg<strong id="health-heart-avg">--</strong></span>
+                        <span>High<strong id="health-heart-max">--</strong></span>
                       </div>
                     </div>
                   </div>
-                </div>
+                </section>
 
-                <div id="health-manual-card" class="pixel-card space-y-3">
-                  <div class="flex items-center justify-between">
-                    <h4 class="font-semibold text-sm flex items-center gap-2">
-                      <i class="fas fa-pen-to-square text-primary"></i>Manual Reading
-                    </h4>
-                    <span class="text-[10px] text-gray-500">Manual input</span>
-                  </div>
-                  <div class="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
+                <section id="health-manual-card" class="health-side-panel">
+                  <div class="health-card-head">
                     <div>
-                      <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">Temperature</label>
+                      <h4><i class="fas fa-pen-to-square text-primary"></i> Manual Reading</h4>
+                      <p>Save two numbers when the tracker is not available.</p>
+                    </div>
+                  </div>
+                  <div class="health-form-grid">
+                    <label>
+                      <span>Temperature</span>
                       <div class="relative">
                         <input id="health-input-temp" type="number" step="0.1" min="34" max="43" class="pixel-input text-xs pr-14" placeholder="38.5" />
-                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">°C</span>
+                        <em>°C</em>
                       </div>
-                    </div>
-                    <div>
-                      <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">Heart Rate</label>
+                    </label>
+                    <label>
+                      <span>Heart rate</span>
                       <div class="relative">
                         <input id="health-input-heart" type="number" min="40" max="240" class="pixel-input text-xs pr-16" placeholder="118" />
-                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">bpm</span>
+                        <em>bpm</em>
                       </div>
-                    </div>
+                    </label>
                   </div>
-                  <div class="flex flex-wrap gap-2">
-                    <button id="health-save-reading" type="button" class="pixel-button text-xs flex items-center gap-2">
-                      <i class="fas fa-wave-square"></i><span>Save Reading</span>
-                    </button>
-                  </div>
+                  <button id="health-save-reading" type="button" class="pixel-button text-xs flex items-center justify-center gap-2 w-full">
+                    <i class="fas fa-wave-square"></i><span>Save reading</span>
+                  </button>
                   <p id="health-form-status" class="text-[11px] text-primary hidden"></p>
-                </div>
-
+                </section>
               </div>
 
-              <div class="space-y-4">
-                <div class="pixel-card space-y-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <h4 class="font-semibold text-sm flex items-center gap-2">
-                      <i class="fas fa-clock-rotate-left text-primary"></i>Recent Health Records
-                    </h4>
+              <div class="health-side-column">
+                <section class="health-side-panel health-records-card">
+                  <div class="health-card-head">
+                    <div>
+                      <h4><i class="fas fa-clock-rotate-left text-primary"></i> Recent records</h4>
+                      <p>Keep older readings out of the way until needed.</p>
+                    </div>
                     <div class="flex items-center gap-2">
                       <span id="health-history-count" class="text-[10px] text-gray-500">0 records</span>
                       <button id="health-history-toggle" type="button" class="health-history-toggle" aria-expanded="false" aria-controls="health-history-scroll" aria-label="Show recent health records" title="Show records">
@@ -1098,59 +1279,156 @@
                       </button>
                     </div>
                   </div>
-                  <div id="health-history-scroll" class="pr-1 custom-scrollbar hidden" aria-hidden="true">
+                  <div id="health-history-scroll" class="health-history-list custom-scrollbar hidden" aria-hidden="true">
                     <div id="health-history-list" class="space-y-2 text-[11px] text-gray-700"></div>
                     <p id="health-history-empty" class="text-[11px] text-gray-400 italic">No health records yet.</p>
                   </div>
-                </div>
+                </section>
 
-                <div class="pixel-card space-y-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 class="font-semibold text-sm flex items-center gap-2">
-                        <i class="fas fa-wifi text-primary"></i>WiFi Telemetry
-                      </h4>
-                      <p class="text-[11px] text-gray-500">Use the M5 LAN URL on the same hotspot to read status, send messages, and trigger uploads.</p>
+                <details class="health-advanced-details health-device-status">
+                  <summary>
+                    <span><i class="fas fa-signal text-primary"></i>Device status</span>
+                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                  </summary>
+                  <div class="health-wifi-panel">
+                    <div class="health-focus-grid health-focus-grid--device">
+                      <div class="health-focus-item">
+                        <span><i class="fas fa-wifi"></i>Live link</span>
+                        <strong id="health-network-state">Tracker waiting</strong>
+                        <p id="health-wifi-state">Tracker waiting</p>
+                      </div>
+                      <div class="health-focus-item">
+                        <span><i class="fas fa-battery-half"></i>Battery</span>
+                        <strong id="health-battery-state">--</strong>
+                        <p id="health-battery-meta">Tracker battery</p>
+                      </div>
+                      <div class="health-focus-item">
+                        <span><i class="fas fa-map-location-dot"></i>Map signal</span>
+                        <strong id="health-location-state">Location waiting</strong>
+                        <p id="health-gps-state">GPS searching</p>
+                      </div>
+                      <div class="health-focus-item">
+                        <span><i class="fas fa-stethoscope"></i>Sensor fit</span>
+                        <strong id="health-heart-found">Contact waiting</strong>
+                        <p id="health-finger-state">Sensor waiting</p>
+                      </div>
                     </div>
-                    <span id="wifi-bridge-status" class="health-status-pill">Idle</span>
+                    <div class="health-data-grid health-technical-grid text-[11px]">
+                      <div class="health-data-item">
+                        <span class="health-data-label">Device</span>
+                        <strong id="health-device-id">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Last reading</span>
+                        <strong id="health-packet-time">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Source</span>
+                        <strong id="health-packet-source">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">WiFi signal</span>
+                        <strong id="health-wifi-rssi">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Sync</span>
+                        <strong id="health-upload-state">No sync yet</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Auto sync</span>
+                        <strong id="health-upload-enabled">Auto sync --</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Upload code</span>
+                        <strong id="health-upload-code">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Coordinates</span>
+                        <strong id="health-location-coords">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Satellites</span>
+                        <strong id="health-gps-sats">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">GPS signal</span>
+                        <strong id="health-gps-hdop">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Last fix</span>
+                        <strong id="health-last-location-valid">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Samples</span>
+                        <strong id="health-track-samples">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Safe zone</span>
+                        <strong id="health-geofence-enabled">Safe zone --</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Distance</span>
+                        <strong id="health-distance-state">--</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Alert</span>
+                        <strong id="health-lost-alert">Alert clear</strong>
+                      </div>
+                      <div class="health-data-item">
+                        <span class="health-data-label">Oxygen signal</span>
+                        <strong id="health-spo2-valid-detail">Oxygen waiting</strong>
+                      </div>
+                    </div>
                   </div>
-                  <div class="grid gap-2">
-                    <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">M5 LAN URL</label>
-                    <div class="flex gap-2">
-                      <input id="wifi-lan-url" class="pixel-input text-xs flex-1" placeholder="http://192.168.31.42:8080" />
-                      <button id="wifi-lan-save" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
-                        <i class="fas fa-floppy-disk"></i><span>Save</span>
-                      </button>
+                </details>
+
+                <details class="health-advanced-details health-device-tools">
+                  <summary>
+                    <span><i class="fas fa-screwdriver-wrench text-primary"></i>Device tools</span>
+                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                  </summary>
+                  <div class="health-wifi-panel">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <h4 class="font-semibold text-sm flex items-center gap-2">
+                          <i class="fas fa-wifi text-primary"></i>WiFi telemetry
+                        </h4>
+                        <p class="text-[11px] text-gray-500">Optional hardware controls for testing the M5 tracker.</p>
+                      </div>
+                      <span id="wifi-bridge-status" class="health-status-pill">Idle</span>
                     </div>
+                    <label class="health-field">
+                      <span>Optional M5 LAN URL</span>
+                      <div class="flex gap-2">
+                        <input id="wifi-lan-url" class="pixel-input text-xs flex-1" placeholder="http://192.168.31.42:8080" />
+                        <button id="wifi-lan-save" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
+                          <i class="fas fa-floppy-disk"></i><span>Save</span>
+                        </button>
+                      </div>
+                    </label>
                     <div class="grid grid-cols-2 gap-2">
                       <button id="wifi-lan-refresh" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
-                        <i class="fas fa-arrows-rotate"></i><span>Read Status</span>
+                        <i class="fas fa-arrows-rotate"></i><span>Read status</span>
                       </button>
                       <button id="wifi-lan-upload" type="button" class="pixel-button text-xs bg-white/80 text-dark border border-primary/30 flex items-center justify-center gap-2">
-                        <i class="fas fa-cloud-arrow-up"></i><span>Upload Now</span>
+                        <i class="fas fa-cloud-arrow-up"></i><span>Upload now</span>
                       </button>
                     </div>
-                  </div>
-                  <div class="grid gap-2">
-                    <label class="block text-[10px] uppercase tracking-[0.18em] text-gray-500">Message to M5</label>
-                    <input id="wifi-message-input" class="pixel-input text-xs" maxlength="160" placeholder="Hi PawTrace, confirm WiFi upload." />
+                    <label class="health-field">
+                      <span>Message to M5</span>
+                      <input id="wifi-message-input" class="pixel-input text-xs" maxlength="160" placeholder="Hi PawTrace, confirm WiFi upload." />
+                    </label>
                     <button id="wifi-send-message" type="button" class="pixel-button text-xs flex items-center justify-center gap-2">
-                      <i class="fas fa-paper-plane"></i><span>Send WiFi Message</span>
+                      <i class="fas fa-paper-plane"></i><span>Send message</span>
                     </button>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2 text-[11px]">
-                    <div class="health-metric-chip">
-                      <span class="health-metric-chip__label">Device</span>
-                      <span id="wifi-device-name" class="health-metric-chip__value">--</span>
+                    <div class="health-wifi-mini">
+                      <span>Device<strong id="wifi-device-name">--</strong></span>
+                      <span>Queue<strong id="wifi-queue-depth">--</strong></span>
                     </div>
-                    <div class="health-metric-chip">
-                      <span class="health-metric-chip__label">Queue</span>
-                      <span id="wifi-queue-depth" class="health-metric-chip__value">--</span>
-                    </div>
+                    <pre id="wifi-latest-payload" class="ble-payload-preview text-[10px] text-gray-600">No WiFi packet received.</pre>
+                    <p id="wifi-store-status" class="text-[11px] text-gray-500">Cloud mode works on a phone hotspot. LAN mode only works when the browser can reach the M5 IP directly.</p>
                   </div>
-                  <pre id="wifi-latest-payload" class="ble-payload-preview text-[10px] text-gray-600">No WiFi packet received.</pre>
-                  <p id="wifi-store-status" class="text-[11px] text-gray-500">On the M5 serial monitor, run CONFIG or LAN to get the same-network URL.</p>
-                </div>
+                </details>
               </div>
             </div>
           </div>
@@ -1263,11 +1541,23 @@
                 </div>
                 <div class="bg-white/60 rounded-2xl p-4 border border-white/60 custom-scrollbar shadow-inner diag-result-panel">
                   <div id="diag-loading" class="hidden diag-result-state text-center space-y-3">
-                    <div class="relative">
-                      <div class="w-14 h-14 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                      <div class="absolute inset-0 flex items-center justify-center">
-                        <i class="fas fa-paw text-primary/40 text-lg animate-pulse"></i>
+                    <div class="ai-hamster-loader" aria-label="Orange and tan hamster running in a metal wheel" role="img">
+                      <div class="ai-hamster-loader__wheel"></div>
+                      <div class="ai-hamster-loader__hamster">
+                        <div class="ai-hamster-loader__body">
+                          <div class="ai-hamster-loader__head">
+                            <div class="ai-hamster-loader__ear"></div>
+                            <div class="ai-hamster-loader__eye"></div>
+                            <div class="ai-hamster-loader__nose"></div>
+                          </div>
+                          <div class="ai-hamster-loader__limb ai-hamster-loader__limb--fr"></div>
+                          <div class="ai-hamster-loader__limb ai-hamster-loader__limb--fl"></div>
+                          <div class="ai-hamster-loader__limb ai-hamster-loader__limb--br"></div>
+                          <div class="ai-hamster-loader__limb ai-hamster-loader__limb--bl"></div>
+                          <div class="ai-hamster-loader__tail"></div>
+                        </div>
                       </div>
+                      <div class="ai-hamster-loader__spoke"></div>
                     </div>
                     <div class="space-y-1">
                       <p class="text-sm font-semibold text-dark">Analyzing pet photo</p>
@@ -1314,9 +1604,9 @@
               </div>
               <p id="ai-service-status" class="text-[10px] text-primary hidden"></p>
               <div class="ai-service-card ai-output-panel">
-                <p id="ai-service-output" class="text-[11px] text-gray-700">
+                <div id="ai-service-output" class="text-[11px] text-gray-700">
                   Choose a care topic and add context to generate a draft note.
-                </p>
+                </div>
               </div>
             </div>
 
@@ -1501,30 +1791,34 @@
 
   <div id="mobile-tabbar" class="hidden fixed inset-x-0 bottom-4 px-4 z-40 lg:hidden">
     <div class="mobile-tabbar">
-      <button type="button" class="app-tab active" data-tab="map" aria-label="Open map tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-map"></use></svg>
-        <span>Map</span>
-      </button>
-      <button type="button" class="app-tab" data-tab="pets" aria-label="Open pets tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-paw"></use></svg>
-        <span>Pets</span>
-      </button>
-      <button type="button" class="app-tab" data-tab="chat" aria-label="Open chat tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-chat"></use></svg>
-        <span>Chat</span>
-      </button>
-      <button type="button" class="app-tab" data-tab="health" aria-label="Open health monitoring tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-heart"></use></svg>
-        <span>Health</span>
-      </button>
-      <button type="button" class="app-tab" data-tab="ai" aria-label="Open AI assist tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-ai"></use></svg>
-        <span>AI</span>
-      </button>
-      <button type="button" class="app-tab" data-tab="profile" aria-label="Open profile tab">
-        <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-user"></use></svg>
-        <span>Profile</span>
-      </button>
+      <div class="mobile-nav-group mobile-nav-group--primary" role="group" aria-label="Primary tabs">
+        <button type="button" class="app-tab active" data-tab="map" aria-label="Open map tab">
+          <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-map"></use></svg>
+          <span>Map</span>
+        </button>
+        <button type="button" class="app-tab" data-tab="pets" aria-label="Open pets tab">
+          <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-paw"></use></svg>
+          <span>Pets</span>
+        </button>
+        <button type="button" class="app-tab" data-tab="chat" aria-label="Open chat tab">
+          <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-chat"></use></svg>
+          <span>Chat</span>
+        </button>
+        <button type="button" class="app-tab" data-tab="health" aria-label="Open health monitoring tab">
+          <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-heart"></use></svg>
+          <span>Health</span>
+        </button>
+      </div>
+      <div class="mobile-nav-group mobile-nav-group--tools" role="group" aria-label="Assistant and profile tabs">
+        <button type="button" class="app-tab" data-tab="ai" aria-label="Open AI assist tab">
+          <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-ai"></use></svg>
+          <span>AI</span>
+        </button>
+        <button type="button" class="app-tab" data-tab="profile" aria-label="Open profile tab">
+          <svg class="w-5 h-5 text-primary" aria-hidden="true"><use href="#ico-user"></use></svg>
+          <span>Profile</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1811,15 +2105,46 @@
   </div>
 
     <script src="/app/runtime-config.js"></script>
+    <script src="/map.js"></script>
     <script src="/app/app.js"></script>
   <script>
   (function(){
+    var imageFallbacks = {
+      user: '/assets/people/person1.png',
+      pet: '/assets/1.png',
+      sticker: '/assets/stickers/paw-sticker-01.png',
+      map: '/assets/m2.png'
+    };
+    function inferImageFallback(t){
+      var descriptor=[
+        t.id||'',
+        t.className||'',
+        t.alt||'',
+        t.getAttribute('src')||'',
+        t.closest && t.closest('.chat-contact-item,.contact-hover-card,.chat-main-header,#contact-list') ? ' user' : '',
+        t.closest && t.closest('.chat-sticker-panel,.bubble-sticker') ? ' sticker' : '',
+        t.closest && t.closest('#pet-list,#community-pet-feed,.map-pet,.tracked-pet-row,.pet-owned-card,.community-card,.nfc-photo-frame') ? ' pet' : ''
+      ].join(' ').toLowerCase();
+      if(/sticker|reaction/.test(descriptor))return imageFallbacks.sticker;
+      if(/map|campus|background|m1\.jpg|m2\.png/.test(descriptor))return imageFallbacks.map;
+      if(/avatar|profile|contact|owner|user|friend|hover/.test(descriptor))return imageFallbacks.user;
+      if(/pet|paw|photo|preview|community|nfc|feed|share|diagnosis/.test(descriptor))return imageFallbacks.pet;
+      return imageFallbacks.pet;
+    }
     document.addEventListener('error',function(e){
       var t=e.target;
-      if(t.tagName==='IMG'&&!t.dataset.fallback){
-        var src=t.currentSrc||t.getAttribute('src')||'';
-        if(!src)return;
-        t.dataset.fallback='1';
+      if(!(t instanceof HTMLImageElement))return;
+      if(t.dataset.inlineFallbackHidden==='1')return;
+      var src=t.currentSrc||t.getAttribute('src')||'';
+      if(!src)return;
+      var fallback=t.getAttribute('data-fallback-src')||inferImageFallback(t);
+      if(fallback&&src!==fallback&&t.dataset.inlineFallbackApplied!=='1'){
+        t.dataset.inlineFallbackApplied='1';
+        t.src=fallback;
+        return;
+      }
+      if(!t.dataset.inlineFallbackHidden){
+        t.dataset.inlineFallbackHidden='1';
         t.style.display='none';
         var d=document.createElement('div');
         d.className='img-fallback';
@@ -1828,7 +2153,7 @@
         d.style.width=t.offsetWidth?t.offsetWidth+'px':'3rem';
         d.style.height=t.offsetHeight?t.offsetHeight+'px':'3rem';
         d.style.borderRadius=getComputedStyle(t).borderRadius||'50%';
-        d.innerHTML='<i class="fas fa-paw"></i>';
+        d.setAttribute('aria-hidden','true');
         if(t.parentNode)t.parentNode.insertBefore(d,t.nextSibling);
       }
     },true);
@@ -1846,24 +2171,40 @@
   (function(){
     var KEY='pawtrace_dark';
     var themeMeta=document.getElementById('theme-color-meta');
+    function keepMobileTabbarVisibleIfAppOpen(){
+      var appRoot=document.getElementById('app-root');
+      var mobileTabbar=document.getElementById('mobile-tabbar');
+      if(!appRoot||!mobileTabbar){return;}
+      var hasOpenModal=!!document.querySelector('.app-modal:not(.hidden)');
+      if(!appRoot.classList.contains('hidden')&&!hasOpenModal){
+        mobileTabbar.classList.remove('hidden');
+      }
+    }
     function applyAll(dark){
       document.body.classList.toggle('theme-dark',dark);
       document.documentElement.style.colorScheme=dark?'dark':'light';
       if(themeMeta){themeMeta.setAttribute('content',dark?'#081217':'#fff3f8');}
-      var icon=dark?'☀️':'🌙';
       var title=dark?'Switch to light mode':'Switch to dark mode';
-      document.querySelectorAll('.dark-toggle-inline').forEach(function(b){b.textContent=icon;b.title=title;b.setAttribute('aria-pressed',dark?'true':'false');});
+      document.querySelectorAll('.theme-switch').forEach(function(toggle){
+        toggle.title=title;
+        toggle.setAttribute('aria-label',title);
+      });
+      document.querySelectorAll('.theme-switch__checkbox').forEach(function(input){
+        input.checked=dark;
+        input.setAttribute('aria-label',title);
+        input.setAttribute('aria-checked',dark?'true':'false');
+      });
       try{localStorage.setItem(KEY,dark?'1':'0');}catch(e){}
+      window.requestAnimationFrame(keepMobileTabbarVisibleIfAppOpen);
     }
     var saved=null;
     try{saved=localStorage.getItem(KEY);}catch(e){}
     var isDark=saved!==null?saved==='1':false;
     applyAll(isDark);
-    document.addEventListener('click',function(e){
-      if(e.target.closest('.dark-toggle-inline')){applyAll(!document.body.classList.contains('theme-dark'));}
+    document.addEventListener('change',function(e){
+      if(e.target.matches('.theme-switch__checkbox')){applyAll(e.target.checked);}
     });
   })();
   </script>
-  <script type="module" src="/map.js"></script>
 </body>
 </html>

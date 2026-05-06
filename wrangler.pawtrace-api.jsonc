@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pawtrace-api",
+  "main": "./cloudflare/pawtrace-api/worker.js",
+  "compatibility_date": "2026-05-03",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pawtrace-db",
+      "database_id": "5f389aa2-e759-4caf-9e33-ebac576219c5"
+    }
+  ],
+  "vars": {
+    "DEVICE_DEFAULT_USER": "demo",
+    "DASHSCOPE_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "QWEN_TEXT_MODEL": "qwen3.6-plus",
+    "QWEN_VISION_MODEL": "qwen3.6-plus",
+    "QWEN_ENABLE_THINKING": "false",
+    "AI_TIMEOUT_MS": "60000"
+  }
+}

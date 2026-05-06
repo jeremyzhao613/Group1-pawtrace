@@ -1,0 +1,4 @@
+/monitor /monitor/index.html 200
+/monitor/ /monitor/index.html 200
+/monitor/* /monitor/:splat 200
+/* /index.html 200

@@ -17,6 +17,7 @@ import { requireAuth } from './middleware/jwtAuth.js';
 
 type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 type LocalChatMessage = { role?: string; content?: string };
+type StreamAuthUser = { sub: string; username: string };
 const VIDEO_UPLOAD_MAX_BYTES = 150 * 1024 * 1024;
 const VIDEO_UPLOAD_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.webm']);
 const VIDEO_UPLOAD_MIME_TYPES = new Set([
@@ -29,7 +30,7 @@ const VIDEO_UPLOAD_MIME_TYPES = new Set([
 ]);
 const VIDEO_BEHAVIOR_DISCLAIMER = 'This result is only a behavior-risk hint and does not constitute veterinary diagnosis.';
 const videoUploadDir = path.join(os.tmpdir(), 'pawtrace-video-uploads');
-const MAP_TILE_TIMEOUT_MS = 8000;
+const MAP_TILE_TIMEOUT_MS = 3500;
 const MAP_TILE_MAX_ZOOM = 19;
 const MAP_TILE_SOURCES = [
   {
@@ -39,6 +40,10 @@ const MAP_TILE_SOURCES = [
   {
     name: 'openstreetmap-a',
     url: (z: number, x: number, y: number) => `https://a.tile.openstreetmap.org/${z}/${x}/${y}.png`,
+  },
+  {
+    name: 'openstreetmap-b',
+    url: (z: number, x: number, y: number) => `https://b.tile.openstreetmap.org/${z}/${x}/${y}.png`,
   },
   {
     name: 'carto-light',
@@ -305,13 +310,15 @@ function parseTelemetryCsv(input: string): Record<string, unknown> {
 }
 
 function parseTelemetryPayload(body: unknown): Record<string, unknown> {
+  if (Array.isArray(body)) return { samples: body.filter(isRecord) };
   if (isRecord(body)) return body;
   if (typeof body !== 'string') return {};
   const raw = body.trim();
   if (!raw) return {};
-  if (raw.startsWith('{')) {
+  if (raw.startsWith('{') || raw.startsWith('[')) {
     try {
       const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return { samples: parsed.filter(isRecord) };
       return isRecord(parsed) ? parsed : {};
     } catch {
       return {};
@@ -331,6 +338,15 @@ function isBleTelemetryPayload(payload: Record<string, unknown>): boolean {
     || payload.ble_name !== undefined;
 }
 
+function isUsbTelemetryPayload(payload: Record<string, unknown>): boolean {
+  const source = [
+    firstTextField(payload, ['source']),
+    firstTextField(payload, ['transport']),
+    firstTextField(payload, ['connection']),
+  ].join(' ').toLowerCase();
+  return source.includes('usb') || source.includes('serial-bridge');
+}
+
 function isBleTelemetryRow(row: DeviceTelemetry): boolean {
   const metadata = isRecord(row.metadata) ? row.metadata : {};
   const source = `${row.source || ''} ${row.transport || ''} ${metadata.source || ''} ${metadata.transport || ''}`.toLowerCase();
@@ -344,8 +360,14 @@ function isBleTelemetryRow(row: DeviceTelemetry): boolean {
     || row.bleMessageUuid !== null;
 }
 
+function isUsbTelemetryRow(row: DeviceTelemetry): boolean {
+  const metadata = isRecord(row.metadata) ? row.metadata : {};
+  const source = `${row.source || ''} ${row.transport || ''} ${metadata.source || ''} ${metadata.transport || ''}`.toLowerCase();
+  return source.includes('usb') || source.includes('serial-bridge');
+}
+
 function isWifiTelemetryRow(row: DeviceTelemetry): boolean {
-  return !isBleTelemetryRow(row);
+  return !isBleTelemetryRow(row) && !isUsbTelemetryRow(row);
 }
 
 function telemetryDeviceId(payload: Record<string, unknown>): string {
@@ -489,7 +511,7 @@ function telemetryMetadata(payload: Record<string, unknown>, source: string): Re
     bleMessageSeq: firstNumericField(payload, ['bleMessageSeq', 'ble_message_seq', 'messageSeq', 'message_seq']),
     bleBridgeReceivedAt: firstTextField(payload, ['bleBridgeReceivedAt', 'ble_bridge_received_at']),
     bleBridgeStoredBy: firstTextField(payload, ['bleBridgeStoredBy', 'ble_bridge_stored_by']),
-    notifySeq: firstNumericField(payload, ['notifySeq', 'notify_seq', 'seq']),
+    notifySeq: firstNumericField(payload, ['notifySeq', 'notify_seq', 'packetSeq', 'packet_seq', 'seq']),
     uptimeMs: firstNumericField(payload, ['uptimeMs', 'uptime_ms']),
     activityScore: firstNumericField(payload, ['activityScore', 'activity_score']),
     wifiConnected: firstBooleanField(payload, ['wifiConnected', 'wifi_connected']),
@@ -517,6 +539,15 @@ function telemetryMetadata(payload: Record<string, unknown>, source: string): Re
     board: firstTextField(payload, ['board', 'hardware']),
     gpsModule: firstTextField(payload, ['gpsModule']),
     heartRateHat: firstTextField(payload, ['heartRateHat']),
+    temperatureValid: firstBooleanField(payload, ['temperatureValid', 'temperature_valid', 'tempValid', 'temp_valid']),
+    temperatureSource: firstTextField(payload, ['temperatureSource', 'temperature_source', 'tempSource', 'temp_source']),
+    boardTempC: firstNumericField(payload, ['boardTempC', 'board_temp_c', 'chipTempC', 'chip_temp_c']),
+    movementScore: firstNumericField(payload, ['movementScore', 'movement_score']),
+    accelMagnitudeG: firstNumericField(payload, ['accelMagnitudeG', 'accel_magnitude_g']),
+    filteredAccelMagnitudeG: firstNumericField(payload, ['filteredAccelMagnitudeG', 'filtered_accel_magnitude_g']),
+    activityConfidence: firstNumericField(payload, ['activityConfidence', 'activity_confidence']),
+    signalQuality: firstNumericField(payload, ['signalQuality', 'signal_quality']),
+    sampleIntervalMs: firstNumericField(payload, ['sampleIntervalMs', 'sample_interval_ms']),
     mapCoords: Object.keys(mapCoords).length ? mapCoords : undefined,
   });
 }
@@ -599,15 +630,32 @@ function mapTelemetryRow(row: HealthMeasurementRow) {
     uploadCode: numericField(metadata, 'uploadCode'),
     uploadAttemptSeq: numericField(metadata, 'uploadAttemptSeq'),
     httpFailCount: numericField(metadata, 'httpFailCount'),
+    temperatureValid: typeof metadata.temperatureValid === 'boolean' ? metadata.temperatureValid : null,
+    temperatureSource: typeof metadata.temperatureSource === 'string' ? metadata.temperatureSource : null,
+    boardTempC: numericField(metadata, 'boardTempC'),
+    movementScore: numericField(metadata, 'movementScore'),
+    accelMagnitudeG: numericField(metadata, 'accelMagnitudeG'),
+    filteredAccelMagnitudeG: numericField(metadata, 'filteredAccelMagnitudeG'),
+    activityConfidence: numericField(metadata, 'activityConfidence'),
+    signalQuality: numericField(metadata, 'signalQuality'),
+    sampleIntervalMs: numericField(metadata, 'sampleIntervalMs'),
     mapCoords: mapX !== undefined && mapY !== undefined ? { x: mapX, y: mapY } : undefined,
     metadata,
   };
 }
 
 type DeviceTelemetry = ReturnType<typeof mapTelemetryRow>;
+type TelemetryStreamClient = {
+  id: string;
+  userId: string;
+  deviceId: string;
+  res: Response;
+};
 
 const DEVICE_TELEMETRY_CACHE_MAX = 100;
+const TELEMETRY_STREAM_HEARTBEAT_MS = 25000;
 const latestDeviceTelemetry = new Map<string, DeviceTelemetry>();
+const telemetryStreamClients = new Set<TelemetryStreamClient>();
 
 function telemetryTimeMs(row: DeviceTelemetry): number {
   const receivedAtMs = Date.parse(String(row.receivedAt || ''));
@@ -654,6 +702,182 @@ function uniqueLatestTelemetry(rows: DeviceTelemetry[], limit: number): DeviceTe
     if (latest.length >= limit) break;
   }
   return latest;
+}
+
+function streamToken(req: Request): string {
+  const value = req.query.token;
+  if (Array.isArray(value)) return String(value[0] || '').trim();
+  return String(value || '').trim();
+}
+
+function authUserFromTelemetryStream(req: Request): StreamAuthUser | null {
+  if (req.authUser) return req.authUser;
+  const token = streamToken(req);
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, config.JWT_SECRET) as StreamAuthUser & { sub?: string };
+    if (!payload.sub) return null;
+    return { sub: payload.sub, username: String(payload.username || '') };
+  } catch {
+    return null;
+  }
+}
+
+function writeTelemetryStreamEvent(res: Response, event: string, data: Record<string, unknown>, id?: string) {
+  if (id) res.write(`id: ${id}\n`);
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function broadcastTelemetry(row: DeviceTelemetry) {
+  if (!isWifiTelemetryRow(row) || !row.userId || telemetryStreamClients.size === 0) return;
+  for (const client of telemetryStreamClients) {
+    if (client.userId !== row.userId) continue;
+    if (client.deviceId && client.deviceId !== row.deviceId) continue;
+    try {
+      writeTelemetryStreamEvent(client.res, 'telemetry', { telemetry: row, latest: row }, row.id);
+    } catch {
+      telemetryStreamClients.delete(client);
+    }
+  }
+}
+
+class TelemetryIngestError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'TelemetryIngestError';
+    this.status = status;
+  }
+}
+
+type StoredTelemetryPayload = {
+  telemetry: DeviceTelemetry;
+  deviceId: string;
+  receivedAt: string;
+  locationPointId: string | null;
+};
+
+function telemetryPayloadSamples(payload: Record<string, unknown>): Record<string, unknown>[] {
+  const rawSamples = Array.isArray(payload.samples) ? payload.samples.filter(isRecord) : [payload];
+  return rawSamples.slice(0, 24);
+}
+
+async function storeTelemetryPayload(payload: Record<string, unknown>, authUser?: StreamAuthUser | null): Promise<StoredTelemetryPayload> {
+  if (isBleTelemetryPayload(payload)) {
+    throw new TelemetryIngestError(400, 'BLE telemetry is disabled. Use BLE only for WiFi provisioning; device data must be uploaded over WiFi.');
+  }
+  if (isUsbTelemetryPayload(payload)) {
+    throw new TelemetryIngestError(400, 'USB telemetry is disabled. Device data must be uploaded over WiFi HTTP.');
+  }
+  const deviceId = telemetryDeviceId(payload);
+  if (!deviceId) throw new TelemetryIngestError(400, 'deviceId is required');
+
+  const payloadUserId = await resolveUserId(firstTextField(payload, ['userId', 'user_id', 'username', 'ownerId', 'owner_id']));
+  if (authUser && payloadUserId && payloadUserId !== authUser.sub) {
+    throw new TelemetryIngestError(403, 'Authenticated users can only write telemetry to their own account.');
+  }
+  const defaultUserId = authUser || payloadUserId ? null : await resolveUserId(config.DEVICE_DEFAULT_USER);
+  const userId = authUser?.sub || payloadUserId || defaultUserId || null;
+
+  const tagId = firstTextField(payload, ['tagId', 'tagID', 'tag_id', 'nfcId', 'nfc_id']);
+  const source = firstTextField(payload, ['source']) || 'm5stack-wifi-http';
+  const timestamp = toIsoTimestamp(firstTextField(payload, ['timestamp', 'capturedAt', 'time']));
+  const receivedAt = new Date().toISOString();
+  const heartRateBpm = firstNumericField(payload, ['heartRateBpm', 'heart_rate_bpm', 'heartRate', 'pet_bpm', 'bpm']);
+  const tempC = firstNumericField(payload, ['tempC', 'temp_c', 'temperatureC', 'temperature']);
+  const lat = firstNumericField(payload, ['lat', 'latitude']);
+  const lon = firstNumericField(payload, ['lon', 'lng', 'longitude']);
+  const locationValid = firstBooleanField(payload, ['locationValid', 'location_valid', 'gpsValid', 'gps_valid']);
+  const gpsFix = firstNumericField(payload, ['gpsFix', 'gps_fix']);
+  const shouldStoreLocation = lat !== undefined
+    && lon !== undefined
+    && lat !== 0
+    && lon !== 0
+    && locationValid !== false
+    && gpsFix !== 0;
+  const storedLat = shouldStoreLocation ? lat : undefined;
+  const storedLon = shouldStoreLocation ? lon : undefined;
+  const locationAccuracy = firstNumericField(payload, ['locationAccuracy', 'location_accuracy', 'accuracy', 'gpsAccuracy']);
+  const altitude = firstNumericField(payload, ['altitude', 'alt']);
+  const locationTimestamp = firstTextField(payload, ['locationTimestamp', 'location_timestamp', 'gpsTimestamp', 'gps_timestamp']);
+  const quality = payload.quality === undefined || payload.quality === null || payload.quality === ''
+    ? undefined
+    : String(payload.quality);
+  const metadata = telemetryMetadata(payload, source);
+
+  const health = await prisma.healthMeasurement.create({
+    data: {
+      id: `health-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+      deviceId,
+      userId,
+      tagId: tagId || null,
+      timestamp,
+      heartRateBpm,
+      soundLevelDb: firstNumericField(payload, ['soundLevelDb', 'soundDb', 'soundLevel']),
+      batteryPct: firstNumericField(payload, ['batteryPct', 'battery_pct', 'batteryPercent', 'battery', 'bat']),
+      steps: firstNumericField(payload, ['steps', 'stepCount']),
+      tempC,
+      accelPeak: firstNumericField(payload, ['accelPeak', 'accelerationPeak']),
+      activity: firstTextField(payload, ['activity', 'activityState', 'motionState']),
+      lat: storedLat,
+      lon: storedLon,
+      locationAccuracy,
+      locationTimestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : undefined,
+      quality,
+      metadata: Object.keys(metadata).length ? jsonObject(metadata) : undefined,
+      receivedAt,
+    },
+  });
+
+  let locationPointId: string | null = null;
+  if (storedLat !== undefined && storedLon !== undefined) {
+    const point = await prisma.locationPoint.create({
+      data: {
+        id: `loc-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+        source,
+        tagId: tagId || null,
+        deviceId,
+        userId,
+        timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
+        lat: storedLat,
+        lon: storedLon,
+        accuracy: locationAccuracy,
+        altitude,
+      },
+    });
+    locationPointId = point.id;
+
+    if (userId) {
+      const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+      if (userExists) {
+        await prisma.lastLocation.upsert({
+          where: { userId },
+          create: {
+            userId,
+            lat: storedLat,
+            lon: storedLon,
+            accuracy: locationAccuracy,
+            timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
+            source,
+          },
+          update: {
+            lat: storedLat,
+            lon: storedLon,
+            accuracy: locationAccuracy,
+            timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
+            source,
+          },
+        });
+      }
+    }
+  }
+
+  const telemetry = mapTelemetryRow(health);
+  cacheLatestTelemetry(telemetry);
+  broadcastTelemetry(telemetry);
+  return { telemetry, deviceId, receivedAt, locationPointId };
 }
 
 function ownerLabelFrom(payload: Record<string, unknown>): string {
@@ -869,14 +1093,15 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
       return res.status(400).json({ error: 'Invalid map tile coordinates' });
     }
 
-    const errors: string[] = [];
-    for (const source of MAP_TILE_SOURCES) {
+    const controllers: AbortController[] = [];
+    const attempts = MAP_TILE_SOURCES.map(async (source) => {
       const controller = new AbortController();
+      controllers.push(controller);
       const timer = setTimeout(() => controller.abort(), MAP_TILE_TIMEOUT_MS);
       try {
         const upstream = await fetch(source.url(z, x, y), {
           headers: {
-            'User-Agent': 'PawTrace/8.9 local development map tile proxy',
+            'User-Agent': 'PawTrace/10.1 local development map tile proxy',
             Accept: 'image/avif,image/webp,image/png,image/*,*/*;q=0.8',
           },
           signal: controller.signal,
@@ -885,18 +1110,31 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
           throw new Error(`${upstream.status} ${upstream.statusText}`);
         }
         const body = Buffer.from(await upstream.arrayBuffer());
-        res.setHeader('Content-Type', upstream.headers.get('content-type') || 'image/png');
-        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
-        res.setHeader('X-PawTrace-Tile-Source', source.name);
-        return res.send(body);
+        return {
+          body,
+          contentType: upstream.headers.get('content-type') || 'image/png',
+          source: source.name,
+        };
       } catch (err) {
-        errors.push(`${source.name}: ${err instanceof Error ? err.message : String(err)}`);
+        throw new Error(`${source.name}: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         clearTimeout(timer);
       }
-    }
+    });
 
-    return res.status(502).json({ error: 'Map tile unavailable', detail: errors.join('; ') });
+    try {
+      const tile = await Promise.any(attempts);
+      controllers.forEach((controller) => controller.abort());
+      res.setHeader('Content-Type', tile.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+      res.setHeader('X-PawTrace-Tile-Source', tile.source);
+      return res.send(tile.body);
+    } catch (err) {
+      const detail = err instanceof AggregateError
+        ? err.errors.map((entry) => entry instanceof Error ? entry.message : String(entry)).join('; ')
+        : err instanceof Error ? err.message : String(err);
+      return res.status(502).json({ error: 'Map tile unavailable', detail });
+    }
   }));
 
   app.get('/api/sticky-notes', requireAuth, asyncHandler(async (_req, res) => {
@@ -950,123 +1188,91 @@ export function registerRoutes(app: Express, deps: { metrics: AppMetrics }) {
   }));
 
   // ─── M5Stack Device Telemetry ───
-  app.post('/api/device/telemetry', express.text({ type: ['text/csv', 'text/plain'], limit: '16kb' }), requireDeviceIngestAuth, asyncHandler(async (req, res) => {
-    const payload = parseTelemetryPayload(req.body);
-    if (isBleTelemetryPayload(payload)) {
-      return res.status(400).json({
-        error: 'BLE telemetry is disabled. Use BLE only for WiFi provisioning; device data must be uploaded over WiFi.',
-      });
-    }
-    const deviceId = telemetryDeviceId(payload);
-    if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
+  app.get('/api/device/telemetry/stream', asyncHandler(async (req, res) => {
+    const authUser = authUserFromTelemetryStream(req);
+    if (!authUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    const payloadUserId = await resolveUserId(firstTextField(payload, ['userId', 'user_id', 'username', 'ownerId', 'owner_id']));
-    if (req.authUser && payloadUserId && payloadUserId !== req.authUser.sub) {
-      return res.status(403).json({ error: 'Authenticated users can only write telemetry to their own account.' });
-    }
-    const defaultUserId = req.authUser || payloadUserId ? null : await resolveUserId(config.DEVICE_DEFAULT_USER);
-    const userId = req.authUser?.sub || payloadUserId || defaultUserId || null;
+    const deviceId = String(req.query.deviceId || '').trim();
+    const initialLimit = boundedPositiveInt(req.query.limit, 1, 10);
+    const client: TelemetryStreamClient = {
+      id: `stream-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+      userId: authUser.sub,
+      deviceId,
+      res,
+    };
 
-    const tagId = firstTextField(payload, ['tagId', 'tagID', 'tag_id', 'nfcId', 'nfc_id']);
-    const source = firstTextField(payload, ['source']) || 'm5stack-wifi-http';
-    const timestamp = toIsoTimestamp(firstTextField(payload, ['timestamp', 'capturedAt', 'time']));
-    const receivedAt = new Date().toISOString();
-    const heartRateBpm = firstNumericField(payload, ['heartRateBpm', 'heart_rate_bpm', 'heartRate', 'pet_bpm', 'bpm']);
-    const tempC = firstNumericField(payload, ['tempC', 'temp_c', 'temperatureC', 'temperature']);
-    const lat = firstNumericField(payload, ['lat', 'latitude']);
-    const lon = firstNumericField(payload, ['lon', 'lng', 'longitude']);
-    const locationValid = firstBooleanField(payload, ['locationValid', 'location_valid', 'gpsValid', 'gps_valid']);
-    const gpsFix = firstNumericField(payload, ['gpsFix', 'gps_fix']);
-    const shouldStoreLocation = lat !== undefined
-      && lon !== undefined
-      && lat !== 0
-      && lon !== 0
-      && locationValid !== false
-      && gpsFix !== 0;
-    const storedLat = shouldStoreLocation ? lat : undefined;
-    const storedLon = shouldStoreLocation ? lon : undefined;
-    const locationAccuracy = firstNumericField(payload, ['locationAccuracy', 'location_accuracy', 'accuracy', 'gpsAccuracy']);
-    const altitude = firstNumericField(payload, ['altitude', 'alt']);
-    const locationTimestamp = firstTextField(payload, ['locationTimestamp', 'location_timestamp', 'gpsTimestamp', 'gps_timestamp']);
-    const quality = payload.quality === undefined || payload.quality === null || payload.quality === ''
-      ? undefined
-      : String(payload.quality);
-    const metadata = telemetryMetadata(payload, source);
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
 
-    const health = await prisma.healthMeasurement.create({
-      data: {
-        id: `health-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
-        deviceId,
-        userId,
-        tagId: tagId || null,
-        timestamp,
-        heartRateBpm,
-        soundLevelDb: firstNumericField(payload, ['soundLevelDb', 'soundDb', 'soundLevel']),
-        batteryPct: firstNumericField(payload, ['batteryPct', 'battery_pct', 'batteryPercent', 'battery', 'bat']),
-        steps: firstNumericField(payload, ['steps', 'stepCount']),
-        tempC,
-        accelPeak: firstNumericField(payload, ['accelPeak', 'accelerationPeak']),
-        activity: firstTextField(payload, ['activity', 'activityState', 'motionState']),
-        lat: storedLat,
-        lon: storedLon,
-        locationAccuracy,
-        locationTimestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : undefined,
-        quality,
-        metadata: Object.keys(metadata).length ? jsonObject(metadata) : undefined,
-        receivedAt,
-      },
+    telemetryStreamClients.add(client);
+    writeTelemetryStreamEvent(res, 'ready', {
+      ready: true,
+      clientId: client.id,
+      deviceId: deviceId || null,
+      heartbeatMs: TELEMETRY_STREAM_HEARTBEAT_MS,
     });
 
-    let locationPointId: string | null = null;
-    if (storedLat !== undefined && storedLon !== undefined) {
-      const point = await prisma.locationPoint.create({
-        data: {
-          id: `loc-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
-          source,
-          tagId: tagId || null,
-          deviceId,
-          userId,
-          timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
-          lat: storedLat,
-          lon: storedLon,
-          accuracy: locationAccuracy,
-          altitude,
-        },
-      });
-      locationPointId = point.id;
+    const cachedTelemetry = getCachedTelemetry(authUser.sub, deviceId, initialLimit);
+    cachedTelemetry.forEach((row) => {
+      writeTelemetryStreamEvent(res, 'telemetry', { telemetry: row, latest: row, fromCache: true }, row.id);
+    });
 
-      if (userId) {
-        const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-        if (userExists) {
-          await prisma.lastLocation.upsert({
-            where: { userId },
-            create: {
-              userId,
-              lat: storedLat,
-              lon: storedLon,
-              accuracy: locationAccuracy,
-              timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
-              source,
-            },
-            update: {
-              lat: storedLat,
-              lon: storedLon,
-              accuracy: locationAccuracy,
-              timestamp: locationTimestamp ? toIsoTimestamp(locationTimestamp) : timestamp,
-              source,
-            },
-          });
-        }
+    const heartbeat = setInterval(() => {
+      try {
+        writeTelemetryStreamEvent(res, 'ping', { time: new Date().toISOString() });
+      } catch {
+        clearInterval(heartbeat);
+        telemetryStreamClients.delete(client);
       }
+    }, TELEMETRY_STREAM_HEARTBEAT_MS);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      telemetryStreamClients.delete(client);
+    });
+  }));
+
+  app.post('/api/device/telemetry', express.text({ type: ['text/csv', 'text/plain'], limit: '64kb' }), requireDeviceIngestAuth, asyncHandler(async (req, res) => {
+    const payload = parseTelemetryPayload(req.body);
+    const samples = telemetryPayloadSamples(payload);
+    if (!samples.length) return res.status(400).json({ error: 'telemetry payload is required' });
+
+    let stored: StoredTelemetryPayload[] = [];
+    try {
+      for (const sample of samples) {
+        stored.push(await storeTelemetryPayload(sample, req.authUser));
+      }
+    } catch (err) {
+      if (err instanceof TelemetryIngestError) {
+        return res.status(err.status).json({ error: err.message });
+      }
+      throw err;
     }
 
-    const telemetry = mapTelemetryRow(health);
-    cacheLatestTelemetry(telemetry);
+    const latest = stored[stored.length - 1];
+
+    const responseMode = String(req.get('x-device-response') || req.query.response || req.query.compact || '').trim().toLowerCase();
+    if (['1', 'true', 'compact', 'minimal', 'fast'].includes(responseMode)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({
+        success: true,
+        count: stored.length,
+        id: latest.telemetry.id,
+        deviceId: latest.deviceId,
+        receivedAt: latest.receivedAt,
+        locationPointId: latest.locationPointId,
+      });
+    }
 
     res.json({
       success: true,
-      telemetry,
-      locationPointId,
+      count: stored.length,
+      telemetry: latest.telemetry,
+      locationPointId: latest.locationPointId,
     });
   }));
 

@@ -1,0 +1,6 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pawtrace-glass",
+  "compatibility_date": "2026-05-03",
+  "pages_build_output_dir": "./pawtrace-glass/dist"
+}

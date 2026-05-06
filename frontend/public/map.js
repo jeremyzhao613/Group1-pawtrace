@@ -12,17 +12,19 @@
   const OSM_TILE_MAX_ZOOM = 19;
   const MAP_ZOOM_MIN = -2;
   const MAP_ZOOM_MAX = 3;
-  const MAP_TILE_LOAD_TIMEOUT_MS = 7000;
+  const MAP_TILE_LOAD_TIMEOUT_MS = 2800;
+  const MAP_TILE_READY_RATIO = 0.32;
+  const MAP_TILE_FAILURE_RATIO = 0.55;
   const DEFAULT_GEOFENCE_RADIUS_M = 180;
   const FENCE_RADIUS_MIN_M = 60;
   const FENCE_RADIUS_MAX_M = 650;
   const MAP_CONTROL_STORAGE_KEY = 'pawtrace_map_controls_v2';
   const MAP_TILE_URL_TEMPLATES = [
-    '/api/map/tile/{z}/{x}/{y}.png',
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
     'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+    '/api/map/tile/{z}/{x}/{y}.png',
   ];
   const TRACKED_ZONE_FALLBACKS = [
     { label: 'West Residence Quad', coords: { x: 24, y: 20 } },
@@ -46,7 +48,7 @@
   function safeImageSrc(value, fallback = '') {
     const src = String(value || '').trim();
     if (!src) return fallback;
-    if (/^(https?:\/\/|data:image\/|\/|\.\/|\.\.\/)/i.test(src)) return src;
+    if (/^(https?:\/\/|data:image\/|blob:|\/|\.\/|\.\.\/)/i.test(src)) return src;
     return fallback;
   }
 
@@ -76,6 +78,30 @@
     if (value === true) return 'YES';
     if (value === false) return 'NO';
     return '--';
+  }
+
+  function markerIconSvg(icon = '', label = '') {
+    const key = String(icon || label || '').toLowerCase();
+    const iconName = key.includes('mug') || key.includes('cafe') || key.includes('coffee')
+      ? 'coffee'
+      : key.includes('seed') || key.includes('lawn') || key.includes('garden')
+        ? 'leaf'
+        : key.includes('store') || key.includes('supply') || key.includes('kiosk')
+          ? 'store'
+          : key.includes('walk') || key.includes('track')
+            ? 'walk'
+            : key.includes('med') || key.includes('care')
+              ? 'care'
+              : 'pin';
+    const paths = {
+      coffee: '<path d="M6 8h9v4.5A4.5 4.5 0 0 1 10.5 17h0A4.5 4.5 0 0 1 6 12.5V8Z"/><path d="M15 9h1.5a2 2 0 0 1 0 4H15"/><path d="M7 20h9"/><path d="M8 4.5c.7.5.7 1.2 0 1.7"/><path d="M11 4.5c.7.5.7 1.2 0 1.7"/>',
+      leaf: '<path d="M19 5c-7.2.4-11.1 3.3-11.6 8.8-.2 2.6 1.6 4.5 4.1 4.2 5.5-.6 8.1-5.2 7.5-13Z"/><path d="M7.5 17.5 15 10"/><path d="M9.5 14.5h4.1"/><path d="M11.5 12.5v4.1"/>',
+      store: '<path d="M5.5 5h13l1.4 4.2a2.5 2.5 0 0 1-4.6 1.9 2.5 2.5 0 0 1-4.6 0 2.5 2.5 0 0 1-4.6-1.9L5.5 5Z"/><path d="M6.5 12.2V19h11v-6.8"/><path d="M9 19v-4h6v4"/>',
+      walk: '<path d="M13 5.2a1.7 1.7 0 1 0 0-3.4 1.7 1.7 0 0 0 0 3.4Z"/><path d="m10.5 8.1 2.6-1.1 2 3.1 2.5.9"/><path d="m12.8 10.8-2.1 3.1-3.3 1.3"/><path d="m13.9 12.4 1.6 2.3-.1 4.1"/><path d="m9.8 14.2 2.3 1.7 1.7 2.9"/>',
+      care: '<path d="M12 21s-7-3.9-7-10.1A4.9 4.9 0 0 1 9.9 6c1 0 1.7.3 2.1.8.4-.5 1.1-.8 2.1-.8A4.9 4.9 0 0 1 19 10.9C19 17.1 12 21 12 21Z"/><path d="M12 9.2v5.4"/><path d="M9.3 11.9h5.4"/>',
+      pin: '<path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/><path d="M12 12.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4Z"/>',
+    };
+    return `<svg class="map-marker__icon map-marker__svg map-marker__svg--${iconName}" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" focusable="false">${paths[iconName]}</svg>`;
   }
 
   function readMapPreferences() {
@@ -341,15 +367,97 @@
     return ((1 - (mercatorY(lat) / Math.PI)) / 2) * (2 ** zoom) * OSM_TILE_SIZE;
   }
 
+  const API_BASE_OVERRIDE_KEY = 'pawtrace_api_base_url';
+
+  function isLocalHardwareHostName(hostname = global.location?.hostname || '') {
+    const host = String(hostname || '').trim().toLowerCase();
+    return host === 'localhost'
+      || host === '127.0.0.1'
+      || host === '::1'
+      || host.startsWith('10.')
+      || host.startsWith('192.168.')
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+  }
+
+  function getRouteHashPath() {
+    try {
+      return String(global.location?.hash || '').replace(/^#/, '').split('?')[0].split('/')[0].trim().toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  function isLocalM5DemoRoute() {
+    if (!isLocalHardwareHostName()) return false;
+    try {
+      const params = new URLSearchParams(global.location?.search || '');
+      const openApp = String(params.get('openApp') || '').trim().toLowerCase();
+      const hashPath = getRouteHashPath();
+      return params.get('autoDemo') === '1'
+        || params.has('m5Demo')
+        || openApp === 'm5'
+        || openApp === 'health'
+        || (openApp === 'profile' && hashPath === 'health');
+    } catch {
+      return false;
+    }
+  }
+
+  function getApiBaseUrl() {
+    const queryBase = getQueryApiBaseUrl();
+    const storedBase = getStoredApiBaseUrl();
+    if (queryBase) setStoredApiBaseUrl(queryBase);
+    const useLocalDemoApi = !queryBase && isLocalM5DemoRoute();
+    if (useLocalDemoApi) setStoredApiBaseUrl('');
+    const rawBase = String(queryBase || (useLocalDemoApi ? '' : storedBase) || (useLocalDemoApi ? '' : global.PAWTRACE_API_BASE_URL) || '').trim();
+    return rawBase.replace(/\/+$/, '');
+  }
+
+  function getQueryApiBaseUrl() {
+    try {
+      const params = new URLSearchParams(global.location?.search || '');
+      return String(params.get('apiBase') || params.get('api') || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  function getStoredApiBaseUrl() {
+    try {
+      return String(global.localStorage?.getItem(API_BASE_OVERRIDE_KEY) || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  function setStoredApiBaseUrl(value) {
+    try {
+      const normalized = String(value || '').trim().replace(/\/+$/, '');
+      if (normalized) global.localStorage?.setItem(API_BASE_OVERRIDE_KEY, normalized);
+      else global.localStorage?.removeItem(API_BASE_OVERRIDE_KEY);
+    } catch {}
+  }
+
+  function resolveApiUrl(path) {
+    const target = String(path || '');
+    const apiBaseUrl = getApiBaseUrl();
+    if (!apiBaseUrl || !target.startsWith('/api/')) return target;
+    if (apiBaseUrl.endsWith('/api')) {
+      return `${apiBaseUrl}${target.slice('/api'.length)}`;
+    }
+    return `${apiBaseUrl}${target}`;
+  }
+
   function mapTileUrl(x, y, zoom = OSM_TILE_ZOOM, sourceIndex = 0) {
     const template = MAP_TILE_URL_TEMPLATES[sourceIndex] || MAP_TILE_URL_TEMPLATES[0];
-    return template
+    const url = template
       .replace('{z}', encodeURIComponent(String(zoom)))
       .replace('{x}', encodeURIComponent(String(x)))
       .replace('{y}', encodeURIComponent(String(y)));
+    return resolveApiUrl(url);
   }
 
-  function projectCoordinateToRealMap(coordinate = {}, view = {}) {
+  function projectCoordinateToRealMap(coordinate = {}, view = {}, options = {}) {
     const bounds = view.bounds || {};
     if (!coordinate
       || !hasValidCoordinate(coordinate.lat, coordinate.lon)
@@ -363,9 +471,14 @@
     const northY = mercatorY(bounds.north);
     const southY = mercatorY(bounds.south);
     const ySpan = Math.max(0.000001, northY - southY);
+    const point = {
+      x: (degreesToRadians(Number(coordinate.lon) - Number(bounds.west)) / xSpan) * 100,
+      y: ((northY - mercatorY(coordinate.lat)) / ySpan) * 100,
+    };
+    if (options?.clamp === false) return point;
     return {
-      x: Math.min(94, Math.max(6, (degreesToRadians(Number(coordinate.lon) - Number(bounds.west)) / xSpan) * 100)),
-      y: Math.min(94, Math.max(6, ((northY - mercatorY(coordinate.lat)) / ySpan) * 100)),
+      x: Math.min(94, Math.max(6, point.x)),
+      y: Math.min(94, Math.max(6, point.y)),
     };
   }
 
@@ -719,18 +832,18 @@
       this.getVisibleLocations().forEach(location => {
         const marker = document.createElement('button');
         marker.type = 'button';
-        marker.className = `map-marker map-marker--store ${location.id === this.activeLocationId ? 'map-marker--active' : ''}`;
         const projected = projectCoordinateToRealMap(getLocationCoordinate(location), this.realMapView)
           || { x: location.coords?.x ?? 50, y: location.coords?.y ?? 50 };
+        const labelPositionClass = projected.y > 62 ? 'map-marker--label-above' : 'map-marker--label-below';
+        marker.className = `map-marker map-marker--store ${labelPositionClass} ${location.id === this.activeLocationId ? 'map-marker--active' : ''}`;
         marker.style.left = `${projected.x}%`;
         marker.style.top = `${projected.y}%`;
         const coordinateLabel = formatCoordinatePair(getLocationCoordinate(location));
         marker.setAttribute('aria-label', `${location.name} marker ${coordinateLabel}`);
         marker.title = coordinateLabel ? `${location.name} · ${coordinateLabel}` : location.name;
-        const markerIcon = escapeHtml(location.markerIcon || 'fa-store');
         const markerLabel = escapeHtml(location.markerLabel || location.name);
         marker.innerHTML = `
-          <span class="map-marker__icon" aria-hidden="true"><i class="fas ${markerIcon}"></i></span>
+          ${markerIconSvg(location.markerIcon, location.markerLabel || location.name)}
           <span class="map-marker__label">${markerLabel}</span>
         `;
         marker.addEventListener('click', () => this.showLocationCard(location, marker));
@@ -1134,17 +1247,39 @@
       const endY = Math.floor(southY / OSM_TILE_SIZE);
       const maxTile = 2 ** zoom;
       const fragment = document.createDocumentFragment();
+      const renderToken = (this.tileRenderToken = (this.tileRenderToken || 0) + 1);
+      let tileCount = 0;
+      let settledCount = 0;
+      let loadedCount = 0;
+      let failedCount = 0;
+
+      this.container?.classList.remove('map-container--tiles-failed');
+      this.container?.classList.add('map-container--tiles-loading');
+
+      const updateTileHealth = () => {
+        if (this.tileRenderToken !== renderToken || tileCount <= 0) return;
+        const readyThreshold = Math.max(1, Math.ceil(tileCount * MAP_TILE_READY_RATIO));
+        const isReady = loadedCount >= readyThreshold;
+        const isComplete = settledCount >= tileCount;
+        this.container?.classList.toggle('map-container--tiles-loading', !(isReady || isComplete));
+        this.container?.classList.toggle(
+          'map-container--tiles-failed',
+          isComplete && loadedCount < readyThreshold && (failedCount / tileCount) >= MAP_TILE_FAILURE_RATIO
+        );
+      };
 
       for (let tileX = startX; tileX <= endX; tileX += 1) {
         for (let tileY = startY; tileY <= endY; tileY += 1) {
           if (tileY < 0 || tileY >= maxTile) continue;
+          tileCount += 1;
           const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
           const tile = document.createElement('img');
           tile.className = 'real-map-tile';
           tile.alt = '';
           tile.loading = 'eager';
           tile.decoding = 'async';
-          tile.referrerPolicy = 'no-referrer';
+          tile.fetchPriority = 'high';
+          tile.referrerPolicy = 'strict-origin-when-cross-origin';
           tile.draggable = false;
           tile.style.left = `${((tileX * OSM_TILE_SIZE - westX) / worldWidth) * 100}%`;
           tile.style.top = `${((tileY * OSM_TILE_SIZE - northY) / worldHeight) * 100}%`;
@@ -1152,30 +1287,43 @@
           tile.style.height = `${(OSM_TILE_SIZE / worldHeight) * 100}%`;
           let sourceIndex = 0;
           let fallbackTimer = 0;
+          let settled = false;
           const applyTileSource = () => {
+            if (this.tileRenderToken !== renderToken) return;
             tile.dataset.source = String(sourceIndex);
             tile.src = mapTileUrl(wrappedX, tileY, zoom, sourceIndex);
             if (fallbackTimer) window.clearTimeout(fallbackTimer);
             fallbackTimer = window.setTimeout(tryNextTileSource, MAP_TILE_LOAD_TIMEOUT_MS);
           };
           const markLoaded = () => {
+            if (settled || this.tileRenderToken !== renderToken) return;
+            settled = true;
             if (fallbackTimer) window.clearTimeout(fallbackTimer);
             fallbackTimer = 0;
             tile.classList.add('real-map-tile--loaded');
+            loadedCount += 1;
+            settledCount += 1;
+            updateTileHealth();
           };
           const markFailed = () => {
+            if (settled || this.tileRenderToken !== renderToken) return;
+            settled = true;
             if (fallbackTimer) window.clearTimeout(fallbackTimer);
             fallbackTimer = 0;
             tile.classList.add('real-map-tile--failed');
+            failedCount += 1;
+            settledCount += 1;
+            updateTileHealth();
           };
-          function tryNextTileSource() {
+          const tryNextTileSource = () => {
+            if (settled || this.tileRenderToken !== renderToken) return;
             if (sourceIndex >= MAP_TILE_URL_TEMPLATES.length - 1) {
               markFailed();
               return;
             }
             sourceIndex += 1;
             applyTileSource();
-          }
+          };
           tile.addEventListener('load', markLoaded);
           tile.addEventListener('error', tryNextTileSource);
           applyTileSource();
@@ -1189,6 +1337,7 @@
       this.realMapTiles.replaceChildren(fragment);
       this.realMapTiles.appendChild(attribution);
       this.realMapTiles.dataset.viewKey = viewKey;
+      updateTileHealth();
     }
 
     updateRealMapState() {
@@ -1272,6 +1421,14 @@
       return this.getFenceState(pet).radiusM;
     }
 
+    getOverlayAspectRatio() {
+      const frame = this.overlayLayer || this.realMapTiles || this.realMapFrame || this.container;
+      const rect = frame?.getBoundingClientRect?.();
+      const width = Number(rect?.width);
+      const height = Number(rect?.height);
+      return width > 0 && height > 0 ? width / height : REAL_MAP_DEFAULT_ASPECT;
+    }
+
     projectGeofence(pet = {}) {
       const fenceState = this.getFenceState(pet);
       if (!fenceState.enabled || !fenceState.center) return null;
@@ -1279,10 +1436,15 @@
       const center = projectCoordinateToRealMap(centerCoordinate, this.realMapView);
       if (!center) return null;
       const radiusM = fenceState.radiusM;
-      const east = projectCoordinateToRealMap(offsetCoordinateMeters(centerCoordinate, radiusM, 0), this.realMapView);
-      const north = projectCoordinateToRealMap(offsetCoordinateMeters(centerCoordinate, 0, radiusM), this.realMapView);
-      const rx = east ? Math.max(2.3, Math.abs(east.x - center.x)) : 5;
-      const ry = north ? Math.max(2.3, Math.abs(north.y - center.y)) : 5;
+      const centerRaw = projectCoordinateToRealMap(centerCoordinate, this.realMapView, { clamp: false }) || center;
+      const east = projectCoordinateToRealMap(offsetCoordinateMeters(centerCoordinate, radiusM, 0), this.realMapView, { clamp: false });
+      const north = projectCoordinateToRealMap(offsetCoordinateMeters(centerCoordinate, 0, radiusM), this.realMapView, { clamp: false });
+      const aspect = this.getOverlayAspectRatio();
+      const eastScreenRadius = east ? Math.abs(east.x - centerRaw.x) * aspect : null;
+      const northScreenRadius = north ? Math.abs(north.y - centerRaw.y) : null;
+      const screenRadius = Math.max(2.3, eastScreenRadius || 0, northScreenRadius || 0);
+      const rx = Math.max(2.3, screenRadius / aspect);
+      const ry = Math.max(2.3, screenRadius);
       return {
         ...center,
         rx,

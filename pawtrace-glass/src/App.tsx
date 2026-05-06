@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type ApiUser = {
   id?: string;
@@ -91,6 +91,24 @@ type MapCoordinate = {
   timestamp?: string;
 };
 
+type MapTile = {
+  key: string;
+  url: string;
+  offsetX: number;
+  offsetY: number;
+};
+
+type MapTileLoadState = {
+  signature: string;
+  loaded: Set<string>;
+  failed: Set<string>;
+};
+
+const OSM_TILE_SIZE = 256;
+const OSM_TILE_ZOOM = 16;
+const OSM_TILE_RADIUS = 1;
+const OSM_MAX_LAT = 85.05112878;
+
 const demoPacket = {
   device_id: 'm5stickc-plus-1-1',
   source: 'm5stickc-plus-wifi',
@@ -136,7 +154,7 @@ const emptyState: DashboardState = {
   lastRefresh: '',
 };
 
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || import.meta.env.PAWTRACE_API_BASE_URL || '').trim().replace(/\/+$/, '');
 
 function apiUrl(path: string) {
   const target = String(path || '');
@@ -252,22 +270,107 @@ function getActiveCoordinate(latest: Telemetry | null, points: LocationPoint[], 
   return null;
 }
 
-function osmEmbedUrl(point: MapCoordinate) {
-  const delta = 0.006;
-  const west = point.lon - delta;
-  const south = point.lat - delta;
-  const east = point.lon + delta;
-  const north = point.lat + delta;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${west}%2C${south}%2C${east}%2C${north}&layer=mapnik&marker=${point.lat}%2C${point.lon}`;
-}
-
 function osmOpenUrl(point: MapCoordinate) {
   return `https://www.openstreetmap.org/?mlat=${point.lat}&mlon=${point.lon}#map=17/${point.lat}/${point.lon}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function coordinateToTile(point: MapCoordinate, zoom = OSM_TILE_ZOOM) {
+  const lat = clamp(point.lat, -OSM_MAX_LAT, OSM_MAX_LAT);
+  const scale = 2 ** zoom;
+  const latRad = lat * Math.PI / 180;
+  return {
+    x: ((point.lon + 180) / 360) * scale,
+    y: ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * scale,
+  };
+}
+
+function osmTiles(point: MapCoordinate, zoom = OSM_TILE_ZOOM): MapTile[] {
+  const center = coordinateToTile(point, zoom);
+  const centerTileX = Math.floor(center.x);
+  const centerTileY = Math.floor(center.y);
+  const centerPixelX = center.x * OSM_TILE_SIZE;
+  const centerPixelY = center.y * OSM_TILE_SIZE;
+  const maxTile = 2 ** zoom - 1;
+  const tiles: MapTile[] = [];
+
+  for (let yOffset = -OSM_TILE_RADIUS; yOffset <= OSM_TILE_RADIUS; yOffset += 1) {
+    for (let xOffset = -OSM_TILE_RADIUS; xOffset <= OSM_TILE_RADIUS; xOffset += 1) {
+      const x = clamp(centerTileX + xOffset, 0, maxTile);
+      const y = clamp(centerTileY + yOffset, 0, maxTile);
+      tiles.push({
+        key: `${zoom}-${x}-${y}-${xOffset}-${yOffset}`,
+        url: `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`,
+        offsetX: x * OSM_TILE_SIZE - centerPixelX,
+        offsetY: y * OSM_TILE_SIZE - centerPixelY,
+      });
+    }
+  }
+
+  return tiles;
+}
+
+function telemetryStreamUrl(token: string) {
+  return apiUrl(`/api/device/telemetry/stream?limit=1&token=${encodeURIComponent(token)}`);
+}
+
+function telemetryFromStreamPayload(payload: unknown): Telemetry | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const record = payload as { telemetry?: Telemetry; latest?: Telemetry };
+  return record.telemetry || record.latest || null;
+}
+
+function telemetryRowKey(row: Telemetry | null | undefined) {
+  if (!row) return '';
+  return String(row.id || [
+    row.deviceId || '',
+    row.receivedAt || row.timestamp || '',
+    row.notifySeq ?? '',
+  ].join(':'));
+}
+
+function prependTelemetryRow(history: Telemetry[], row: Telemetry, limit = 80) {
+  const key = telemetryRowKey(row);
+  return [
+    row,
+    ...history.filter((item) => telemetryRowKey(item) !== key),
+  ].slice(0, limit);
+}
+
+function locationPointFromTelemetry(row: Telemetry): LocationPoint | null {
+  if (!hasLiveCoordinateLock(row)) return null;
+  return {
+    id: `telemetry-${telemetryRowKey(row)}`,
+    timestamp: row.receivedAt || row.timestamp || new Date().toISOString(),
+    lat: Number(row.lat),
+    lon: Number(row.lon),
+    source: row.source || 'm5stickc-plus-wifi',
+  };
+}
+
+function appendTelemetryPoint(points: LocationPoint[], row: Telemetry, limit = 80) {
+  const point = locationPointFromTelemetry(row);
+  if (!point) return points;
+  return [
+    ...points.filter((item) => item.id !== point.id),
+    point,
+  ].slice(-limit);
 }
 
 export default function App() {
   const [state, setState] = useState<DashboardState>(emptyState);
   const [posting, setPosting] = useState(false);
+  const [mapTileLoadState, setMapTileLoadState] = useState<MapTileLoadState>(() => ({
+    signature: '',
+    loaded: new Set(),
+    failed: new Set(),
+  }));
+  const tokenRef = useRef('');
+  const loginPromiseRef = useRef<Promise<string> | null>(null);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const apiFetch = useCallback(async (path: string, token: string, options: RequestInit = {}) => {
     const headers = {
@@ -284,57 +387,117 @@ export default function App() {
   }, []);
 
   const ensureToken = useCallback(async () => {
-    if (state.token) return state.token;
-    const response = await fetch(apiUrl('/api/auth/login'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'demo', password: 'demo123' }),
+    if (tokenRef.current) return tokenRef.current;
+    if (loginPromiseRef.current) return loginPromiseRef.current;
+
+    loginPromiseRef.current = (async () => {
+      const response = await fetch(apiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'demo', password: 'demo123' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.token) {
+        throw new Error(data.error || 'Unable to log in with demo account');
+      }
+      tokenRef.current = data.token;
+      setState((current) => ({ ...current, token: data.token }));
+      return data.token as string;
+    })().finally(() => {
+      loginPromiseRef.current = null;
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.token) {
-      throw new Error(data.error || 'Unable to log in with demo account');
-    }
-    setState((current) => ({ ...current, token: data.token }));
-    return data.token as string;
-  }, [state.token]);
+
+    return loginPromiseRef.current;
+  }, []);
 
   const refresh = useCallback(async () => {
-    try {
-      const token = await ensureToken();
-      const [me, pets, latest, history, points] = await Promise.all([
-        apiFetch('/api/auth/me', token),
-        apiFetch('/api/pets', token),
-        apiFetch('/api/device/telemetry/latest?limit=8', token),
-        apiFetch('/api/device/telemetry/history?limit=40', token),
-        apiFetch('/api/location/points?limit=40', token),
-      ]);
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
-      setState((current) => ({
-        ...current,
-        token,
-        user: me.user || null,
-        pets: Array.isArray(pets.pets) ? pets.pets : [],
-        latest: latest.latest || latest.telemetry?.[0] || null,
-        history: Array.isArray(history.telemetry) ? history.telemetry : [],
-        points: Array.isArray(points.points) ? points.points : [],
-        error: '',
-        loading: false,
-        lastRefresh: new Date().toISOString(),
-      }));
-    } catch (err) {
-      setState((current) => ({
-        ...current,
-        error: err instanceof Error ? err.message : 'Unable to refresh dashboard',
-        loading: false,
-      }));
-    }
+    refreshPromiseRef.current = (async () => {
+      try {
+        const token = await ensureToken();
+        const [me, pets, latest, history, points] = await Promise.all([
+          apiFetch('/api/auth/me', token),
+          apiFetch('/api/pets', token),
+          apiFetch('/api/device/telemetry/latest?limit=8', token),
+          apiFetch('/api/device/telemetry/history?limit=40', token),
+          apiFetch('/api/location/points?limit=40', token),
+        ]);
+
+        setState((current) => ({
+          ...current,
+          token,
+          user: me.user || null,
+          pets: Array.isArray(pets.pets) ? pets.pets : [],
+          latest: latest.latest || latest.telemetry?.[0] || null,
+          history: Array.isArray(history.telemetry) ? history.telemetry : [],
+          points: Array.isArray(points.points) ? points.points : [],
+          error: '',
+          loading: false,
+          lastRefresh: new Date().toISOString(),
+        }));
+      } catch (err) {
+        setState((current) => ({
+          ...current,
+          error: err instanceof Error ? err.message : 'Unable to refresh dashboard',
+          loading: false,
+        }));
+      }
+    })().finally(() => {
+      refreshPromiseRef.current = null;
+    });
+
+    return refreshPromiseRef.current;
   }, [apiFetch, ensureToken]);
 
   useEffect(() => {
     refresh();
-    const timer = window.setInterval(refresh, 6000);
+    const timer = window.setInterval(refresh, 15000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    if (typeof EventSource === 'undefined') return undefined;
+
+    let stream: EventSource | null = null;
+    let stopped = false;
+
+    ensureToken()
+      .then((token) => {
+        if (stopped || !token) return;
+        stream = new EventSource(telemetryStreamUrl(token));
+        stream.addEventListener('telemetry', (event) => {
+          try {
+            const payload = JSON.parse((event as MessageEvent<string>).data);
+            const telemetry = telemetryFromStreamPayload(payload);
+            if (!telemetry?.deviceId) return;
+            setState((current) => ({
+              ...current,
+              latest: telemetry,
+              history: prependTelemetryRow(current.history, telemetry),
+              points: appendTelemetryPoint(current.points, telemetry),
+              error: '',
+              loading: false,
+              lastRefresh: new Date().toISOString(),
+            }));
+          } catch (err) {
+            console.warn('Telemetry stream event parse failed', err);
+          }
+        });
+      })
+      .catch((err) => {
+        setState((current) => ({
+          ...current,
+          error: err instanceof Error ? err.message : 'Unable to open telemetry stream',
+          loading: false,
+        }));
+      });
+
+    return () => {
+      stopped = true;
+      stream?.close();
+    };
+  }, [ensureToken]);
 
   const sendPacket = useCallback(async (packet: Record<string, unknown>) => {
     setPosting(true);
@@ -368,6 +531,34 @@ export default function App() {
     () => getActiveCoordinate(latest, state.points, liveGpsValid),
     [liveGpsValid, latest, state.points],
   );
+  const mapTiles = useMemo(() => (mapPoint ? osmTiles(mapPoint) : []), [mapPoint]);
+  const mapTileSignature = useMemo(() => mapTiles.map((tile) => tile.key).join('|'), [mapTiles]);
+  const mapLoading = state.loading && !mapPoint;
+  const loadedMapTiles = mapTileLoadState.signature === mapTileSignature ? mapTileLoadState.loaded : new Set<string>();
+  const failedMapTiles = mapTileLoadState.signature === mapTileSignature ? mapTileLoadState.failed : new Set<string>();
+  const mapTilesReady = mapTiles.length > 0
+    && failedMapTiles.size === 0
+    && mapTiles.every((tile) => loadedMapTiles.has(tile.key));
+  const mapBaseReady = !mapPoint || mapTilesReady || failedMapTiles.size > 0;
+  const pageReady = !state.loading && !state.error && mapBaseReady;
+  const mapLoadingLabel = failedMapTiles.size > 0
+    ? 'Map fallback loaded'
+    : `Loading map ${Math.min(loadedMapTiles.size, mapTiles.length)}/${mapTiles.length}`;
+  const mapHeading = mapLoading
+    ? 'Loading GPS data'
+    : liveGpsValid
+      ? 'Live Wi-Fi GPS on real map'
+      : mapPoint
+        ? 'Showing last valid GPS point'
+        : 'Waiting for valid GPS fix';
+  const mapStatusTone = liveGpsValid ? 'good' : mapPoint || mapLoading ? 'idle' : 'bad';
+  const mapStatusText = mapLoading
+    ? 'Loading coordinates'
+    : liveGpsValid
+      ? 'Live coordinate lock'
+      : mapPoint
+        ? 'Last point'
+        : 'No coordinate lock';
   const activePet = state.pets[0];
 
   const kpis = [
@@ -414,6 +605,9 @@ export default function App() {
             <button type="button" onClick={sendDemoPacket} disabled={posting}>
               {posting ? 'Posting packet...' : 'Send demo Wi-Fi packet'}
             </button>
+            <span className={`status-pill ${pageReady ? 'good' : 'idle'}`}>
+              {pageReady ? 'Page loaded' : 'Loading page'}
+            </span>
             <span className={`status-pill ${state.error ? 'bad' : 'good'}`}>
               {state.error ? 'Backend warning' : 'Backend linked'}
             </span>
@@ -466,35 +660,73 @@ export default function App() {
             <div className="map-head">
               <div>
                 <p className="eyebrow">GPS status</p>
-                <h2>
-                  {liveGpsValid
-                    ? 'Live Wi-Fi GPS on real map'
-                    : mapPoint
-                      ? 'Showing last valid GPS point'
-                      : 'Waiting for valid GPS fix'}
-                </h2>
+                <h2>{mapHeading}</h2>
               </div>
-              <span className={`status-pill ${liveGpsValid ? 'good' : mapPoint ? 'idle' : 'bad'}`}>
-                {liveGpsValid ? 'Live coordinate lock' : mapPoint ? 'Last point' : 'No coordinate lock'}
-              </span>
+              <span className={`status-pill ${mapStatusTone}`}>{mapStatusText}</span>
             </div>
 
             <div className="gps-map real-map">
               {mapPoint ? (
                 <>
-                  <iframe
-                    className="osm-frame"
-                    title="PawTrace OpenStreetMap location"
-                    src={osmEmbedUrl(mapPoint)}
-                    loading="lazy"
-                  />
+                  <div className={`osm-tile-layer ${mapTilesReady ? 'ready' : ''}`} aria-hidden="true">
+                    {mapTiles.map((tile) => (
+                      <img
+                        key={tile.key}
+                        className="osm-tile"
+                        src={tile.url}
+                        alt=""
+                        loading="eager"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          left: `calc(50% + ${tile.offsetX}px)`,
+                          top: `calc(50% + ${tile.offsetY}px)`,
+                        }}
+                        onLoad={() => {
+                          setMapTileLoadState((current) => {
+                            const loaded = current.signature === mapTileSignature ? current.loaded : new Set<string>();
+                            const failed = current.signature === mapTileSignature ? current.failed : new Set<string>();
+                            if (current.signature === mapTileSignature && loaded.has(tile.key)) return current;
+                            const next = new Set(loaded);
+                            next.add(tile.key);
+                            return { signature: mapTileSignature, loaded: next, failed };
+                          });
+                        }}
+                        onError={(event) => {
+                          event.currentTarget.style.visibility = 'hidden';
+                          setMapTileLoadState((current) => {
+                            const loaded = current.signature === mapTileSignature ? current.loaded : new Set<string>();
+                            const failed = current.signature === mapTileSignature ? current.failed : new Set<string>();
+                            if (current.signature === mapTileSignature && failed.has(tile.key)) return current;
+                            const next = new Set(failed);
+                            next.add(tile.key);
+                            return { signature: mapTileSignature, loaded, failed: next };
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
                   <div className={`pet-marker ${mapPoint.live ? 'active' : 'idle'}`}>
                     <span />
                   </div>
                   <a className="osm-link" href={osmOpenUrl(mapPoint)} target="_blank" rel="noreferrer">
                     Open map
                   </a>
+                  {!mapTilesReady ? (
+                    <div className="map-loading" aria-live="polite">
+                      <strong>{mapLoadingLabel}</strong>
+                      <span>{failedMapTiles.size > 0 ? 'Using stable local map base.' : 'Waiting for complete tile set.'}</span>
+                    </div>
+                  ) : null}
+                  <div className="map-attribution">
+                    {mapTilesReady ? 'OpenStreetMap contributors' : 'PawTrace map'}
+                  </div>
                 </>
+              ) : mapLoading ? (
+                <div className="map-empty">
+                  <strong>Loading GPS data</strong>
+                  <span>Checking latest telemetry and saved location points.</span>
+                </div>
               ) : (
                 <div className="map-empty">
                   <strong>No valid GPS coordinate</strong>

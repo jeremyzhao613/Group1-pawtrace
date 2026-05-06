@@ -1,3 +1,241 @@
+    (function initLocalIconFallback() {
+      const ICON_PREFIX = 'pawtrace-local-icon-';
+      const ICON_SPRITE_ID = `${ICON_PREFIX}sprite`;
+      const LOCAL_ICON_SYMBOLS = {
+        ai: '<path fill="currentColor" d="M11 2.5 13 8l5.5 2-5.5 2-2 5.5L9 12 3.5 10 9 8l2-5.5Zm7 9.5 1.1 2.9L22 16l-2.9 1.1L18 20l-1.1-2.9L14 16l2.9-1.1L18 12Zm-13 1 1 2.4L8.5 16 6 17l-1 2.5L4 17l-2.5-1L4 15l1-2Z"/>',
+        arrowLeft: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 5-7 7 7 7"/></g>',
+        battery: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 11v2"/><path d="M7 11h5"/></g>',
+        bell: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></g>',
+        camera: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></g>',
+        carrot: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8c4 1 7 4 8 8-4-1-7-4-8-8Z"/><path d="M8 8 5 5"/><path d="M10 7 9 3"/><path d="M7 10 3 9"/></g>',
+        chartBars: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 16v-5"/><path d="M12 16V6"/><path d="M17 16v-8"/></g>',
+        chartLine: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m6 15 4-4 3 3 5-7"/></g>',
+        check: '<path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4 10-10"/>',
+        chevronDown: '<path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>',
+        chevronUp: '<path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 15 6-6 6 6"/>',
+        clipboard: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l1 2h3v15H5V6h3z"/><path d="M9 10h6"/><path d="M9 14h4"/></g>',
+        clock: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></g>',
+        cloudUp: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 18a4.5 4.5 0 0 0-.7-8.9A6 6 0 0 0 5.3 11 3.5 3.5 0 0 0 6.5 18"/><path d="M12 19V11"/><path d="m8.5 14.5 3.5-3.5 3.5 3.5"/></g>',
+        coffee: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/><path d="M16 10h2a2 2 0 0 1 0 4h-2"/><path d="M8 4v1"/><path d="M12 4v1"/></g>',
+        comments: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V7a2 2 0 0 1 2-2Z"/><path d="M8 9h8"/><path d="M8 13h5"/></g>',
+        compass: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></g>',
+        copy: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></g>',
+        crosshair: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/></g>',
+        directions: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 19 5"/><path d="M9 5h10v10"/><path d="M5 19l6-1-5-5z"/></g>',
+        dog: '<path fill="currentColor" d="M12.5 11.2c.9-.8 2.5-.6 3.4.2.9.8 1.1 2 .3 2.9-.5.6-1.4 1.3-2.3 1.9-.5.4-1.2.4-1.7 0-.9-.6-1.8-1.3-2.3-1.9-.8-.9-.6-2.1.3-2.9.9-.8 2.4-1 3.3-.2ZM8 6.2c.8.6 1 1.7.4 2.5-.6.8-1.7 1-2.5.4-.8-.6-1-1.7-.4-2.5.6-.8 1.7-1 2.5-.4Zm8 0c.8-.6 1.9-.4 2.5.4.6.8.4 1.9-.4 2.5-.8.6-1.9.4-2.5-.4-.6-.8-.4-1.9.4-2.5ZM9 4c0-1.1.8-2 1.8-2S12.5 2.9 12.5 4 11.7 6 10.7 6 9 5.1 9 4Zm6 0c0-1.1.8-2 1.8-2S18.5 2.9 18.5 4 17.7 6 16.7 6 15 5.1 15 4Z"/>',
+        door: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4a1 1 0 0 1 1-1h10v18"/><path d="M10 12h.01"/><path d="M4 21h16"/></g>',
+        droplet: '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3s6 6.3 6 11a6 6 0 0 1-12 0c0-4.7 6-11 6-11Z"/>',
+        edit: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L8 20H4v-4z"/></g>',
+        ellipsisV: '<g fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></g>',
+        eraser: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 16 8-8 6 6-5 5H7z"/><path d="M12 19h8"/></g>',
+        external: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="m10 14 10-10"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></g>',
+        fileMedical: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M12 11v6"/><path d="M9 14h6"/></g>',
+        gamepad: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9h10a4 4 0 0 1 3.8 5.2l-.7 2.1a2 2 0 0 1-3.2.8L15 15H9l-1.9 2.1a2 2 0 0 1-3.2-.8l-.7-2.1A4 4 0 0 1 7 9Z"/><path d="M8 12v4"/><path d="M6 14h4"/><circle cx="16.5" cy="13.5" r=".7" fill="currentColor"/><circle cx="18.5" cy="15.5" r=".7" fill="currentColor"/></g>',
+        heart: '<path fill="currentColor" d="M12 21s-7-4.4-9.3-9C.9 9.1 2 5.3 5.3 4.4c2-.5 3.5.4 4.3 1.6.8-1.2 2.4-2.1 4.3-1.6 3.3.9 4.4 4.7 2.6 7.6C19 16.6 12 21 12 21Z"/>',
+        heartPulse: '<path fill="currentColor" opacity=".22" d="M12 21s-7-4.4-9.3-9C.9 9.1 2 5.3 5.3 4.4c2-.5 3.5.4 4.3 1.6.8-1.2 2.4-2.1 4.3-1.6 3.3.9 4.4 4.7 2.6 7.6C19 16.6 12 21 12 21Z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h4l2-4 4 8 2-4h4"/>',
+        idCard: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6.5 16a3 3 0 0 1 5 0"/><path d="M14 10h4"/><path d="M14 14h4"/></g>',
+        image: '<path fill="currentColor" d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v9.6l3.4-3.4a1.2 1.2 0 0 1 1.7 0l2.1 2.1 3.7-4a1.2 1.2 0 0 1 1.8 0L19 11.8V6H5Zm0 12h14v-3.3l-2.2-2.3-3.7 4a1.2 1.2 0 0 1-1.7 0l-2.1-2.1L5 18Zm5.2-9.5a1.7 1.7 0 1 1-3.4 0 1.7 1.7 0 0 1 3.4 0Z"/>',
+        info: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></g>',
+        link: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1"/></g>',
+        logout: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></g>',
+        mail: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></g>',
+        map: '<path fill="currentColor" d="M9 3 3 5.5v15l6-2.5 6 2.5 6-2.5v-15L15 5.5 9 3Zm0 2.2 4.5 1.9v11.7L9 17V5.2ZM5 6.8l2-.8v11.8l-2 .8V6.8Zm14 0v11.7l-2 .8V7.7l2-.9Z"/>',
+        mapLocation: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18-6 2.5v-15L9 3l6 2.5 6-2.5v15L15 21z"/><path d="M9 3v15"/><path d="M15 5.5V21"/><path d="M12 8a3 3 0 0 1 3 3c0 2.2-3 5-3 5s-3-2.8-3-5a3 3 0 0 1 3-3Z"/><circle cx="12" cy="11" r=".8" fill="currentColor" stroke="none"/></g>',
+        microscope: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 4 5 3-4 7-5-3z"/><path d="M6 18h12"/><path d="M9 18a5 5 0 0 0 8-4"/><path d="M14 4l2-2"/><path d="M7 14l-2 4"/></g>',
+        moon: '<path fill="currentColor" d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 9 9 0 1 0 20.5 15.5Z"/>',
+        navigation: '<path fill="currentColor" d="M12 3 21 21l-9-4-9 4z"/>',
+        paperPlane: '<path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4l-.8 6.8L14 12 2.6 13.8l.8 6.8Z"/>',
+        paw: '<path fill="currentColor" d="M12.5 11.2c.9-.8 2.5-.6 3.4.2.9.8 1.1 2 .3 2.9-.5.6-1.4 1.3-2.3 1.9-.5.4-1.2.4-1.7 0-.9-.6-1.8-1.3-2.3-1.9-.8-.9-.6-2.1.3-2.9.9-.8 2.4-1 3.3-.2ZM8 6.2c.8.6 1 1.7.4 2.5-.6.8-1.7 1-2.5.4-.8-.6-1-1.7-.4-2.5.6-.8 1.7-1 2.5-.4Zm8 0c.8-.6 1.9-.4 2.5.4.6.8.4 1.9-.4 2.5-.8.6-1.9.4-2.5-.4-.6-.8-.4-1.9.4-2.5ZM9 4c0-1.1.8-2 1.8-2S12.5 2.9 12.5 4 11.7 6 10.7 6 9 5.1 9 4Zm6 0c0-1.1.8-2 1.8-2S18.5 2.9 18.5 4 17.7 6 16.7 6 15 5.1 15 4Z"/>',
+        pen: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16.5 3.5 4 4L8 20H4v-4z"/><path d="M14 6l4 4"/></g>',
+        phone: '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6.6 3.8 9 8.7l-2 1.6c1.5 3 3.7 5.2 6.7 6.7l1.6-2 4.9 2.4c.4.2.6.6.5 1.1l-.6 2.2c-.1.5-.6.8-1.1.8C9.6 21.5 2.5 14.4 2.5 5c0-.5.3-1 .8-1.1l2.2-.6c.5-.1.9.1 1.1.5Z"/>',
+        pin: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-5.7 7-12a7 7 0 1 0-14 0c0 6.3 7 12 7 12Z"/><circle cx="12" cy="10" r="2.5"/></g>',
+        plus: '<path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M12 5v14M5 12h14"/>',
+        plusCircle: '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8"/><path d="M8 12h8"/></g>',
+        polygon: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 7-4 7 4v8l-7 4-7-4z"/><path d="M5 8h14"/><path d="M12 4v16"/></g>',
+        pulse: '<path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M3 12h4l2-6 4 12 2-6h6"/>',
+        rotate: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v6h-6"/></g>',
+        running: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="M10 21l2-5-3-3-2 3"/><path d="M15 8l-3 3 3 3 4 1"/><path d="M7 9l3-1 3 1"/></g>',
+        save: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8"/><path d="M8 21v-7h8v7"/></g>',
+        search: '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></g>',
+        shield: '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
+        signal: '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 18h.01"/><path d="M9 18v-4"/><path d="M13 18v-8"/><path d="M17 18V6"/></g>',
+        stethoscope: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v5a4 4 0 0 0 8 0V4"/><path d="M10 13v2a4 4 0 0 0 8 0v-1"/><circle cx="18" cy="12" r="2"/></g>',
+        temperature: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0Z"/><path d="M12 8v8"/></g>',
+        tools: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 7 3-3 3 3-3 3z"/><path d="M14 7 4 17l3 3L17 10"/><path d="m5 5 4 4"/></g>',
+        trash: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></g>',
+        user: '<path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.3 0-6 1.7-6 3.8V20h12v-2.2C18 15.7 15.3 14 12 14Z"/>',
+        userPlus: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M3 21a6 6 0 0 1 12 0"/><path d="M18 8v6"/><path d="M15 11h6"/></g>',
+        users: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M14 19a4.5 4.5 0 0 1 7 0"/></g>',
+        video: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></g>',
+        warning: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 10 18H2z"/><path d="M12 9v5"/><path d="M12 17h.01"/></g>',
+        wifi: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 10a11 11 0 0 1 14 0"/><path d="M8 13a6 6 0 0 1 8 0"/><path d="M11 16a2 2 0 0 1 2 0"/><path d="M12 19h.01"/></g>',
+        x: '<path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/>',
+        dot: '<circle cx="12" cy="12" r="5" fill="currentColor"/>',
+        circleCheck: '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></g>'
+      };
+      const LOCAL_ICON_ALIASES = {
+        'fa-arrow-left': 'arrowLeft',
+        'fa-arrow-up-right-from-square': 'external',
+        'fa-arrows-rotate': 'rotate',
+        'fa-battery-half': 'battery',
+        'fa-bell': 'bell',
+        'fa-camera': 'camera',
+        'fa-camera-retro': 'camera',
+        'fa-carrot': 'carrot',
+        'fa-chart-line': 'chartLine',
+        'fa-chart-simple': 'chartBars',
+        'fa-check': 'check',
+        'fa-chevron-down': 'chevronDown',
+        'fa-chevron-up': 'chevronUp',
+        'fa-circle': 'dot',
+        'fa-circle-check': 'circleCheck',
+        'fa-circle-info': 'info',
+        'fa-clipboard-check': 'clipboard',
+        'fa-clipboard-list': 'clipboard',
+        'fa-clock': 'clock',
+        'fa-clock-rotate-left': 'clock',
+        'fa-cloud-arrow-up': 'cloudUp',
+        'fa-cog': 'tools',
+        'fa-comment-dots': 'comments',
+        'fa-comments': 'comments',
+        'fa-compass': 'compass',
+        'fa-copy': 'copy',
+        'fa-directions': 'directions',
+        'fa-dog': 'dog',
+        'fa-door-open': 'door',
+        'fa-draw-polygon': 'polygon',
+        'fa-droplet': 'droplet',
+        'fa-edit': 'edit',
+        'fa-ellipsis-v': 'ellipsisV',
+        'fa-envelope': 'mail',
+        'fa-eraser': 'eraser',
+        'fa-exclamation-circle': 'warning',
+        'fa-file-medical-alt': 'fileMedical',
+        'fa-floppy-disk': 'save',
+        'fa-gamepad': 'gamepad',
+        'fa-heart': 'heart',
+        'fa-heart-pulse': 'heartPulse',
+        'fa-id-card': 'idCard',
+        'fa-image': 'image',
+        'fa-images': 'image',
+        'fa-info-circle': 'info',
+        'fa-link': 'link',
+        'fa-location-arrow': 'navigation',
+        'fa-location-crosshairs': 'crosshair',
+        'fa-location-dot': 'pin',
+        'fa-magic': 'ai',
+        'fa-map-location-dot': 'mapLocation',
+        'fa-map-marked-alt': 'mapLocation',
+        'fa-map-marker-alt': 'pin',
+        'fa-message': 'comments',
+        'fa-microscope': 'microscope',
+        'fa-moon': 'moon',
+        'fa-mug-hot': 'coffee',
+        'fa-notes-medical': 'fileMedical',
+        'fa-paper-plane': 'paperPlane',
+        'fa-paw': 'paw',
+        'fa-pen-to-square': 'pen',
+        'fa-person-running': 'running',
+        'fa-phone': 'phone',
+        'fa-plus': 'plus',
+        'fa-plus-circle': 'plusCircle',
+        'fa-save': 'save',
+        'fa-screwdriver-wrench': 'tools',
+        'fa-search': 'search',
+        'fa-shield-alt': 'shield',
+        'fa-sign-out-alt': 'logout',
+        'fa-signal': 'signal',
+        'fa-stethoscope': 'stethoscope',
+        'fa-temperature-half': 'temperature',
+        'fa-times': 'x',
+        'fa-trash-alt': 'trash',
+        'fa-triangle-exclamation': 'warning',
+        'fa-up-right-and-down-left-from-center': 'external',
+        'fa-upload': 'upload',
+        'fa-user': 'user',
+        'fa-user-group': 'users',
+        'fa-user-plus': 'userPlus',
+        'fa-users': 'users',
+        'fa-video': 'video',
+        'fa-wand-magic-sparkles': 'ai',
+        'fa-wave-square': 'pulse',
+        'fa-wifi': 'wifi',
+        'fa-xmark': 'x'
+      };
+      LOCAL_ICON_SYMBOLS.upload = LOCAL_ICON_SYMBOLS.cloudUp;
+
+      function injectLocalIconSprite() {
+        if (document.getElementById(ICON_SPRITE_ID) || !document.body) return;
+        const sprite = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        sprite.id = ICON_SPRITE_ID;
+        sprite.setAttribute('aria-hidden', 'true');
+        sprite.setAttribute('focusable', 'false');
+        sprite.style.position = 'absolute';
+        sprite.style.width = '0';
+        sprite.style.height = '0';
+        sprite.style.overflow = 'hidden';
+        sprite.innerHTML = Object.entries(LOCAL_ICON_SYMBOLS)
+          .map(([name, body]) => `<symbol id="${ICON_PREFIX}${name}" viewBox="0 0 24 24">${body}</symbol>`)
+          .join('');
+        document.body.prepend(sprite);
+      }
+
+      function getLocalIconName(iconElement) {
+        for (const className of iconElement.classList) {
+          const iconName = LOCAL_ICON_ALIASES[className];
+          if (iconName) return iconName;
+        }
+        return '';
+      }
+
+      function renderLocalIcon(iconElement) {
+        const iconName = getLocalIconName(iconElement);
+        if (!iconName || !LOCAL_ICON_SYMBOLS[iconName]) return;
+        const targetId = `${ICON_PREFIX}${iconName}`;
+        if (iconElement.dataset.pawLocalIcon === targetId) return;
+        iconElement.classList.add('paw-local-icon');
+        iconElement.dataset.pawLocalIcon = targetId;
+        iconElement.setAttribute('aria-hidden', 'true');
+        iconElement.innerHTML = `<svg aria-hidden="true" focusable="false"><use href="#${targetId}"></use></svg>`;
+      }
+
+      function renderLocalIcons(root = document) {
+        injectLocalIconSprite();
+        if (root instanceof Element && root.matches('i')) {
+          renderLocalIcon(root);
+        }
+        root.querySelectorAll?.('i.fas, i.fa-solid, i[class*=" fa-"], i[class^="fa-"]').forEach(renderLocalIcon);
+      }
+
+      function startLocalIconObserver() {
+        if (!document.body) return;
+        renderLocalIcons(document);
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+              renderLocalIcons(mutation.target);
+              return;
+            }
+            mutation.addedNodes.forEach((node) => {
+              if (node instanceof Element) renderLocalIcons(node);
+            });
+          });
+        });
+        observer.observe(document.body, {
+          attributes: true,
+          attributeFilter: ['class'],
+          childList: true,
+          subtree: true
+        });
+      }
+
+      if (document.body) {
+        startLocalIconObserver();
+      } else {
+        document.addEventListener('DOMContentLoaded', startLocalIconObserver, { once: true });
+      }
+    })();
+
     let pendingAvatarData = null;
     let editAvatarFileInput = null;
     let profileAvatarPreviewImg = null;
@@ -39,9 +277,14 @@
     let lastChatAssistantWarning = '';
     let petCheckInInitialized = false;
     let deviceTelemetryPollTimer = null;
+    let deviceTelemetryHistoryPollTimer = null;
+    let deviceTelemetryStream = null;
+    let deviceTelemetrySyncWanted = false;
+    let deviceTelemetrySyncEpoch = 0;
     let deviceTelemetryCommitTimer = null;
     let pendingDeviceTelemetryRecords = [];
     let lastDeviceTelemetryCommitMs = 0;
+    const deviceTelemetryRequests = new Map();
     let wifiTelemetryBridgeInitialized = false;
     let wifiTelemetryPollTimer = null;
     let stopWifiTelemetryBridge = () => {};
@@ -108,12 +351,43 @@
         path: 'profile-center'
       }
     };
+    const MOBILE_CHROME_QUERY = '(max-width: 768px), (hover: none), (pointer: coarse)';
+
+    function isMobileChromeViewport() {
+      return window.matchMedia?.(MOBILE_CHROME_QUERY)?.matches || window.innerWidth <= 768;
+    }
+
+    function isKeyboardEditingElement(element) {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.matches('textarea, [contenteditable="true"]')) return true;
+      if (element instanceof HTMLInputElement) {
+        const textEntryTypes = new Set([
+          'email',
+          'number',
+          'password',
+          'search',
+          'tel',
+          'text',
+          'url',
+        ]);
+        return textEntryTypes.has((element.type || 'text').toLowerCase());
+      }
+      return false;
+    }
+
+    function syncMobileChromeState() {
+      const shouldSuppress = document.body.classList.contains('modal-open') ||
+        (isMobileChromeViewport() && isKeyboardEditingElement(document.activeElement));
+      document.body.classList.toggle('mobile-chrome-suppressed', shouldSuppress);
+    }
+
     function syncModalState() {
       const hasOpenModal = !!document.querySelector('.app-modal:not(.hidden)');
       document.body.classList.toggle('modal-open', hasOpenModal);
       if (!hasOpenModal) {
         activeModalId = null;
       }
+      syncMobileChromeState();
     }
 
     function setModalState(modalId, isOpen) {
@@ -129,7 +403,7 @@
         activeModalId = modalId;
         syncModalState();
         const firstField = modal.querySelector('input, textarea, select, button:not([disabled])');
-        if (firstField instanceof HTMLElement) {
+        if (firstField instanceof HTMLElement && !isMobileChromeViewport()) {
           window.requestAnimationFrame(() => {
             firstField.focus({ preventScroll: true });
           });
@@ -195,6 +469,10 @@
           setModalState(activeModalId, false);
         }
       });
+      document.addEventListener('focusin', syncMobileChromeState);
+      document.addEventListener('focusout', () => window.setTimeout(syncMobileChromeState, 80));
+      window.visualViewport?.addEventListener('resize', syncMobileChromeState);
+      window.addEventListener('resize', syncMobileChromeState);
       syncModalState();
     }
 
@@ -278,12 +556,138 @@
     const LS_USERS_KEY = 'pawtrace_users';
     const LS_CURRENT_USER_KEY = 'pawtrace_current_user';
     const LS_AUTH_TOKEN_KEY = 'pawtrace_auth_token';
+    const API_BASE_OVERRIDE_KEY = 'pawtrace_api_base_url';
+    const DEFAULT_API_TIMEOUT_MS = 8000;
+    const STATUS_API_TIMEOUT_MS = 4500;
+    const TELEMETRY_API_TIMEOUT_MS = 3500;
     const API_BASE_URL = getApiBaseUrl();
+    const DEFAULT_PUBLIC_APP_URL = 'https://pawtrace.pages.dev';
+    const PUBLIC_APP_BASE_URL = getPublicAppBaseUrl();
+
+    function isLocalHardwareHostName(hostname = window.location.hostname) {
+      const host = String(hostname || '').trim().toLowerCase();
+      return host === 'localhost'
+        || host === '127.0.0.1'
+        || host === '::1'
+        || host.startsWith('10.')
+        || host.startsWith('192.168.')
+        || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+    }
+
+    function getRouteHashPath() {
+      try {
+        return String(window.location.hash || '').replace(/^#/, '').split('?')[0].split('/')[0].trim().toLowerCase();
+      } catch {
+        return '';
+      }
+    }
+
+    function isLocalM5DemoRoute() {
+      if (!isLocalHardwareHostName()) return false;
+      try {
+        const query = new URLSearchParams(window.location.search || '');
+        const openApp = String(query.get('openApp') || '').trim().toLowerCase();
+        const hashPath = getRouteHashPath();
+        return query.get('autoDemo') === '1'
+          || query.has('m5Demo')
+          || openApp === 'm5'
+          || openApp === 'health'
+          || (openApp === 'profile' && hashPath === 'health');
+      } catch {
+        return false;
+      }
+    }
 
     function getApiBaseUrl() {
       const metaBase = document.querySelector('meta[name="pawtrace-api-base"]')?.getAttribute('content') || '';
-      const rawBase = String(window.PAWTRACE_API_BASE_URL || metaBase || '').trim();
+      const queryBase = getQueryApiBaseUrl();
+      const storedBase = getStoredApiBaseUrl();
+      if (queryBase) setStoredApiBaseUrl(queryBase);
+      const useLocalDemoApi = !queryBase && isLocalM5DemoRoute();
+      if (useLocalDemoApi) setStoredApiBaseUrl('');
+      const rawBase = String(queryBase || (useLocalDemoApi ? '' : storedBase) || (useLocalDemoApi ? '' : window.PAWTRACE_API_BASE_URL) || (useLocalDemoApi ? '' : metaBase) || '').trim();
       return rawBase.replace(/\/+$/, '');
+    }
+
+    function normalizeAbsoluteHttpUrl(value = '') {
+      const trimmed = String(value || '').trim();
+      if (!trimmed) return '';
+      const withScheme = /^[a-z][a-z\d+\-.]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+      try {
+        const url = new URL(withScheme);
+        if (!/^https?:$/i.test(url.protocol)) return '';
+        url.pathname = url.pathname.replace(/\/+$/, '') || '/';
+        url.search = '';
+        url.hash = '';
+        return url.toString().replace(/\/+$/, '');
+      } catch {
+        return '';
+      }
+    }
+
+    function getQueryPublicAppUrl() {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        return String(params.get('publicAppUrl') || params.get('appUrl') || '').trim();
+      } catch {
+        return '';
+      }
+    }
+
+    function getPublicAppBaseUrl() {
+      const metaBase = document.querySelector('meta[name="pawtrace-public-app-url"]')?.getAttribute('content') || '';
+      const currentPublicOrigin = isLocalHardwareHostName() ? '' : window.location.origin;
+      return normalizeAbsoluteHttpUrl(
+        getQueryPublicAppUrl()
+        || window.PAWTRACE_PUBLIC_APP_URL
+        || metaBase
+        || currentPublicOrigin
+        || DEFAULT_PUBLIC_APP_URL
+      ) || DEFAULT_PUBLIC_APP_URL;
+    }
+
+    function buildPublicAppUrl(path = '/', configure = null) {
+      const url = new URL(path || '/', `${PUBLIC_APP_BASE_URL}/`);
+      if (typeof configure === 'function') configure(url);
+      return url.toString();
+    }
+
+    function getQueryApiBaseUrl() {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        return String(params.get('apiBase') || params.get('api') || '').trim();
+      } catch {
+        return '';
+      }
+    }
+
+    function getStoredApiBaseUrl() {
+      try {
+        return String(localStorage.getItem(API_BASE_OVERRIDE_KEY) || '').trim();
+      } catch {
+        return '';
+      }
+    }
+
+    function setStoredApiBaseUrl(value) {
+      try {
+        const normalized = String(value || '').trim().replace(/\/+$/, '');
+        if (normalized) localStorage.setItem(API_BASE_OVERRIDE_KEY, normalized);
+        else localStorage.removeItem(API_BASE_OVERRIDE_KEY);
+      } catch {}
+    }
+
+    window.PAWTRACE_SET_API_BASE_URL = (value = '') => {
+      setStoredApiBaseUrl(value);
+      window.location.reload();
+    };
+
+    function promptApiBaseOverride() {
+      const currentBase = getStoredApiBaseUrl() || API_BASE_URL || '';
+      const nextBase = window.prompt('PawTrace API base URL', currentBase);
+      if (nextBase === null) return;
+      setStoredApiBaseUrl(nextBase);
+      window.location.reload();
     }
 
     function apiUrl(path) {
@@ -295,6 +699,20 @@
         return `${API_BASE_URL}${normalizedPath.slice('/api'.length)}`;
       }
       return `${API_BASE_URL}${normalizedPath}`;
+    }
+
+    function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_API_TIMEOUT_MS) {
+      const controller = new AbortController();
+      const externalSignal = options.signal;
+      const abortFromExternal = () => controller.abort(externalSignal?.reason);
+      if (externalSignal?.aborted) abortFromExternal();
+      else externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      return fetch(apiUrl(url), { ...options, signal: controller.signal })
+        .finally(() => {
+          window.clearTimeout(timeoutId);
+          externalSignal?.removeEventListener?.('abort', abortFromExternal);
+        });
     }
 
     function sanitizeStoredUser(user = {}) {
@@ -388,8 +806,9 @@
     }
 
     async function authJsonFetch(url, options = {}) {
+      const { timeoutMs = DEFAULT_API_TIMEOUT_MS, ...fetchOptions } = options;
       const headers = authHeaders({ 'Content-Type': 'application/json', ...(options.headers || {}) });
-      return fetch(apiUrl(url), { ...options, headers });
+      return fetchWithTimeout(url, { ...fetchOptions, headers }, timeoutMs);
     }
 
     function telemetryRecordsFromPayload(data = {}) {
@@ -408,14 +827,27 @@
     async function fetchDeviceTelemetryPayload(path) {
       const appToken = getAuthToken();
       if (!appToken) return null;
-      const response = await fetch(apiUrl(path), {
-        headers: telemetryAuthHeaders(appToken),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || 'Device telemetry request failed.');
+      const key = String(path || '');
+      const existing = deviceTelemetryRequests.get(key);
+      if (existing) return existing;
+      const request = (async () => {
+        const response = await fetchWithTimeout(path, {
+          headers: telemetryAuthHeaders(appToken),
+        }, TELEMETRY_API_TIMEOUT_MS);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || 'Device telemetry request failed.');
+        }
+        return data;
+      })();
+      deviceTelemetryRequests.set(key, request);
+      try {
+        return await request;
+      } finally {
+        if (deviceTelemetryRequests.get(key) === request) {
+          deviceTelemetryRequests.delete(key);
+        }
       }
-      return data;
     }
 
     function normalizeSessionUser(user = {}) {
@@ -449,13 +881,14 @@
     function safeImageSrc(value, fallback = '') {
       const src = String(value || '').trim();
       if (!src) return fallback;
-      if (/^(https?:\/\/|data:image\/|\/|\.\/|\.\.\/)/i.test(src)) return src;
+      if (/^(https?:\/\/|data:image\/|blob:|\/|\.\/|\.\.\/)/i.test(src)) return src;
       return fallback;
     }
 
     function normalizeUserAvatar(value) {
       const src = safeImageSrc(value, DEFAULT_USER_AVATAR);
       if (/design\.gemcoder\.com\/staticResource\/echoAiSystemImages/i.test(src)) return DEFAULT_USER_AVATAR;
+      if (/\/assets\/avatars\/avatar\d+\.png$/i.test(src)) return DEFAULT_USER_AVATAR;
       return src || DEFAULT_USER_AVATAR;
     }
 
@@ -601,14 +1034,66 @@
       };
     }
 
-    function resolveNfcPetCard(nfcDeepLink = {}) {
+    function getPublicNfcCardId(pet = {}) {
+      return String(pet.nfcId || pet.nid || buildPetNfcId(pet, 0)).trim();
+    }
+
+    function buildStablePublicNfcLink(pet = {}) {
+      const cardId = getPublicNfcCardId(pet);
+      return buildPublicAppUrl('/', (url) => {
+        url.searchParams.set('nfcId', cardId);
+        url.hash = 'nfc';
+      });
+    }
+
+    function buildEmbeddedPublicNfcLink(pet = {}) {
+      const payload = buildPublicNfcPetPayload(pet, getCurrentUser() || getDefaultUser());
+      return buildPublicAppUrl('/', (url) => {
+        url.searchParams.set('nfc', base64UrlEncode(JSON.stringify(payload)));
+        url.hash = 'nfc';
+      });
+    }
+
+    async function fetchPublicNfcPetCard(target = '') {
+      const cardId = String(target || '').trim();
+      if (!cardId) return null;
+      try {
+        const response = await fetch(apiUrl(`/api/nfc-pet-cards/${encodeURIComponent(cardId)}`), {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return null;
+        const data = await response.json().catch(() => ({}));
+        return data.pet || data.card || data.payload || null;
+      } catch (err) {
+        console.warn('Public NFC card lookup failed', err);
+        return null;
+      }
+    }
+
+    async function resolveNfcPetCard(nfcDeepLink = {}) {
       if (nfcDeepLink.pet) return normalizeNfcPetPayload(nfcDeepLink.pet);
       const target = String(nfcDeepLink.targetId || '').trim();
       if (!target) return null;
       const pets = getStoredPets();
       const matchedPet = pets.find((pet) => pet.id === target || pet.nfcId === target);
-      if (!matchedPet) return null;
-      return normalizeNfcPetPayload(buildPublicNfcPetPayload(matchedPet, getCurrentUser() || getDefaultUser()));
+      if (matchedPet) return normalizeNfcPetPayload(buildPublicNfcPetPayload(matchedPet, getCurrentUser() || getDefaultUser()));
+      const publicPet = await fetchPublicNfcPetCard(target);
+      return publicPet ? normalizeNfcPetPayload(publicPet) : null;
+    }
+
+    function renderStandaloneNfcLoading(targetId = '') {
+      const nfcRoot = document.getElementById('nfc-root');
+      const content = document.getElementById('nfc-page-content');
+      if (!nfcRoot || !content) return;
+      nfcRoot.classList.remove('hidden');
+      document.title = 'PAWTRACE · NFC Pet Card';
+      content.innerHTML = `
+        <section class="nfc-empty-card pixel-card">
+          <div class="nfc-empty-icon"><i class="fas fa-id-card"></i></div>
+          <h1>Loading NFC pet card</h1>
+          <p>${targetId ? `Looking up ${escapeHtml(targetId)} from the public card service.` : 'Opening the public pet card.'}</p>
+        </section>
+      `;
     }
 
     function renderStandaloneNfcPage(petPayload, options = {}) {
@@ -749,6 +1234,11 @@
 
     function getImageFallbackSource(img, fallback = '') {
       if (fallback) return fallback;
+      const attrFallback = img?.dataset?.fallbackSrc || img?.getAttribute?.('data-fallback-src') || img?.dataset?.fallback || '';
+      if (attrFallback) return safeImageSrc(attrFallback, '');
+      if (img?.closest?.('.chat-contact-item, .contact-hover-card, .chat-main-header, #chat-avatar, #contact-list')) return DEFAULT_USER_AVATAR;
+      if (img?.closest?.('.chat-sticker-panel, .bubble-sticker')) return DEFAULT_STICKER_IMAGE;
+      if (img?.closest?.('#pet-list, #community-pet-feed, .map-pet, .tracked-pet-row, .pet-owned-card, .community-card, .nfc-photo-frame')) return DEFAULT_PET_AVATAR;
       const id = String(img?.id || '');
       if (
         id === 'current-user-avatar' ||
@@ -759,7 +1249,37 @@
       ) {
         return DEFAULT_USER_AVATAR;
       }
+      if (id === 'map-background-img') return '/assets/m2.png';
+      const descriptor = [
+        id,
+        img?.className || '',
+        img?.alt || '',
+        img?.getAttribute?.('src') || ''
+      ].join(' ').toLowerCase();
+      if (/avatar|profile|contact|owner|user|friend|hover/.test(descriptor)) return DEFAULT_USER_AVATAR;
+      if (/sticker|emoji|reaction/.test(descriptor)) return DEFAULT_STICKER_IMAGE;
+      if (/map|campus|background|m1\.jpg|m2\.png/.test(descriptor)) return '/assets/m2.png';
+      if (/pet|paw|photo|preview|community|nfc|feed|share|diagnosis/.test(descriptor)) return DEFAULT_PET_AVATAR;
+      if (descriptor.trim()) return DEFAULT_PET_AVATAR;
       return '';
+    }
+
+    let imageFallbackHandlerInstalled = false;
+
+    function installImageFallbackHandler() {
+      if (imageFallbackHandlerInstalled) return;
+      imageFallbackHandlerInstalled = true;
+      document.addEventListener('error', (event) => {
+        const img = event.target;
+        if (!(img instanceof HTMLImageElement)) return;
+        if (img.dataset.fallbackApplied === '1') return;
+        const fallbackSrc = getImageFallbackSource(img, '');
+        if (!fallbackSrc) return;
+        const currentSrc = img.getAttribute('src') || '';
+        if (currentSrc === fallbackSrc) return;
+        img.dataset.fallbackApplied = '1';
+        img.src = fallbackSrc;
+      }, true);
     }
 
     function setPreviewImageSource(img, src, fallback = '') {
@@ -1172,6 +1692,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       initModalSystem();
+      installImageFallbackHandler();
       const loginScreen = document.getElementById('login-screen');
       const appRoot = document.getElementById('app-root');
       const nfcRoot = document.getElementById('nfc-root');
@@ -1418,6 +1939,17 @@
       const currentUserNameEl = document.getElementById('current-user-name');
       const currentUserAvatarEl = document.getElementById('current-user-avatar');
       const headerConnectionStatusEl = document.getElementById('header-connection-status');
+      if (headerConnectionStatusEl) {
+        headerConnectionStatusEl.tabIndex = 0;
+        headerConnectionStatusEl.setAttribute('role', 'button');
+        headerConnectionStatusEl.style.cursor = 'pointer';
+        headerConnectionStatusEl.addEventListener('click', promptApiBaseOverride);
+        headerConnectionStatusEl.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          promptApiBaseOverride();
+        });
+      }
       const sidebarUserNameEl = document.getElementById('sidebar-user-name');
       const profileAvatarEl = document.getElementById('profile-avatar');
       const profileNameEl = document.getElementById('profile-name');
@@ -1524,11 +2056,36 @@
         aiStatusBadge.classList.toggle('text-gray-500', mode !== 'ready' && mode !== 'fallback');
       }
 
+      function setConnectionStatus(message, mode = 'unknown') {
+        if (!headerConnectionStatusEl) return;
+        headerConnectionStatusEl.textContent = message;
+        headerConnectionStatusEl.title = API_BASE_URL
+          ? `API: ${API_BASE_URL}`
+          : 'API: same origin /api';
+        headerConnectionStatusEl.classList.toggle('text-green-600', mode === 'ready');
+        headerConnectionStatusEl.classList.toggle('text-red-500', mode === 'error');
+        headerConnectionStatusEl.classList.toggle('text-gray-500', mode !== 'ready' && mode !== 'error');
+      }
+
+      async function refreshBackendStatus() {
+        setConnectionStatus(API_BASE_URL ? 'API checking' : 'API same-origin', 'unknown');
+        try {
+          const response = await fetchWithTimeout('/api/status', {
+            cache: 'no-store',
+          }, STATUS_API_TIMEOUT_MS);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          setConnectionStatus('API online', 'ready');
+        } catch (err) {
+          console.warn('Backend status check failed', err);
+          setConnectionStatus('API unreachable', 'error');
+        }
+      }
+
       async function refreshAIStatus() {
         try {
           const response = getAuthToken()
-            ? await authJsonFetch('/api/ai/status')
-            : await fetch(apiUrl('/api/ai/status'));
+            ? await authJsonFetch('/api/ai/status', { timeoutMs: STATUS_API_TIMEOUT_MS })
+            : await fetchWithTimeout('/api/ai/status', {}, STATUS_API_TIMEOUT_MS);
           if (!response.ok) throw new Error('AI status unavailable');
           const data = await response.json();
           if (data?.dashscopeConfigured) {
@@ -1548,6 +2105,35 @@
         diagStatus.classList.remove('hidden');
         diagStatus.classList.toggle('text-red-500', isError);
         diagStatus.classList.toggle('text-primary', !isError);
+      }
+
+      function buildAIHamsterLoaderMarkup(title = 'Generating AI report', detail = 'Reviewing pet details...') {
+        return `
+          <div class="ai-service-loading-state ai-fade" role="status" aria-live="polite">
+            <div class="ai-hamster-loader" aria-label="Orange and tan hamster running in a metal wheel" role="img">
+              <div class="ai-hamster-loader__wheel"></div>
+              <div class="ai-hamster-loader__hamster">
+                <div class="ai-hamster-loader__body">
+                  <div class="ai-hamster-loader__head">
+                    <div class="ai-hamster-loader__ear"></div>
+                    <div class="ai-hamster-loader__eye"></div>
+                    <div class="ai-hamster-loader__nose"></div>
+                  </div>
+                  <div class="ai-hamster-loader__limb ai-hamster-loader__limb--fr"></div>
+                  <div class="ai-hamster-loader__limb ai-hamster-loader__limb--fl"></div>
+                  <div class="ai-hamster-loader__limb ai-hamster-loader__limb--br"></div>
+                  <div class="ai-hamster-loader__limb ai-hamster-loader__limb--bl"></div>
+                  <div class="ai-hamster-loader__tail"></div>
+                </div>
+              </div>
+              <div class="ai-hamster-loader__spoke"></div>
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-semibold text-dark">${escapeHtml(title)}</p>
+              <p class="text-[11px] text-gray-500">${escapeHtml(detail)}</p>
+            </div>
+          </div>
+        `;
       }
 
       function toggleDiagLoading(show) {
@@ -1634,13 +2220,10 @@
         setDiagStatus(file ? 'Reviewing the pet photo...' : 'Reviewing symptoms without a photo...');
         try {
           if (diagResult) {
-            diagResult.innerHTML = `
-              <div class="space-y-2 ai-fade">
-                <div class="skeleton h-4 rounded"></div>
-                <div class="skeleton h-4 rounded w-5/6"></div>
-                <div class="skeleton h-4 rounded w-2/3"></div>
-              </div>
-            `;
+            diagResult.innerHTML = buildAIHamsterLoaderMarkup(
+              file ? 'Analyzing pet photo' : 'Analyzing symptoms',
+              file ? 'Reviewing visible posture, skin, and fur details...' : 'Reviewing care notes and symptom details...'
+            );
           }
           if (file) {
             const base64 = await fileToBase64(file);
@@ -1762,13 +2345,10 @@
         setAIButtonsDisabled(true);
         setAIServiceStatus(`Generating ${AI_SERVICE_CONFIG[selectedAIService]?.label || 'report'} ...`);
         if (aiServiceOutputEl) {
-          aiServiceOutputEl.innerHTML = `
-            <div class="space-y-2 ai-fade">
-              <div class="skeleton h-4 rounded"></div>
-              <div class="skeleton h-4 rounded w-5/6"></div>
-              <div class="skeleton h-4 rounded w-2/3"></div>
-            </div>
-          `;
+          aiServiceOutputEl.innerHTML = buildAIHamsterLoaderMarkup(
+            `Generating ${AI_SERVICE_CONFIG[selectedAIService]?.label || 'AI report'}`,
+            'Reviewing profile details and care notes...'
+          );
         }
         try {
           const response = await authJsonFetch(config.endpoint, {
@@ -1882,6 +2462,7 @@
         loginScreen?.classList.add('hidden');
         appRoot.classList.remove('hidden');
         mobileTabbar?.classList.remove('hidden');
+        syncMobileChromeState();
         const displayName = user.displayName || user.username;
         const avatar = normalizeUserAvatar(user.avatar);
         currentUserNameEl.textContent = displayName;
@@ -1904,6 +2485,7 @@
         mapController?.refreshTrackedPets?.();
         initChat();
         handleScrollReveal();
+        refreshBackendStatus();
         refreshAIStatus();
         fetchPetInsight();
         startDeviceTelemetrySync();
@@ -1951,6 +2533,49 @@
         authMsg.textContent = '';
         showApp(sessionUser);
         return sessionUser;
+      }
+
+      function isLocalHardwareDemoHost() {
+        return isLocalHardwareHostName();
+      }
+
+      function shouldAutoOpenDemoHealth(existingUser) {
+        if (!isLocalHardwareDemoHost()) return false;
+        void existingUser;
+        return isLocalM5DemoRoute();
+      }
+
+      async function openDemoHealthSession() {
+        authMsg.textContent = 'Connecting M5 demo data...';
+        setStoredApiBaseUrl('');
+        try {
+          const response = await fetch(apiUrl('/api/auth/login'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'demo', password: 'demo123' })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.token || !data.user) {
+            throw new Error(data.error || 'Demo login failed.');
+          }
+          if (getHashPathAndParams().path !== 'health') {
+            history.replaceState(null, '', `${window.location.pathname}${window.location.search}#health`);
+          }
+          applyAuthenticatedSession(data);
+          window.setTimeout(() => refreshDeviceTelemetry(), 0);
+        } catch (err) {
+          console.warn('M5 demo auto-login failed', err);
+          setAuthToken('');
+          const fakeUser = seedFakeAppData() || createFakeAppUser();
+          if (getHashPathAndParams().path !== 'health') {
+            history.replaceState(null, '', `${window.location.pathname}${window.location.search}#health`);
+          }
+          authMsg.textContent = '';
+          showApp(fakeUser);
+          setAIStatusBadge('AI status: checking', 'unknown');
+          refreshBackendStatus();
+          refreshAIStatus();
+        }
       }
 
       loginForm.addEventListener('submit', async (e) => {
@@ -2053,20 +2678,40 @@
         setCurrentUser(guestUser);
         showApp(guestUser);
         setAIStatusBadge('AI status: checking', 'unknown');
+        refreshBackendStatus();
         refreshAIStatus();
       });
 
-      const existing = getCurrentUser();
+      const forceFakeData = shouldForceFakeAppData();
+      if (forceFakeData) setAuthToken('');
+      const existingBeforeFakeSeed = forceFakeData
+        ? seedFakeAppData({ force: true })
+        : getCurrentUser();
+      const existing = hasNfcDeepLink || (!forceFakeData && shouldAutoOpenDemoHealth(existingBeforeFakeSeed))
+        ? existingBeforeFakeSeed
+        : forceFakeData
+          ? existingBeforeFakeSeed
+          : ensureFakeAppData();
       if (hasNfcDeepLink) {
         closeAllModals();
         loginScreen?.classList.add('hidden');
         appRoot.classList.add('hidden');
         mobileTabbar?.classList.add('hidden');
-        const nfcPetCard = resolveNfcPetCard(nfcDeepLink);
-        activeNfcPetCard = nfcPetCard;
-        renderStandaloneNfcPage(nfcPetCard, { targetId: activeNfcTargetId });
-      } else if (existing && (existing.username === 'guest' || getAuthToken())) {
-        showApp(existing);
+        renderStandaloneNfcLoading(activeNfcTargetId);
+        resolveNfcPetCard(nfcDeepLink)
+          .then((nfcPetCard) => {
+            activeNfcPetCard = nfcPetCard;
+            renderStandaloneNfcPage(nfcPetCard, { targetId: activeNfcTargetId });
+          })
+          .catch((err) => {
+            console.warn('NFC pet card render failed', err);
+            activeNfcPetCard = null;
+            renderStandaloneNfcPage(null, { targetId: activeNfcTargetId });
+          });
+      } else if (!forceFakeData && shouldAutoOpenDemoHealth(existing)) {
+        openDemoHealthSession();
+      } else if (existing && (existing.username === 'guest' || getAuthToken() || isFakeAppSession(existing))) {
+        window.setTimeout(() => showApp(existing), 0);
       } else {
         setAuthToken('');
         setCurrentUser(null);
@@ -2115,6 +2760,10 @@
       const mobileMoreSheet = document.getElementById('mobile-more-sheet');
       const mobileMoreItems = document.querySelectorAll('[data-mobile-tab]');
       const mobileMoreTabs = new Set();
+      mobileMoreItems.forEach(btn => {
+        const name = btn.getAttribute('data-mobile-tab');
+        if (name) mobileMoreTabs.add(name);
+      });
       if (tabsInitialized) {
         activateAppTab?.(activeTabName);
         return;
@@ -2158,6 +2807,11 @@
         if (name === 'map') {
           window.requestAnimationFrame(() => {
             mapController?.syncMapView?.();
+          });
+        }
+        if (name === 'health') {
+          window.requestAnimationFrame(() => {
+            refreshDeviceTelemetry();
           });
         }
         if (name === 'chat' && window.innerWidth <= 1024) {
@@ -2211,10 +2865,13 @@
     const MONITORING_API = '/api/monitor/collect';
     const DEVICE_TELEMETRY_LATEST_API = '/api/device/telemetry/latest';
     const DEVICE_TELEMETRY_HISTORY_API = '/api/device/telemetry/history';
+    const DEVICE_TELEMETRY_STREAM_API = '/api/device/telemetry/stream';
     const DEVICE_TELEMETRY_HISTORY_LIMIT = 120;
     const DEVICE_BLE_HISTORY_DUMP_LIMIT = 24;
-    const DEVICE_TELEMETRY_POLL_MS = 8000;
-    const DEVICE_TELEMETRY_UI_COMMIT_MS = 2500;
+    const DEVICE_TELEMETRY_POLL_MS = 1000;
+    const DEVICE_TELEMETRY_HISTORY_POLL_MS = 30000;
+    const DEVICE_TELEMETRY_UI_COMMIT_MS = 80;
+    const DEFAULT_M5_DEVICE_ID = 'm5stickc-plus-1-1';
     const WIFI_LAN_URL_KEY = 'pawtrace_m5_lan_url';
     const WIFI_LAN_POLL_MS = 5000;
     const BLE_AUTO_RECONNECT_MS = 8000;
@@ -2223,8 +2880,13 @@
     const BLE_TELEMETRY_UUID = '7b9f0002-6f3a-4f8a-9f4d-222222222222';
     const BLE_MESSAGE_UUID = '7b9f0003-6f3a-4f8a-9f4d-333333333333';
     const DEFAULT_PET_AVATAR = '/assets/1.png';
-    const DEFAULT_USER_AVATAR = '/assets/avatars/avatar1.png';
+    const DEFAULT_USER_AVATAR = '/assets/people/person1.png';
+    const DEFAULT_STICKER_IMAGE = '/assets/stickers/paw-sticker-01.png';
     const MY_PETS_KEY = 'pawtrace_my_pets';
+    const FAKE_APP_DATA_VERSION_KEY = 'pawtrace_fake_data_version';
+    const FAKE_APP_DATA_VERSION = '2026-05-05-demo-v1';
+    const FAKE_APP_USERNAME = 'demo-local';
+    const CHECKINS_DATA_KEY = 'pawtrace_checkins';
     const AI_SERVICE_CONFIG = {
       diagnosis: {
         label: 'Photo Check',
@@ -2377,11 +3039,13 @@
           const heartRateValue = entry?.heartRate ?? entry?.heartRateBpm ?? entry?.heart_rate_bpm ?? entry?.pet_bpm;
           const batteryValue = entry?.batteryPct ?? entry?.battery_pct;
           const stepsValue = entry?.steps;
+          const temperature = temperatureValue === undefined || temperatureValue === null || temperatureValue === '' ? NaN : Number(temperatureValue);
+          const heartRate = heartRateValue === undefined || heartRateValue === null || heartRateValue === '' ? NaN : Number(heartRateValue);
           return {
             id: entry?.id || '',
             timestamp: entry?.timestamp || new Date().toISOString(),
-            temperature: temperatureValue === undefined || temperatureValue === null || temperatureValue === '' ? NaN : Number(temperatureValue),
-            heartRate: heartRateValue === undefined || heartRateValue === null || heartRateValue === '' ? NaN : Number(heartRateValue),
+            temperature: Number.isFinite(temperature) && temperature > 20 ? temperature : NaN,
+            heartRate: Number.isFinite(heartRate) && heartRate > 0 ? heartRate : NaN,
             batteryPct: batteryValue === undefined || batteryValue === null || batteryValue === '' ? NaN : Number(batteryValue),
             batteryMv: finiteNumber(entry?.batteryMv ?? entry?.battery_mv, NaN),
             steps: stepsValue === undefined || stepsValue === null || stepsValue === '' ? NaN : Number(stepsValue),
@@ -2431,7 +3095,8 @@
       if (!entry) {
         return {
           state: 'Waiting',
-          summary: 'No recent M5Stack health packet.',
+          displayState: 'Waiting for data',
+          summary: 'Add a reading or connect the tracker to see a simple health check.',
           tempLabel: 'No reading yet',
           heartLabel: 'No reading yet',
         };
@@ -2456,15 +3121,23 @@
         : tempBand === 'watch' || heartBand === 'watch' || spo2Band === 'watch'
           ? 'Watch closely'
           : 'Stable';
-      const summary = state === 'Check contact'
-        ? 'Heart Rate HAT is detected but optical contact is not stable enough for trusted vitals.'
-        : state === 'Needs attention'
-        ? 'One or more vitals are outside the usual pet-safe monitoring range.'
+      const displayState = state === 'Stable'
+        ? 'Looks good'
         : state === 'Watch closely'
-          ? 'Vitals are slightly off the comfortable monitoring range. Recheck soon.'
-          : 'Latest M5Stack vitals are within the expected prototype monitoring range.';
+          ? 'Recheck soon'
+          : state === 'Check contact'
+            ? 'Fix sensor fit'
+            : state;
+      const summary = state === 'Check contact'
+        ? 'The heart sensor needs better skin contact before this reading can be trusted.'
+        : state === 'Needs attention'
+        ? 'One signal is outside the usual monitoring range. Check your pet now.'
+        : state === 'Watch closely'
+          ? 'Vitals are close to the edge of the comfort range. Take another reading soon.'
+          : 'Latest vitals look comfortable. Keep watching behavior and energy.';
       return {
         state,
+        displayState,
         summary,
         tempLabel: Number.isFinite(temperature) ? `${temperature.toFixed(1)} °C` : 'No reading yet',
         heartLabel: Number.isFinite(heartRate) ? `${Math.round(heartRate)} bpm` : 'No reading yet',
@@ -2613,6 +3286,321 @@
         vitalsHistory: history.length ? history : createStarterVitals(pet, index),
       };
     }
+
+    function fakeDataTimestamp(hoursAgo = 0) {
+      return new Date(Date.now() - (hoursAgo * 60 * 60 * 1000)).toISOString();
+    }
+
+    function roundedMetric(value, digits = 1) {
+      return Number(Number(value).toFixed(digits));
+    }
+
+    function createFakeVitalsHistory(pet = {}, index = 0) {
+      const activities = ['resting', 'walking', 'active', 'resting', 'walking', 'resting', 'active', 'walking'];
+      const baseTemp = Number(pet.baseTemp || 38.3);
+      const baseHeart = Number(pet.baseHeart || (/cat/i.test(pet.type) ? 138 : /rabbit/i.test(pet.type) ? 156 : 112));
+      const baseBattery = Number(pet.baseBattery || 84);
+      return Array.from({ length: 8 }, (_, sampleIndex) => {
+        const activity = activities[(sampleIndex + index) % activities.length];
+        const isActive = activity === 'active';
+        const isWalking = activity === 'walking';
+        const heartLift = isActive ? 24 : isWalking ? 12 : 0;
+        const latOffset = (sampleIndex - 3) * 0.00005;
+        const lonOffset = (3 - sampleIndex) * 0.00004;
+        return {
+          id: `${pet.id || `fake-${index}`}-vital-${sampleIndex + 1}`,
+          timestamp: fakeDataTimestamp(1 + (sampleIndex * (2 + index))),
+          temperature: roundedMetric(baseTemp + (Math.sin(sampleIndex + index) * 0.18), 1),
+          heartRate: Math.round(baseHeart + heartLift + (Math.cos(sampleIndex + index) * 5)),
+          batteryPct: Math.max(22, Math.round(baseBattery - (sampleIndex * 2.7))),
+          batteryMv: Math.round(4090 - (sampleIndex * 17) - (index * 23)),
+          steps: Math.round((pet.baseSteps || 1800) + (sampleIndex * 135) + (index * 220)),
+          activity,
+          activityScore: roundedMetric(isActive ? 0.82 : isWalking ? 0.48 : 0.22, 2),
+          spo2Pct: Math.round((pet.baseSpo2 || 98) - (sampleIndex % 3 === 0 ? 1 : 0)),
+          spo2Valid: true,
+          heartFound: true,
+          finger: true,
+          gpsFix: 2,
+          gpsSatsUsed: 16 - (sampleIndex % 4),
+          gpsVisible: 20,
+          gpsHdop: roundedMetric(1.1 + ((sampleIndex % 3) * 0.1), 1),
+          locationValid: true,
+          lastLocationValid: true,
+          trackSamples: 148 + sampleIndex,
+          geofenceEnabled: true,
+          distanceM: Math.max(8, Math.round((pet.distanceM || 48) + (sampleIndex * 3) - (index * 2))),
+          lostAlert: Boolean(pet.lostAlert && sampleIndex === 0),
+          wifiConnected: true,
+          wifiRssi: -48 - index - sampleIndex,
+          uploadEnabled: true,
+          uploadOk: true,
+          uploadCode: 200,
+          deviceId: pet.deviceId || `demo-collar-${index + 1}`,
+          tagId: pet.tagId || pet.nfcId || '',
+          lat: roundedMetric(Number(pet.lat || 31.48303) + latOffset, 5),
+          lon: roundedMetric(Number(pet.lon || 121.15569) + lonOffset, 5),
+          source: 'fake-demo-telemetry',
+          transport: 'local',
+        };
+      });
+    }
+
+    function createFakeAppUser() {
+      return normalizeSessionUser({
+        username: FAKE_APP_USERNAME,
+        displayName: 'Ava Chen',
+        avatar: '/assets/people/person2.png',
+        bio: 'Synthetic PawTrace demo profile for product testing.',
+        campus: 'XJTLU Taicang Campus',
+        contact: 'WeChat ava-demo-613',
+        starSign: 'Senior care reminders',
+        mainPetName: 'Mocha',
+        mainPetType: 'Corgi',
+        mainPetBirth: '2024-02-18',
+        mainPetNotes: 'Mocha is food-motivated, likes short walks, and needs weight-control snacks.',
+        petInsight: 'Demo insight: Mocha is steady today. Keep the evening walk short and recheck heart rate after play.',
+      });
+    }
+
+    function createFakeAppPets() {
+      const owner = createFakeAppUser();
+      const basePets = [
+        {
+          id: 'fake-mocha',
+          name: 'Mocha',
+          type: 'Dog',
+          breed: 'Pembroke Corgi',
+          age: '2 years',
+          birthday: '2024-02-18',
+          gender: 'Male',
+          avatar: '/assets/1.png',
+          traits: ['Friendly', 'Food-motivated', 'Short walk fan'],
+          health: 'Vaccinated. Mild weight-control plan. No allergy notes.',
+          status: 'Morning walk complete. Ready for a light dinner.',
+          location: 'Central Ring Promenade',
+          mapCoords: { x: 68, y: 48 },
+          lat: 31.48303,
+          lon: 121.15569,
+          deviceId: DEFAULT_M5_DEVICE_ID,
+          tagId: 'PT-MOCHA',
+          nfcId: 'PT-MOCHA',
+          baseTemp: 38.4,
+          baseHeart: 112,
+          baseBattery: 86,
+          baseSteps: 3240,
+          distanceM: 52,
+        },
+        {
+          id: 'fake-mochi',
+          name: 'Mochi',
+          type: 'Cat',
+          breed: 'Ragdoll',
+          age: '1 year',
+          birthday: '2025-01-07',
+          gender: 'Female',
+          avatar: '/assets/3.png',
+          traits: ['Indoor', 'Curious', 'Window watcher'],
+          health: 'Indoor cat. Spayed. Appetite and water intake normal.',
+          status: 'Napped near the studio window after lunch.',
+          location: 'Studio Dorms Block C',
+          mapCoords: { x: 33, y: 42 },
+          lat: 31.48192,
+          lon: 121.15374,
+          deviceId: 'demo-collar-mochi',
+          tagId: 'PT-MOCHI',
+          nfcId: 'PT-MOCHI',
+          baseTemp: 38.1,
+          baseHeart: 136,
+          baseBattery: 78,
+          baseSteps: 980,
+          distanceM: 24,
+        },
+        {
+          id: 'fake-pixel',
+          name: 'Pixel',
+          type: 'Dog',
+          breed: 'Border Collie',
+          age: '3 years',
+          birthday: '2023-03-21',
+          gender: 'Female',
+          avatar: '/assets/2.png',
+          traits: ['High energy', 'Frisbee', 'Training focus'],
+          health: 'Very active. Joint check scheduled next month.',
+          status: 'High activity after frisbee practice. Cooling down now.',
+          location: 'Stadium Track Edge',
+          mapCoords: { x: 50, y: 69 },
+          lat: 31.48074,
+          lon: 121.15602,
+          deviceId: 'demo-collar-pixel',
+          tagId: 'PT-PIXEL',
+          nfcId: 'PT-PIXEL',
+          baseTemp: 38.6,
+          baseHeart: 126,
+          baseBattery: 71,
+          baseSteps: 6120,
+          distanceM: 91,
+        },
+        {
+          id: 'fake-nori',
+          name: 'Nori',
+          type: 'Rabbit',
+          breed: 'Holland Lop',
+          age: '8 months',
+          birthday: '2025-09-14',
+          gender: 'Male',
+          avatar: '/assets/6.png',
+          traits: ['Gentle', 'Quiet', 'Leafy snack fan'],
+          health: 'Needs fresh hay daily. Teeth check reminder next week.',
+          status: 'Calm indoor play session logged this afternoon.',
+          location: 'Learning Hub Entrance',
+          mapCoords: { x: 59, y: 22 },
+          lat: 31.48452,
+          lon: 121.1549,
+          deviceId: 'demo-collar-nori',
+          tagId: 'PT-NORI',
+          nfcId: 'PT-NORI',
+          baseTemp: 38.8,
+          baseHeart: 154,
+          baseBattery: 93,
+          baseSteps: 640,
+          distanceM: 18,
+        },
+      ];
+
+      return basePets.map((pet, index) => {
+        const vitalsHistory = createFakeVitalsHistory(pet, index);
+        const latest = vitalsHistory[0] || {};
+        return normalizePetRecord({
+          ...pet,
+          nfcContact: owner.contact,
+          nfcNote: `${pet.name} is registered in PawTrace demo mode. Please contact Ava if found.`,
+          vitalsHistory,
+          batteryPct: latest.batteryPct,
+          batteryMv: latest.batteryMv,
+          steps: latest.steps,
+          activity: latest.activity,
+          activityScore: latest.activityScore,
+          heartFound: latest.heartFound,
+          finger: latest.finger,
+          spo2Pct: latest.spo2Pct,
+          spo2Valid: latest.spo2Valid,
+          gpsFix: latest.gpsFix,
+          gpsSatsUsed: latest.gpsSatsUsed,
+          gpsVisible: latest.gpsVisible,
+          gpsHdop: latest.gpsHdop,
+          locationValid: latest.locationValid,
+          lastLocationValid: latest.lastLocationValid,
+          trackSamples: latest.trackSamples,
+          geofenceEnabled: latest.geofenceEnabled,
+          distanceM: latest.distanceM,
+          lostAlert: latest.lostAlert,
+          wifiConnected: latest.wifiConnected,
+          wifiRssi: latest.wifiRssi,
+          uploadEnabled: latest.uploadEnabled,
+          uploadOk: latest.uploadOk,
+          uploadCode: latest.uploadCode,
+          telemetrySource: latest.source,
+          telemetryTransport: latest.transport,
+          telemetryUpdatedAt: latest.timestamp,
+        }, index);
+      });
+    }
+
+    function readJsonStorage(key, fallback) {
+      try {
+        const value = JSON.parse(localStorage.getItem(key) || 'null');
+        return value === null ? fallback : value;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function isFakeAppUser(user = getCurrentUser()) {
+      return user?.username === FAKE_APP_USERNAME;
+    }
+
+    function shouldForceFakeAppData() {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        return params.get('fakeData') === '1'
+          || params.get('seedFakeData') === '1'
+          || params.get('demoData') === '1';
+      } catch {
+        return false;
+      }
+    }
+
+    function seedFakeAppData(options = {}) {
+      const force = Boolean(options.force);
+      const currentUser = getCurrentUser();
+      const storedPets = readJsonStorage(PETS_DATA_KEY, []);
+      const seededVersion = localStorage.getItem(FAKE_APP_DATA_VERSION_KEY) === FAKE_APP_DATA_VERSION;
+      const hasStoredPets = Array.isArray(storedPets) && storedPets.length > 0 && !isSeededDefaultPetList(storedPets);
+
+      if (!force && getAuthToken()) return currentUser;
+      if (!force && currentUser && !isFakeAppUser(currentUser)) return currentUser;
+      if (!force && hasStoredPets && !seededVersion) return currentUser;
+      if (!force && hasStoredPets && seededVersion) {
+        const user = currentUser || createFakeAppUser();
+        if (!currentUser) setCurrentUser(user);
+        return user;
+      }
+
+      const fakeUser = createFakeAppUser();
+      const fakePets = createFakeAppPets();
+      const users = loadUsers().filter((user) => user.username !== FAKE_APP_USERNAME);
+      const today = new Date().toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+      const checkins = fakePets.reduce((acc, pet, index) => {
+        acc[pet.id] = {
+          [today]: true,
+          [yesterday]: index < 3,
+        };
+        return acc;
+      }, {});
+
+      saveUsers([...users, fakeUser]);
+      localStorage.setItem(PETS_DATA_KEY, JSON.stringify(fakePets));
+      localStorage.setItem(MY_PETS_KEY, JSON.stringify(fakePets));
+      localStorage.setItem(CHECKINS_DATA_KEY, JSON.stringify(checkins));
+      localStorage.setItem(FAKE_APP_DATA_VERSION_KEY, FAKE_APP_DATA_VERSION);
+      setAuthToken('');
+      setCurrentUser(fakeUser);
+      emitPetsChanged(fakePets);
+      return fakeUser;
+    }
+
+    function ensureFakeAppData() {
+      const existingUser = getCurrentUser();
+      if (getAuthToken()) return existingUser;
+      if (existingUser && !isFakeAppUser(existingUser)) return existingUser;
+      return seedFakeAppData();
+    }
+
+    function isFakeAppSession(user = getCurrentUser()) {
+      return isFakeAppUser(user) && !getAuthToken();
+    }
+
+    window.PAWTRACE_SEED_FAKE_DATA = () => {
+      const user = seedFakeAppData({ force: true });
+      window.location.reload();
+      return user;
+    };
+
+    window.PAWTRACE_CLEAR_FAKE_DATA = () => {
+      const currentUser = getCurrentUser();
+      localStorage.removeItem(PETS_DATA_KEY);
+      localStorage.removeItem(MY_PETS_KEY);
+      localStorage.removeItem(CHECKINS_DATA_KEY);
+      localStorage.removeItem(FAKE_APP_DATA_VERSION_KEY);
+      saveUsers(loadUsers().filter((user) => user.username !== FAKE_APP_USERNAME));
+      if (isFakeAppUser(currentUser)) {
+        setAuthToken('');
+        setCurrentUser(null);
+      }
+      window.location.reload();
+    };
 
     function emitPetsChanged(pets = []) {
       document.dispatchEvent(new CustomEvent(PETS_CHANGED_EVENT, { detail: { pets } }));
@@ -3011,33 +3999,96 @@
       return true;
     }
 
-    async function refreshDeviceTelemetry() {
+    async function refreshDeviceTelemetry({ history = false } = {}) {
+      const syncEpoch = deviceTelemetrySyncEpoch;
       try {
-        const data = await fetchDeviceTelemetryPayload(`${DEVICE_TELEMETRY_HISTORY_API}?limit=${DEVICE_TELEMETRY_HISTORY_LIMIT}`);
+        const endpoint = history
+          ? `${DEVICE_TELEMETRY_HISTORY_API}?limit=${DEVICE_TELEMETRY_HISTORY_LIMIT}`
+          : `${DEVICE_TELEMETRY_LATEST_API}?limit=12`;
+        const data = await fetchDeviceTelemetryPayload(endpoint);
         let records = telemetryRecordsFromPayload(data);
-        if (!records.length) {
-          const latest = await fetchDeviceTelemetryPayload(`${DEVICE_TELEMETRY_LATEST_API}?limit=12`);
-          records = telemetryRecordsFromPayload(latest);
+        if (!records.length && !history) {
+          const backfill = await fetchDeviceTelemetryPayload(`${DEVICE_TELEMETRY_HISTORY_API}?limit=12`);
+          records = telemetryRecordsFromPayload(backfill);
         }
-        if (records.length) mergeDeviceTelemetry(records);
+        if (document.hidden || syncEpoch !== deviceTelemetrySyncEpoch) return;
+        if (records.length) queueDeviceTelemetryMerge(records);
       } catch (err) {
         console.warn('Device telemetry refresh failed', err);
       }
     }
 
-    function stopDeviceTelemetrySync() {
+    function stopDeviceTelemetryStream() {
+      if (deviceTelemetryStream) {
+        deviceTelemetryStream.close();
+        deviceTelemetryStream = null;
+      }
+    }
+
+    function teardownDeviceTelemetrySync() {
+      deviceTelemetrySyncEpoch += 1;
       if (deviceTelemetryPollTimer) {
         window.clearInterval(deviceTelemetryPollTimer);
         deviceTelemetryPollTimer = null;
       }
+      if (deviceTelemetryHistoryPollTimer) {
+        window.clearInterval(deviceTelemetryHistoryPollTimer);
+        deviceTelemetryHistoryPollTimer = null;
+      }
+      stopDeviceTelemetryStream();
       clearQueuedDeviceTelemetryMerge();
+      deviceTelemetryRequests.clear();
+    }
+
+    function startDeviceTelemetryStream() {
+      stopDeviceTelemetryStream();
+      const token = getAuthToken();
+      if (!token || typeof EventSource === 'undefined') return false;
+      const url = apiUrl(`${DEVICE_TELEMETRY_STREAM_API}?limit=1&token=${encodeURIComponent(token)}`);
+      const stream = new EventSource(url);
+      deviceTelemetryStream = stream;
+      stream.addEventListener('telemetry', (event) => {
+        try {
+          const payload = JSON.parse(event.data || '{}');
+          const records = telemetryRecordsFromPayload(payload);
+          if (records.length) queueDeviceTelemetryMerge(records);
+        } catch (err) {
+          console.warn('Device telemetry stream parse failed', err);
+        }
+      });
+      stream.addEventListener('error', () => {
+        // EventSource reconnects automatically; the fast latest poller keeps the UI live meanwhile.
+        refreshDeviceTelemetry();
+      });
+      return true;
+    }
+
+    function stopDeviceTelemetrySync() {
+      deviceTelemetrySyncWanted = false;
+      teardownDeviceTelemetrySync();
     }
 
     function startDeviceTelemetrySync() {
-      stopDeviceTelemetrySync();
+      deviceTelemetrySyncWanted = true;
+      teardownDeviceTelemetrySync();
+      if (document.hidden) return;
+      startDeviceTelemetryStream();
       refreshDeviceTelemetry();
+      refreshDeviceTelemetry({ history: true });
       deviceTelemetryPollTimer = window.setInterval(refreshDeviceTelemetry, DEVICE_TELEMETRY_POLL_MS);
+      deviceTelemetryHistoryPollTimer = window.setInterval(() => {
+        refreshDeviceTelemetry({ history: true });
+      }, DEVICE_TELEMETRY_HISTORY_POLL_MS);
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!deviceTelemetrySyncWanted) return;
+      if (document.hidden) {
+        teardownDeviceTelemetrySync();
+      } else {
+        startDeviceTelemetrySync();
+      }
+    });
 
     function initWifiTelemetryBridge() {
       if (wifiTelemetryBridgeInitialized) return;
@@ -3087,7 +4138,7 @@
           setStoreStatus(`Saved M5 LAN URL ${url}`, 'ok');
         } else {
           localStorage.removeItem(WIFI_LAN_URL_KEY);
-          setStoreStatus('Enter the M5 LAN URL from the CONFIG or LAN serial command.', 'error');
+          setStoreStatus('Using Cloud mode. LAN URL is optional.', 'ok');
         }
         return url;
       };
@@ -3115,10 +4166,43 @@
         return data;
       };
 
+      const refreshCloudStatus = async ({ silent = false } = {}) => {
+        const data = await fetchDeviceTelemetryPayload(`${DEVICE_TELEMETRY_LATEST_API}?deviceId=${encodeURIComponent(DEFAULT_M5_DEVICE_ID)}&limit=1`);
+        const latest = data?.latest || (Array.isArray(data?.telemetry) ? data.telemetry[0] : null);
+        if (!latest) {
+          if (!silent) {
+            setStatus('Cloud waiting', 'watch');
+            setStoreStatus('Cloud is reachable, but no M5 telemetry has arrived for this account yet.', 'neutral');
+          }
+          return null;
+        }
+        updateFromPayload(latest);
+        setStatus('Cloud live', latest.uploadOk === false ? 'watch' : 'stable');
+        setStoreStatus(`Cloud packet received from ${latest.deviceId || latest.device_id || DEFAULT_M5_DEVICE_ID}.`, 'ok');
+        return latest;
+      };
+
+      const queueCloudCommand = async (command = {}) => {
+        if (!getAuthToken()) {
+          throw new Error('Sign in or use the demo account before sending cloud commands to the M5.');
+        }
+        const response = await authJsonFetch('/api/device/commands', {
+          method: 'POST',
+          body: JSON.stringify({
+            deviceId: DEFAULT_M5_DEVICE_ID,
+            ...command,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Cloud command failed.');
+        return data;
+      };
+
       const refreshStatus = async ({ silent = false } = {}) => {
         try {
           if (!silent) setStatus('Reading', 'watch');
-          const data = await fetchLanJson('/status');
+          const data = getLanUrl() ? await fetchLanJson('/status') : await refreshCloudStatus({ silent });
+          if (!data) return null;
           updateFromPayload(data);
           return data;
         } catch (err) {
@@ -3139,41 +4223,50 @@
         }
         try {
           setStatus('Sending', 'watch');
-          const data = await fetchLanJson('/message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: text,
-          });
+          const data = getLanUrl()
+            ? await fetchLanJson('/message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: text,
+              })
+            : await queueCloudCommand({ type: 'message', message: text });
           latestPayloadEl.textContent = JSON.stringify(data, null, 2).slice(0, 2400);
-          setStatus('Message sent', 'stable');
-          setStoreStatus(`WiFi message ${data.message_seq || ''} sent.`, 'ok');
+          setStatus(getLanUrl() ? 'Message sent' : 'Cloud queued', 'stable');
+          setStoreStatus(getLanUrl()
+            ? `WiFi message ${data.message_seq || ''} sent.`
+            : `Cloud command queued for ${data.command?.deviceId || DEFAULT_M5_DEVICE_ID}.`, 'ok');
           if (messageInput) messageInput.value = '';
         } catch (err) {
           console.warn('M5 WiFi message failed', err);
           setStatus('Send failed', 'alert');
-          setStoreStatus(err instanceof Error ? err.message : 'M5 WiFi message failed.', 'error');
+          setStoreStatus(err instanceof Error ? err.message : 'M5 message failed.', 'error');
         }
       };
 
       const triggerUpload = async () => {
         try {
           setStatus('Uploading', 'watch');
-          const data = await fetchLanJson('/upload', { method: 'POST' });
+          const data = getLanUrl()
+            ? await fetchLanJson('/upload', { method: 'POST' })
+            : await queueCloudCommand({ type: 'upload', message: 'upload now' });
           latestPayloadEl.textContent = JSON.stringify(data, null, 2).slice(0, 2400);
-          setStatus(data.upload_ok ? 'Uploaded' : 'Queued', data.upload_ok ? 'stable' : 'watch');
-          setStoreStatus(`M5 queue depth ${data.queue_depth ?? '--'}, HTTP ${data.upload_code ?? '--'}.`, data.upload_ok ? 'ok' : 'neutral');
+          setStatus(getLanUrl() ? (data.upload_ok ? 'Uploaded' : 'Queued') : 'Cloud queued', getLanUrl() && !data.upload_ok ? 'watch' : 'stable');
+          setStoreStatus(getLanUrl()
+            ? `M5 queue depth ${data.queue_depth ?? '--'}, HTTP ${data.upload_code ?? '--'}.`
+            : `Upload command queued for ${data.command?.deviceId || DEFAULT_M5_DEVICE_ID}.`, getLanUrl() && !data.upload_ok ? 'neutral' : 'ok');
           refreshDeviceTelemetry();
         } catch (err) {
           console.warn('M5 WiFi upload trigger failed', err);
           setStatus('Upload failed', 'alert');
-          setStoreStatus(err instanceof Error ? err.message : 'M5 WiFi upload trigger failed.', 'error');
+          setStoreStatus(err instanceof Error ? err.message : 'M5 upload trigger failed.', 'error');
         }
       };
 
       urlInput.value = localStorage.getItem(WIFI_LAN_URL_KEY) || '';
-      if (urlInput.value) setStatus('Ready', 'stable');
+      setStatus(urlInput.value ? 'LAN ready' : 'Cloud ready', 'stable');
       saveBtn?.addEventListener('click', () => {
-        if (saveLanUrl()) refreshStatus();
+        saveLanUrl();
+        refreshStatus();
       });
       refreshBtn?.addEventListener('click', () => {
         saveLanUrl();
@@ -3195,9 +4288,10 @@
         }
       });
 
-      if (urlInput.value) refreshStatus({ silent: true });
+      refreshStatus({ silent: true });
       wifiTelemetryPollTimer = window.setInterval(() => {
-        if (getLanUrl()) refreshStatus({ silent: true });
+        if (document.hidden) return;
+        refreshStatus({ silent: true });
       }, WIFI_LAN_POLL_MS);
       stopWifiTelemetryBridge = () => {
         if (wifiTelemetryPollTimer) {
@@ -3210,272 +4304,6 @@
     function initBluetoothTelemetryBridge() {
       if (bluetoothBridgeInitialized) return;
       bluetoothBridgeInitialized = true;
-
-      const provisionConnectBtn = document.getElementById('ble-wifi-connect');
-      if (provisionConnectBtn) {
-        const disconnectBtn = document.getElementById('ble-wifi-disconnect');
-        const sendWifiBtn = document.getElementById('ble-wifi-send');
-        const ssidInput = document.getElementById('ble-wifi-ssid');
-        const passwordInput = document.getElementById('ble-wifi-password');
-        const hostInput = document.getElementById('ble-wifi-host');
-        const tokenInput = document.getElementById('ble-wifi-token');
-        const statusEl = document.getElementById('ble-wifi-status');
-        const deviceNameEl = document.getElementById('ble-wifi-device-name');
-        const wifiStateEl = document.getElementById('ble-wifi-state');
-        const resultEl = document.getElementById('ble-wifi-result');
-        const storeStatusEl = document.getElementById('ble-wifi-store-status');
-        const savedProvision = (() => {
-          try {
-            return JSON.parse(localStorage.getItem('pawtrace_ble_wifi_provision') || '{}') || {};
-          } catch {
-            return {};
-          }
-        })();
-
-        const setStatus = (text, state = 'stable') => {
-          if (!statusEl) return;
-          statusEl.textContent = text;
-          statusEl.dataset.status = state;
-        };
-
-        const setStoreStatus = (text, state = 'neutral') => {
-          if (!storeStatusEl) return;
-          storeStatusEl.textContent = text;
-          storeStatusEl.classList.toggle('text-red-500', state === 'error');
-          storeStatusEl.classList.toggle('text-primary', state === 'ok');
-          storeStatusEl.classList.toggle('text-gray-500', state !== 'error' && state !== 'ok');
-        };
-
-        const setHeaderWirelessStatus = (text) => {
-          const headerConnectionStatusEl = document.getElementById('header-connection-status');
-          if (!headerConnectionStatusEl) return;
-          const campus = getCurrentUser()?.campus || 'Taicang';
-          headerConnectionStatusEl.textContent = `${campus} · ${text}`;
-        };
-
-        const updateProvisionButtons = () => {
-          const connected = Boolean(bluetoothBridgeState.device?.gatt?.connected);
-          provisionConnectBtn.disabled = connected;
-          if (disconnectBtn) disconnectBtn.disabled = !connected;
-          if (sendWifiBtn) sendWifiBtn.disabled = !connected || !bluetoothBridgeState.messageChar;
-          if (deviceNameEl) deviceNameEl.textContent = bluetoothBridgeState.device?.name || (connected ? 'PawTrace BLE' : '--');
-        };
-
-        const decodeValue = (value) => {
-          const bytes = value instanceof DataView
-            ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
-            : new Uint8Array(value || []);
-          return new TextDecoder('utf-8').decode(bytes).replace(/\0+$/g, '').trim();
-        };
-
-        const normalizeBackendUrl = (value = '') => {
-          let raw = String(value || '').trim();
-          if (!raw) return '';
-          if (!/^https?:\/\//i.test(raw)) raw = `http://${raw}`;
-          let url;
-          try {
-            url = new URL(raw);
-          } catch {
-            return '';
-          }
-          if (!url.port) url.port = '3000';
-          if (!url.pathname || url.pathname === '/') url.pathname = '/api/device/telemetry';
-          return url.toString().replace(/\/+$/, '');
-        };
-
-        const backendHostFromUrl = (value = '') => {
-          const normalized = normalizeBackendUrl(value);
-          if (!normalized) return String(value || '').trim();
-          try {
-            const url = new URL(normalized);
-            return url.hostname;
-          } catch {
-            return String(value || '').trim();
-          }
-        };
-
-        const renderProvisionStatus = (payload = {}) => {
-          if (resultEl) resultEl.textContent = JSON.stringify(payload, null, 2).slice(0, 2400);
-          const wifiConnected = optionalBoolean(payload.wifi_connected ?? payload.wifiConnected);
-          if (wifiStateEl) {
-            wifiStateEl.textContent = wifiConnected === true
-              ? (payload.wifi_ip || payload.wifiIp || 'connected')
-              : wifiConnected === false
-                ? 'not connected'
-                : '--';
-          }
-          if (payload.lan_base_url || payload.lanBaseUrl) {
-            localStorage.setItem(WIFI_LAN_URL_KEY, String(payload.lan_base_url || payload.lanBaseUrl));
-          }
-          if (payload.upload_url || payload.uploadUrl) {
-            const host = backendHostFromUrl(String(payload.upload_url || payload.uploadUrl));
-            if (hostInput && host) hostInput.value = host;
-          }
-        };
-
-        const handleProvisionStatusValue = (value) => {
-          const text = decodeValue(value);
-          if (!text) return;
-          try {
-            const payload = JSON.parse(text);
-            renderProvisionStatus(payload);
-            if (payload.ok === false) {
-              setStatus('Device error', 'alert');
-              setStoreStatus(payload.error || 'M5 rejected the WiFi config.', 'error');
-              return;
-            }
-            const wifiConnected = optionalBoolean(payload.wifi_connected ?? payload.wifiConnected);
-            setStatus(wifiConnected === true ? 'WiFi ready' : 'BLE ready', wifiConnected === false ? 'watch' : 'stable');
-            setStoreStatus('BLE provisioning status received. Live data still uses WiFi upload.', 'ok');
-          } catch {
-            if (resultEl) resultEl.textContent = text;
-          }
-        };
-
-        const connectKnownDevice = async (device) => {
-          if (!navigator.bluetooth || !device?.gatt) throw new Error('Bluetooth device is unavailable.');
-          bluetoothBridgeState.userDisconnected = false;
-          bluetoothBridgeState.device = device;
-          device.addEventListener('gattserverdisconnected', () => {
-            bluetoothBridgeState.telemetryChar = null;
-            bluetoothBridgeState.messageChar = null;
-            setStatus('Disconnected', 'watch');
-            setHeaderWirelessStatus('BLE setup disconnected');
-            updateProvisionButtons();
-          });
-          setStatus('Connecting', 'watch');
-          setHeaderWirelessStatus('BLE WiFi setup');
-          const server = await device.gatt.connect();
-          const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-          try {
-            bluetoothBridgeState.telemetryChar = await service.getCharacteristic(BLE_TELEMETRY_UUID);
-            bluetoothBridgeState.telemetryChar.addEventListener('characteristicvaluechanged', (event) => {
-              handleProvisionStatusValue(event.target?.value);
-            });
-            await bluetoothBridgeState.telemetryChar.startNotifications();
-            const initial = await bluetoothBridgeState.telemetryChar.readValue();
-            handleProvisionStatusValue(initial);
-          } catch {
-            bluetoothBridgeState.telemetryChar = null;
-          }
-          bluetoothBridgeState.messageChar = await service.getCharacteristic(BLE_MESSAGE_UUID);
-          setStatus('Connected', 'stable');
-          setHeaderWirelessStatus('BLE WiFi setup connected');
-          setStoreStatus('Connected. Send SSID/password once, then use WiFi telemetry.', 'ok');
-          updateProvisionButtons();
-          return true;
-        };
-
-        const connect = async () => {
-          if (!navigator.bluetooth) {
-            setStatus('Unsupported', 'alert');
-            setStoreStatus('Web Bluetooth is unavailable. Use Chrome or Edge on localhost/HTTPS.', 'error');
-            return;
-          }
-          setStatus('Scanning', 'watch');
-          setStoreStatus('Choose PawTrace-001 in the Bluetooth picker.');
-          try {
-            const device = await navigator.bluetooth.requestDevice({
-              filters: [{ namePrefix: 'PawTrace' }],
-              optionalServices: [BLE_SERVICE_UUID],
-            });
-            await connectKnownDevice(device);
-          } catch (err) {
-            console.warn('BLE WiFi provisioning failed', err);
-            setStatus('Failed', 'alert');
-            setStoreStatus(err instanceof Error ? err.message : 'Bluetooth connection failed.', 'error');
-            updateProvisionButtons();
-          }
-        };
-
-        const writeProvisionText = async (text) => {
-          if (!bluetoothBridgeState.messageChar) throw new Error('BLE WiFi characteristic is not available.');
-          const bytes = new TextEncoder().encode(String(text || '').slice(0, 500));
-          if (typeof bluetoothBridgeState.messageChar.writeValueWithResponse === 'function') {
-            await bluetoothBridgeState.messageChar.writeValueWithResponse(bytes);
-          } else if (typeof bluetoothBridgeState.messageChar.writeValueWithoutResponse === 'function') {
-            await bluetoothBridgeState.messageChar.writeValueWithoutResponse(bytes);
-          } else {
-            await bluetoothBridgeState.messageChar.writeValue(bytes);
-          }
-        };
-
-        const sendWifiConfig = async () => {
-          const ssid = String(ssidInput?.value || '').trim();
-          const password = String(passwordInput?.value || '');
-          const host = String(hostInput?.value || '').trim();
-          const token = String(tokenInput?.value || '').trim();
-          const uploadUrl = normalizeBackendUrl(host);
-          if (!ssid) {
-            setStoreStatus('WiFi SSID is required.', 'error');
-            return;
-          }
-          if (!uploadUrl) {
-            setStoreStatus('Backend host is required, for example 192.168.31.199.', 'error');
-            return;
-          }
-          const packet = {
-            type: 'wifi_config',
-            ssid,
-            password,
-            host: backendHostFromUrl(uploadUrl),
-            url: uploadUrl,
-            token,
-            source: 'pawtrace-web',
-          };
-          try {
-            setStatus('Sending WiFi', 'watch');
-            await writeProvisionText(JSON.stringify(packet));
-            localStorage.setItem('pawtrace_ble_wifi_provision', JSON.stringify({
-              ssid,
-              host: packet.host,
-              token,
-              savedAt: new Date().toISOString(),
-            }));
-            if (resultEl) resultEl.textContent = JSON.stringify({ ...packet, password: password ? '***' : '' }, null, 2);
-            setStatus('WiFi sent', 'stable');
-            setStoreStatus('WiFi credentials sent over BLE. M5 will connect and upload telemetry through WiFi.', 'ok');
-            window.setTimeout(async () => {
-              try {
-                if (bluetoothBridgeState.messageChar && typeof bluetoothBridgeState.messageChar.readValue === 'function') {
-                  handleProvisionStatusValue(await bluetoothBridgeState.messageChar.readValue());
-                }
-              } catch {}
-            }, 500);
-          } catch (err) {
-            console.warn('BLE WiFi config send failed', err);
-            setStatus('Send failed', 'alert');
-            setStoreStatus(err instanceof Error ? err.message : 'BLE WiFi config send failed.', 'error');
-          }
-        };
-
-        const disconnect = () => {
-          bluetoothBridgeState.userDisconnected = true;
-          if (bluetoothBridgeState.device?.gatt?.connected) bluetoothBridgeState.device.gatt.disconnect();
-          bluetoothBridgeState.telemetryChar = null;
-          bluetoothBridgeState.messageChar = null;
-          setStatus('Disconnected', 'watch');
-          setHeaderWirelessStatus('WiFi telemetry');
-          updateProvisionButtons();
-        };
-
-        if (ssidInput) ssidInput.value = savedProvision.ssid || '';
-        if (hostInput) hostInput.value = savedProvision.host || (window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '');
-        if (tokenInput) tokenInput.value = savedProvision.token || 'pawtrace-m5-dev-token';
-        if (!navigator.bluetooth) {
-          provisionConnectBtn.disabled = true;
-          setStatus('Unsupported', 'alert');
-          setStoreStatus('Web Bluetooth is unavailable. Use Chrome or Edge on localhost/HTTPS.', 'error');
-        } else {
-          setStatus('Pair', 'watch');
-        }
-        provisionConnectBtn.addEventListener('click', connect);
-        disconnectBtn?.addEventListener('click', disconnect);
-        sendWifiBtn?.addEventListener('click', sendWifiConfig);
-        updateProvisionButtons();
-        stopBluetoothTelemetryBridge = disconnect;
-        return;
-      }
 
       const connectBtn = document.getElementById('ble-connect');
       const disconnectBtn = document.getElementById('ble-disconnect');
@@ -4275,6 +5103,10 @@
       const tempStatusEl = document.getElementById('health-temp-status');
       const heartStatusEl = document.getElementById('health-heart-status');
       const spo2StatusEl = document.getElementById('health-spo2-status');
+      const tempMeterEl = document.getElementById('health-temp-meter');
+      const heartMeterEl = document.getElementById('health-heart-meter');
+      const spo2MeterEl = document.getElementById('health-spo2-meter');
+      const activityMeterEl = document.getElementById('health-activity-meter');
       const activityStateEl = document.getElementById('health-activity-state');
       const activityScoreEl = document.getElementById('health-activity-score');
       const batteryStateEl = document.getElementById('health-battery-state');
@@ -4370,12 +5202,94 @@
         return 'stable';
       }
 
+      function assessmentTone(assessment = {}) {
+        return assessment.state === 'Stable'
+          ? 'stable'
+          : assessment.state === 'Watch closely' || assessment.state === 'Check contact'
+            ? 'watch'
+            : assessment.state === 'Needs attention'
+              ? 'alert'
+              : 'unknown';
+      }
+
+      function readableBool(value, trueLabel = 'Ready', falseLabel = 'Waiting', emptyLabel = '--') {
+        const normalized = optionalBoolean(value);
+        if (normalized === true) return trueLabel;
+        if (normalized === false) return falseLabel;
+        return emptyLabel;
+      }
+
+      function activityDisplayLabel(activity = '') {
+        const normalized = String(activity || '').trim().toLowerCase();
+        if (!normalized) return 'Waiting';
+        if (normalized === 'rest' || normalized === 'resting') return 'Resting';
+        if (normalized === 'walk' || normalized === 'walking') return 'Walking';
+        if (normalized === 'run' || normalized === 'running') return 'Running';
+        return toTitleLabel(activity);
+      }
+
+      function activityCareHint(activity = '', activityScore = null) {
+        const normalized = String(activity || '').toLowerCase();
+        if (!activity) return 'No movement yet';
+        if (/(run|running|high|active)/.test(normalized)) return 'High energy now';
+        if (/(walk|walking)/.test(normalized)) return 'Light movement';
+        if (hasTelemetryNumber(activityScore) && Number(activityScore) > 0.45) return 'Active movement';
+        return 'Calm movement';
+      }
+
+      function trackerConnectionLabel(value) {
+        return readableBool(value, 'Live tracker', 'Tracker offline', 'Tracker waiting');
+      }
+
+      function syncLabel(value) {
+        return readableBool(value, 'Synced', 'Sync waiting', 'No sync yet');
+      }
+
+      function locationLabel(value) {
+        return readableBool(value, 'On map', 'Finding location', 'Location waiting');
+      }
+
+      function gpsFixLabel(value) {
+        return hasTelemetryNumber(value) && Number(value) > 0 ? 'GPS locked' : 'GPS searching';
+      }
+
+      function sensorFitLabel(heartFound, finger) {
+        if (optionalBoolean(heartFound) === true && optionalBoolean(finger) === true) return 'Good contact';
+        if (optionalBoolean(heartFound) === false || optionalBoolean(finger) === false) return 'Adjust sensor';
+        return 'Contact waiting';
+      }
+
+      function safeZoneLabel(distanceM, lostAlert) {
+        if (optionalBoolean(lostAlert) === true) return 'Outside safe zone';
+        if (hasTelemetryNumber(distanceM) && Number(distanceM) > 0) return `${Math.round(Number(distanceM))} m from home`;
+        return 'Inside safe zone';
+      }
+
       function setHealthTone(element, tone = 'unknown') {
         if (!element) return;
         const normalized = toneFromBand(tone);
         element.dataset.status = normalized;
-        const tile = element.closest('.health-metric-tile, .health-summary-callout, .health-status-pill');
+        const tile = element.closest('.health-primary-card, .health-focus-item, .health-metric-tile, .health-summary-callout, .health-hero-card, .health-status-pill');
         if (tile) tile.dataset.status = normalized;
+      }
+
+      function setHealthMeter(element, value, min, max, tone = 'unknown') {
+        if (!element) return;
+        let percent = 0;
+        if (hasTelemetryNumber(value) && Number.isFinite(min) && Number.isFinite(max) && max > min) {
+          percent = ((Number(value) - min) / (max - min)) * 100;
+        }
+        const clamped = Math.max(0, Math.min(100, percent));
+        element.style.width = `${clamped}%`;
+        element.dataset.status = toneFromBand(tone);
+      }
+
+      function activityMeterValue(activity = '', activityScore = null, tone = 'unknown') {
+        if (hasTelemetryNumber(activityScore)) return Math.max(0, Math.min(100, Number(activityScore) * 100));
+        if (tone === 'alert') return 96;
+        if (tone === 'watch') return 68;
+        if (tone === 'stable') return /walk/i.test(String(activity || '')) ? 42 : 24;
+        return 0;
       }
 
       function setPacketDetailEmpty(summary = 'Add a health reading to start monitoring.') {
@@ -4391,33 +5305,41 @@
         setHealthTone(heartStatusEl, 'unknown');
         setHealthText(spo2StatusEl, 'No reading yet');
         setHealthTone(spo2StatusEl, 'unknown');
+        setHealthMeter(tempMeterEl, NaN, 35, 42.5, 'unknown');
+        setHealthMeter(heartMeterEl, NaN, 40, 220, 'unknown');
+        setHealthMeter(spo2MeterEl, NaN, 80, 100, 'unknown');
+        setHealthMeter(activityMeterEl, NaN, 0, 100, 'unknown');
         setHealthText(activityStateEl, 'Waiting');
-        setHealthText(activityScoreEl, 'No activity data');
+        setHealthText(activityScoreEl, 'No movement yet');
         setHealthTone(activityScoreEl, 'unknown');
         setHealthText(batteryStateEl, '--');
-        setHealthText(batteryMetaEl, 'battery_mv --');
-        setHealthText(networkStateEl, '--');
-        setHealthText(wifiStateEl, '--');
+        setHealthTone(batteryStateEl, 'unknown');
+        setHealthText(batteryMetaEl, 'Tracker battery');
+        setHealthText(networkStateEl, 'Tracker waiting');
+        setHealthTone(networkStateEl, 'unknown');
+        setHealthText(wifiStateEl, 'Tracker waiting');
         setHealthText(wifiRssiEl, '--');
-        setHealthText(uploadStateEl, 'upload_ok --');
+        setHealthText(uploadStateEl, 'No sync yet');
         setHealthText(uploadEnabledEl, '--');
         setHealthText(uploadCodeEl, '--');
         setHealthText(vitalsStateEl, 'Waiting');
         setHealthText(vitalsSummaryEl, summary);
         setHealthTone(vitalsSummaryEl, 'unknown');
-        setHealthText(locationStateEl, 'location_valid --');
-        setHealthText(gpsStateEl, 'gps_fix --');
+        setHealthText(locationStateEl, 'Location waiting');
+        setHealthTone(locationStateEl, 'unknown');
+        setHealthText(gpsStateEl, 'GPS searching');
         setHealthText(gpsSatsEl, '--');
         setHealthText(gpsHdopEl, '--');
         setHealthText(locationCoordsEl, '--');
         setHealthText(lastLocationValidEl, '--');
         setHealthText(trackSamplesEl, '--');
-        setHealthText(geofenceEnabledEl, '--');
+        setHealthText(geofenceEnabledEl, 'Safe zone --');
         setHealthText(distanceStateEl, '--');
-        setHealthText(lostAlertEl, '--');
-        setHealthText(heartFoundEl, '--');
-        setHealthText(fingerStateEl, '--');
-        setHealthText(spo2ValidDetailEl, 'spo2_valid --');
+        setHealthText(lostAlertEl, 'Alert clear');
+        setHealthText(heartFoundEl, 'Contact waiting');
+        setHealthTone(heartFoundEl, 'unknown');
+        setHealthText(fingerStateEl, 'Sensor waiting');
+        setHealthText(spo2ValidDetailEl, 'Oxygen waiting');
       }
 
       function render() {
@@ -4472,7 +5394,7 @@
         const uploadEnabled = firstTelemetryValue(latestVitals?.uploadEnabled, activePet.uploadEnabled);
         const uploadOk = firstTelemetryValue(latestVitals?.uploadOk, activePet.uploadOk);
         const uploadCode = firstTelemetryValue(latestVitals?.uploadCode, activePet.uploadCode);
-        const coordsLabel = hasTelemetryNumber(lat) && hasTelemetryNumber(lon)
+        const coordsLabel = hasValidCoordinate(lat, lon)
           ? `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}`
           : '--';
         const gpsSatsLabel = hasTelemetryNumber(gpsSatsUsed) || hasTelemetryNumber(gpsVisible)
@@ -4492,45 +5414,55 @@
         setHealthText(latestSpo2El, hasTelemetryNumber(latestVitals?.spo2Pct) ? `${Math.round(Number(latestVitals.spo2Pct))}%` : '--');
         setHealthText(tempStatusEl, latestVitals ? labelFromBand(assessment.tempBand) : 'No reading yet');
         setHealthTone(tempStatusEl, assessment.tempBand);
+        setHealthMeter(tempMeterEl, latestVitals?.temperature, 35, 42.5, assessment.tempBand);
+        const heartTone = heartFound === false || finger === false ? 'watch' : assessment.heartBand;
         setHealthText(heartStatusEl, latestVitals
           ? (heartFound === false || finger === false ? 'Check sensor contact' : labelFromBand(assessment.heartBand))
           : 'No reading yet');
-        setHealthTone(heartStatusEl, heartFound === false || finger === false ? 'watch' : assessment.heartBand);
+        setHealthTone(heartStatusEl, heartTone);
+        setHealthMeter(heartMeterEl, latestVitals?.heartRate, 40, 220, heartTone);
+        const spo2Tone = spo2Valid === false ? 'watch' : assessment.spo2Band;
         setHealthText(spo2StatusEl, hasTelemetryNumber(latestVitals?.spo2Pct)
           ? labelFromBand(assessment.spo2Band, spo2Valid === false ? 'Check sensor contact' : 'Reading captured')
           : 'No reading yet');
-        setHealthTone(spo2StatusEl, spo2Valid === false ? 'watch' : assessment.spo2Band);
-        setHealthText(activityStateEl, activity || 'Waiting');
+        setHealthTone(spo2StatusEl, spo2Tone);
+        setHealthMeter(spo2MeterEl, latestVitals?.spo2Pct, 80, 100, spo2Tone);
+        setHealthText(activityStateEl, activityDisplayLabel(activity));
         const activityStatusTone = activityTone(activity);
-        setHealthText(activityScoreEl, activity
-          ? (hasTelemetryNumber(activityScore) ? `Activity status · ${Number(activityScore).toFixed(2)}` : 'Activity status')
-          : 'No activity data');
+        setHealthText(activityScoreEl, activityCareHint(activity, activityScore));
         setHealthTone(activityScoreEl, activityStatusTone);
+        setHealthMeter(activityMeterEl, activityMeterValue(activity, activityScore, activityStatusTone), 0, 100, activityStatusTone);
         setHealthText(batteryStateEl, hasTelemetryNumber(batteryPct) ? `${Math.round(Number(batteryPct))}%` : '--');
-        setHealthText(batteryMetaEl, hasTelemetryNumber(batteryMv) ? `battery_mv ${Math.round(Number(batteryMv))} mV` : 'battery_mv --');
-        setHealthText(networkStateEl, `Wi-Fi ${telemetryBoolLabel(wifiConnected)}`);
-        setHealthText(wifiStateEl, telemetryBoolLabel(wifiConnected));
+        setHealthTone(batteryStateEl, hasTelemetryNumber(batteryPct) ? (Number(batteryPct) < 20 ? 'alert' : Number(batteryPct) < 35 ? 'watch' : 'stable') : 'unknown');
+        setHealthText(batteryMetaEl, hasTelemetryNumber(batteryMv) ? `${Math.round(Number(batteryMv))} mV tracker battery` : 'Tracker battery');
+        setHealthText(networkStateEl, trackerConnectionLabel(wifiConnected));
+        setHealthTone(networkStateEl, optionalBoolean(wifiConnected) === true ? 'stable' : optionalBoolean(wifiConnected) === false ? 'watch' : 'unknown');
+        setHealthText(wifiStateEl, trackerConnectionLabel(wifiConnected));
         setHealthText(wifiRssiEl, hasTelemetryNumber(wifiRssi) ? `${Math.round(Number(wifiRssi))} dBm` : '--');
-        setHealthText(uploadStateEl, `upload_ok ${telemetryBoolLabel(uploadOk)}`);
-        setHealthText(uploadEnabledEl, telemetryBoolLabel(uploadEnabled));
+        setHealthText(uploadStateEl, syncLabel(uploadOk));
+        setHealthText(uploadEnabledEl, readableBool(uploadEnabled, 'Auto sync on', 'Auto sync off', 'Auto sync --'));
         setHealthText(uploadCodeEl, telemetryIntegerLabel(uploadCode));
-        setHealthText(vitalsStateEl, assessment.state);
-        setHealthText(locationStateEl, `location_valid ${telemetryBoolLabel(locationValid)}`);
-        setHealthText(gpsStateEl, `gps_fix ${telemetryIntegerLabel(gpsFix)}`);
-        setHealthText(gpsSatsEl, gpsSatsLabel);
+        setHealthText(vitalsStateEl, assessment.displayState || assessment.state);
+        setHealthText(locationStateEl, locationLabel(locationValid));
+        setHealthTone(locationStateEl, locationValid === true ? 'stable' : locationValid === false ? 'watch' : 'unknown');
+        setHealthText(gpsStateEl, gpsFixLabel(gpsFix));
+        setHealthText(gpsSatsEl, hasTelemetryNumber(gpsSatsUsed) || hasTelemetryNumber(gpsVisible)
+          ? `${telemetryIntegerLabel(gpsSatsUsed)} of ${telemetryIntegerLabel(gpsVisible)} satellites`
+          : gpsSatsLabel);
         setHealthText(gpsHdopEl, telemetryNumberLabel(gpsHdop, { digits: 1 }));
         setHealthText(locationCoordsEl, coordsLabel);
-        setHealthText(lastLocationValidEl, telemetryBoolLabel(lastLocationValid));
+        setHealthText(lastLocationValidEl, readableBool(lastLocationValid, 'recent', 'stale', '--'));
         setHealthText(trackSamplesEl, telemetryIntegerLabel(trackSamples));
-        setHealthText(geofenceEnabledEl, telemetryBoolLabel(geofenceEnabled));
-        setHealthText(distanceStateEl, telemetryNumberLabel(distanceM, { unit: ' m', digits: 1 }));
-        setHealthText(lostAlertEl, telemetryBoolLabel(lostAlert));
-        setHealthText(heartFoundEl, telemetryBoolLabel(heartFound));
-        setHealthText(fingerStateEl, telemetryBoolLabel(finger));
-        setHealthText(spo2ValidDetailEl, `spo2_valid ${telemetryBoolLabel(spo2Valid)}`);
+        setHealthText(geofenceEnabledEl, readableBool(geofenceEnabled, 'Safe zone on', 'Safe zone off', 'Safe zone --'));
+        setHealthText(distanceStateEl, safeZoneLabel(distanceM, lostAlert));
+        setHealthText(lostAlertEl, readableBool(lostAlert, 'Alert active', 'Alert clear', 'Alert --'));
+        setHealthText(heartFoundEl, sensorFitLabel(heartFound, finger));
+        setHealthTone(heartFoundEl, heartFound === true && finger === true ? 'stable' : heartFound === false || finger === false ? 'watch' : 'unknown');
+        setHealthText(fingerStateEl, readableBool(finger, 'Contact good', 'Contact loose', 'Sensor waiting'));
+        setHealthText(spo2ValidDetailEl, readableBool(spo2Valid, 'Oxygen signal good', 'Oxygen signal weak', 'Oxygen waiting'));
         if (vitalsSummaryEl) {
           vitalsSummaryEl.textContent = assessment.summary;
-          setHealthTone(vitalsSummaryEl, assessment.state === 'Stable' ? 'stable' : assessment.state === 'Watch closely' || assessment.state === 'Check contact' ? 'watch' : assessment.state === 'Needs attention' ? 'alert' : 'unknown');
+          setHealthTone(vitalsSummaryEl, assessmentTone(assessment));
         }
         const history = normalizeVitalsHistory(activePet.vitalsHistory);
         updateTrendCard({ metric: 'temperature', history, chartEl: tempChartEl, badgeEl: tempBadgeEl, captionEl: tempCaptionEl, minEl: tempMinEl, avgEl: tempAvgEl, maxEl: tempMaxEl });
@@ -4557,14 +5489,14 @@
           row.innerHTML = `
             <div class="health-history-row__meta">
               <p class="font-semibold text-dark">${formatReadingTimestamp(entry.timestamp)}</p>
-              <p class="text-[10px] text-gray-500">${petName} · ${escapeHtml(entryAssessment.state)}</p>
+              <p class="text-[10px] text-gray-500">${petName} · ${escapeHtml(entryAssessment.displayState || entryAssessment.state)}</p>
             </div>
             <div class="health-history-row__stats">
               <span class="health-status-pill">Temp ${Number.isFinite(entry.temperature) ? `${entry.temperature.toFixed(1)}°C` : '--'}</span>
               <span class="health-status-pill">HR ${Number.isFinite(entry.heartRate) ? `${Math.round(entry.heartRate)} bpm` : '--'}</span>
               <span class="health-status-pill">SpO2 ${Number.isFinite(entry.spo2Pct) ? `${Math.round(entry.spo2Pct)}%` : '--'}</span>
-              <span class="health-status-pill">${escapeHtml(entry.activity || 'REST')}</span>
-              <span class="health-status-pill" data-status="${entryTone}">${escapeHtml(entryAssessment.state)}</span>
+              <span class="health-status-pill">${escapeHtml(activityDisplayLabel(entry.activity || 'REST'))}</span>
+              <span class="health-status-pill" data-status="${entryTone}">${escapeHtml(entryAssessment.displayState || entryAssessment.state)}</span>
             </div>
           `;
           historyListEl.appendChild(row);
@@ -4641,6 +5573,9 @@
       const profilePetManager = document.getElementById('profile-pet-manager');
       const communityPetFeed = document.getElementById('community-pet-feed');
       const nfcPetResult = document.getElementById('nfc-pet-result');
+      const petSkeleton = document.getElementById('pet-skeleton');
+      const communitySkeleton = document.getElementById('community-skeleton');
+      const communityError = document.getElementById('community-error');
       let openPetId = null;
       const petFormHeading = document.getElementById('pet-form-heading');
       const petFormSubtitle = document.getElementById('pet-form-subtitle');
@@ -4793,11 +5728,91 @@
       }
 
       function buildPetNfcLink(pet = {}) {
-        const url = new URL(window.location.href);
-        url.search = '';
-        url.hash = 'nfc';
-        url.searchParams.set('nfc', base64UrlEncode(JSON.stringify(buildPetNfcPayload(pet))));
-        return url.toString();
+        return buildStablePublicNfcLink(pet);
+      }
+
+      function buildPetEmbeddedNfcLink(pet = {}) {
+        return buildEmbeddedPublicNfcLink(pet);
+      }
+
+      async function publishPublicNfcPetCard(pet = {}) {
+        const stableLink = buildPetNfcLink(pet);
+        const embeddedLink = buildPetEmbeddedNfcLink(pet);
+        const cardId = getPublicNfcCardId(pet);
+        if (!cardId) {
+          return { ok: false, link: embeddedLink, reason: 'Missing card ID.' };
+        }
+        if (!getAuthToken()) {
+          return {
+            ok: false,
+            link: embeddedLink,
+            reason: 'Sign in before publishing a fixed public URL.',
+          };
+        }
+        try {
+          const response = await authJsonFetch(`/api/nfc-pet-cards/${encodeURIComponent(cardId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ pet: buildPetNfcPayload(pet) }),
+          });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || 'Public card publish failed.');
+          }
+          return { ok: true, link: stableLink, reason: '' };
+        } catch (err) {
+          console.warn('Public NFC card publish failed', err);
+          return {
+            ok: false,
+            link: embeddedLink,
+            reason: 'Public card service is unavailable, using an embedded public link.',
+          };
+        }
+      }
+
+      async function copyTextToClipboard(text = '') {
+        const value = String(text || '');
+        if (!value) return false;
+        try {
+          await navigator.clipboard.writeText(value);
+          return true;
+        } catch {
+          window.prompt('Copy this URL', value);
+          return false;
+        }
+      }
+
+      function setPetNfcButtonBusy(button, busy) {
+        if (!button) return;
+        button.disabled = Boolean(busy);
+        button.classList.toggle('opacity-60', Boolean(busy));
+        button.classList.toggle('cursor-not-allowed', Boolean(busy));
+      }
+
+      function canUseWebNfcWriter() {
+        return Boolean('NDEFReader' in window && window.isSecureContext);
+      }
+
+      async function writePetNfcLinkToTag(pet = {}, trigger = null) {
+        const result = await publishPublicNfcPetCard(pet);
+        const link = result.link;
+        if (!canUseWebNfcWriter()) {
+          await copyTextToClipboard(link);
+          alert('This mobile browser cannot write NFC tags directly. The public URL was copied; use your phone NFC writer app to write it.');
+          return;
+        }
+        try {
+          const reader = new NDEFReader();
+          await reader.write({
+            records: [{ recordType: 'url', data: link }],
+          });
+          alert(result.ok ? 'NFC card written with the public pet URL.' : `NFC card written with fallback public URL. ${result.reason}`);
+        } catch (err) {
+          console.warn('NFC write failed', err);
+          await copyTextToClipboard(link);
+          alert('NFC write did not complete. The public URL was copied so you can write it manually.');
+        } finally {
+          setPetNfcButtonBusy(trigger, false);
+        }
       }
 
       function renderNfcPetResult() {
@@ -4942,6 +5957,8 @@
         if (!petList) return;
         renderNfcPetResult();
         petList.innerHTML = '';
+        petSkeleton?.classList.add('hidden');
+        if (petSkeleton) petSkeleton.style.display = 'none';
         if (profilePetCount) profilePetCount.textContent = pets.length.toString();
         if (profileSidePetCount) profileSidePetCount.textContent = pets.length.toString();
         if (pets.length === 0) {
@@ -4974,6 +5991,9 @@
           const petNfcId = escapeHtml(p.nfcId || '');
           const petNfcContact = escapeHtml(p.nfcContact || 'Add an emergency contact');
           const petNfcNote = escapeHtml(p.nfcNote || 'No care note added yet.');
+          const publicNfcLink = buildPetNfcLink(p);
+          const publicNfcLinkEsc = escapeHtml(publicNfcLink);
+          const nfcWriterLabel = canUseWebNfcWriter() ? 'Write NFC Card' : 'Copy for NFC App';
           const telemetryBadge = p.deviceId
             ? `<p class="text-[10px] text-gray-500 mt-1">Device ${escapeHtml(p.deviceId)}${Number.isFinite(Number(p.batteryPct)) ? ` · ${Math.round(Number(p.batteryPct))}% battery` : ''}</p>`
             : '';
@@ -4984,7 +6004,7 @@
           const isOpen = openPetId ? openPetId === p.id : (!mobileLayout && idx === 0);
           if (!openPetId && !mobileLayout && idx === 0) openPetId = p.id;
           const card = document.createElement('div');
-          card.className = 'pixel-card flex flex-col gap-2';
+          card.className = `pixel-card pet-owned-card flex flex-col gap-2 ${isOpen ? 'is-open' : ''}`;
           card.dataset.petCardId = p.id || '';
           card.dataset.petNfcId = p.nfcId || '';
           card.innerHTML = `
@@ -5055,12 +6075,25 @@
                   <p><span class="font-semibold">Emergency:</span> ${petNfcContact}</p>
                   <p><span class="font-semibold">Care note:</span> ${petNfcNote}</p>
                 </div>
+                <div class="pet-nfc-url-box">
+                  <div class="flex items-center justify-between gap-2">
+                    <span>Public NFC URL</span>
+                    <button type="button" data-copy-nfc-link="${petId}">Copy</button>
+                  </div>
+                  <code title="${publicNfcLinkEsc}">${publicNfcLinkEsc}</code>
+                </div>
                 <div class="flex flex-wrap gap-2 pt-1">
                   <button type="button" class="pet-action-link" data-copy-nfc="${petId}">
                     <i class="fas fa-id-card"></i><span>Copy Emergency Card</span>
                   </button>
                   <button type="button" class="pet-action-link" data-copy-nfc-link="${petId}">
-                    <i class="fas fa-link"></i><span>Copy NFC Link</span>
+                    <i class="fas fa-link"></i><span>Copy NFC URL</span>
+                  </button>
+                  <button type="button" class="pet-action-link" data-write-nfc="${petId}">
+                    <i class="fas fa-wifi"></i><span>${nfcWriterLabel}</span>
+                  </button>
+                  <button type="button" class="pet-action-link" data-open-nfc-link="${petId}">
+                    <i class="fas fa-arrow-up-right-from-square"></i><span>Open Public Card</span>
                   </button>
                   <button type="button" class="pet-action-link" data-open-map="${petId}">
                     <i class="fas fa-location-arrow"></i><span>Locate on Map</span>
@@ -5070,6 +6103,9 @@
             </div>
           `;
         petList.appendChild(card);
+        card.querySelectorAll('img').forEach((img) => {
+          setPreviewImageSource(img, img.getAttribute('src') || '', DEFAULT_PET_AVATAR);
+        });
       });
         petList.querySelectorAll('.pet-edit').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -5094,7 +6130,9 @@
             const id = btn.getAttribute('data-copy-nfc');
             const pet = pets.find((entry) => entry.id === id);
             if (!pet) return;
-            const nfcLink = buildPetNfcLink(pet);
+            setPetNfcButtonBusy(btn, true);
+            const publishResult = await publishPublicNfcPetCard(pet);
+            const nfcLink = publishResult.link;
             const cardText = [
               `PAWTRACE Emergency Card · ${pet.name}`,
               `Card ID: ${pet.nfcId}`,
@@ -5105,11 +6143,15 @@
               `NFC link: ${nfcLink}`,
             ].join('\n');
             try {
-              await navigator.clipboard.writeText(cardText);
-              alert(`Copied ${pet.name}'s emergency card.`);
+              await copyTextToClipboard(cardText);
+              alert(publishResult.ok
+                ? `Copied ${pet.name}'s emergency card with the public NFC URL.`
+                : `Copied ${pet.name}'s emergency card. ${publishResult.reason}`);
             } catch (err) {
               console.warn('Clipboard copy failed', err);
               alert(cardText);
+            } finally {
+              setPetNfcButtonBusy(btn, false);
             }
           });
         });
@@ -5118,14 +6160,33 @@
             const id = btn.getAttribute('data-copy-nfc-link');
             const pet = pets.find((entry) => entry.id === id);
             if (!pet) return;
-            const link = buildPetNfcLink(pet);
-            try {
-              await navigator.clipboard.writeText(link);
-              alert(`Copied ${pet.name}'s NFC link. Write this URL to the NFC card.`);
-            } catch (err) {
-              console.warn('NFC link copy failed', err);
-              alert(link);
-            }
+            setPetNfcButtonBusy(btn, true);
+            const publishResult = await publishPublicNfcPetCard(pet);
+            await copyTextToClipboard(publishResult.link);
+            alert(publishResult.ok
+              ? `Copied ${pet.name}'s fixed public NFC URL. Write this URL to the NFC card.`
+              : `Copied a public fallback NFC URL. ${publishResult.reason}`);
+            setPetNfcButtonBusy(btn, false);
+          });
+        });
+        petList.querySelectorAll('[data-write-nfc]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-write-nfc');
+            const pet = pets.find((entry) => entry.id === id);
+            if (!pet) return;
+            setPetNfcButtonBusy(btn, true);
+            await writePetNfcLinkToTag(pet, btn);
+          });
+        });
+        petList.querySelectorAll('[data-open-nfc-link]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-open-nfc-link');
+            const pet = pets.find((entry) => entry.id === id);
+            if (!pet) return;
+            setPetNfcButtonBusy(btn, true);
+            const publishResult = await publishPublicNfcPetCard(pet);
+            window.open(publishResult.link, '_blank', 'noopener,noreferrer');
+            setPetNfcButtonBusy(btn, false);
           });
         });
         petList.querySelectorAll('[data-open-map]').forEach(btn => {
@@ -5182,6 +6243,9 @@
       function renderCommunityPets() {
         if (!communityPetFeed) return;
         communityPetFeed.innerHTML = '';
+        communitySkeleton?.classList.add('hidden');
+        if (communitySkeleton) communitySkeleton.style.display = 'none';
+        communityError?.classList.add('hidden');
         COMMUNITY_PETS.forEach((pet, idx) => {
           const petPhoto = escapeHtml(safeImageSrc(pet.photo, DEFAULT_PET_AVATAR));
           const petName = escapeHtml(pet.name || 'Community pet');
@@ -5193,10 +6257,10 @@
             .map(tag => `<span class="px-2 py-0.5 rounded-full bg-secondary/60">${escapeHtml(tag)}</span>`)
             .join('');
           const card = document.createElement('div');
-          card.className = 'pixel-card flex flex-col gap-2';
+          card.className = 'pixel-card community-card flex flex-col gap-2';
           card.innerHTML = `
-            <div class="relative">
-              <img src="${petPhoto}" alt="${petName}" loading="lazy" decoding="async" class="community-cover w-full object-cover rounded-sm pixel-border" />
+            <div class="community-cover pixel-border">
+              <img src="${petPhoto}" alt="${petName}" loading="lazy" decoding="async" />
               <span class="absolute top-2 left-2 bg-primary text-white text-[10px] px-2 py-0.5 rounded-full">Community</span>
             </div>
             <div class="flex items-center justify-between">
@@ -5215,6 +6279,9 @@
             </div>
           `;
           communityPetFeed.appendChild(card);
+          card.querySelectorAll('img').forEach((img) => {
+            setPreviewImageSource(img, img.getAttribute('src') || '', DEFAULT_PET_AVATAR);
+          });
         });
         communityPetFeed.querySelectorAll('[data-community-contact]').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -5362,6 +6429,9 @@
             pets.push(updatedPet);
           }
           setStoredPets(pets);
+          if (getAuthToken()) {
+            void publishPublicNfcPetCard(updatedPet);
+          }
           render();
           hidePetForm();
           const currentUser = getCurrentUser();
@@ -5387,7 +6457,7 @@
         {
           id: 'c1',
           name: 'Lily (Team Lead)',
-          avatar: '/assets/avatars/文件1.png',
+          avatar: '/assets/people/person1.png',
           petName: 'Mocha',
           petType: 'Corgi',
           petBreed: 'Welsh Corgi',
@@ -5400,7 +6470,7 @@
         {
           id: 'c2',
           name: 'Eric (Developer)',
-          avatar: '/assets/avatars/文件2.png',
+          avatar: '/assets/people/person2.png',
           petName: 'Pixel',
           petType: 'Border Collie',
           petBreed: 'Border Collie',
@@ -5413,7 +6483,7 @@
         {
           id: 'c3',
           name: 'Mia (Designer)',
-          avatar: '/assets/avatars/文件3.png',
+          avatar: '/assets/people/person3.png',
           petName: 'Mochi',
           petType: 'Cat',
           petBreed: 'Ragdoll',
@@ -5426,7 +6496,7 @@
         {
           id: 'c4',
           name: 'Leo (Product Manager)',
-          avatar: '/assets/avatars/文件4.png',
+          avatar: '/assets/people/person4.png',
           petName: 'Kiko',
           petType: 'Husky',
           petBreed: 'Siberian Husky',
@@ -5439,7 +6509,7 @@
         {
           id: 'c5',
           name: 'Zoe (Maker)',
-          avatar: '/assets/avatars/文件5.png',
+          avatar: '/assets/people/person5.png',
           petName: 'Baozi',
           petType: 'Bichon',
           petBreed: 'Bichon Frisé',
@@ -5452,7 +6522,7 @@
         {
           id: 'c6',
           name: 'Iris (Art Student)',
-          avatar: '/assets/avatars/文件6.png',
+          avatar: '/assets/people/person6.png',
           petName: 'Nova',
           petType: 'Cat',
           petBreed: 'Ragdoll',
@@ -5465,7 +6535,7 @@
         {
           id: 'c7',
           name: 'Aaron (Volunteer)',
-          avatar: '/assets/avatars/文件7.png',
+          avatar: '/assets/people/person7.png',
           petName: 'Pudding',
           petType: 'Corgi',
           petBreed: 'Pembroke Corgi',
@@ -5527,15 +6597,21 @@
     }
 
     async function requestAssistantResponse(payload = {}) {
-      const { type, contact, contactId, messages = [], fallback } = payload;
+      const { type, contact, contactId, messages = [] } = payload;
+      let fallback = payload.fallback;
+      const summaryPrompt = type === 'owner-pet-summary' && contact
+        ? {
+            role: 'user',
+            content: `Give a concise owner-side pet profile summary for the chat sidebar. Keep it under 34 words.\n${buildContactProfile(contact)}`
+          }
+        : null;
       if (type === 'owner-pet-summary' && contact) {
         const generator = LOCAL_PET_SUMMARIES[Math.floor(Math.random() * LOCAL_PET_SUMMARIES.length)];
-        lastChatAssistantSource = 'local';
-        lastChatAssistantWarning = '';
-        return (generator ? generator(contact) : fallback) || 'No recent pet update yet.';
+        fallback = (generator ? generator(contact) : fallback) || 'No recent pet update yet.';
       }
       if (!contactId) return fallback || 'Message received.';
-      const sanitizedHistory = messages
+      const sourceMessages = summaryPrompt ? [summaryPrompt] : messages;
+      const sanitizedHistory = sourceMessages
         .slice(-12)
         .map(m => {
           let content = (m.content || '').trim();
@@ -5627,9 +6703,12 @@
         chatHoverCard = document.createElement('div');
         chatHoverCard.className = 'contact-hover-card';
         chatHoverCard.innerHTML = `
-          <div class="flex items-center gap-2 mb-2">
-            <img id="hover-avatar" class="w-9 h-9 rounded-full object-cover pixel-border bg-secondary" alt="Avatar preview" />
-            <div>
+          <button type="button" class="contact-hover-close" data-hover-close aria-label="Close profile">
+            <span aria-hidden="true">x</span>
+          </button>
+          <div class="flex items-center gap-2 mb-2 pr-7">
+            <img id="hover-avatar" src="${DEFAULT_USER_AVATAR}" data-fallback-src="${DEFAULT_USER_AVATAR}" class="w-9 h-9 rounded-full object-cover pixel-border bg-secondary" alt="Avatar preview" />
+            <div class="min-w-0">
               <h4 id="hover-name">Friend</h4>
               <p id="hover-pet-tag" class="text-[11px] text-gray-500">Pet info</p>
             </div>
@@ -5641,6 +6720,15 @@
         document.body.appendChild(chatHoverCard);
       }
       const hoverCard = chatHoverCard;
+      const hideHoverCard = () => hoverCard.classList.remove('show');
+      const canShowContactHover = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches && window.innerWidth > 768;
+      hoverCard.querySelector('[data-hover-close]')?.addEventListener('click', hideHoverCard);
+      document.addEventListener('pointerdown', (event) => {
+        if (!hoverCard.classList.contains('show')) return;
+        const target = event.target;
+        if (target instanceof Element && (hoverCard.contains(target) || target.closest('.chat-contact-item'))) return;
+        hideHoverCard();
+      });
 
       if (profileFriendsCount) profileFriendsCount.textContent = CHAT_STATE.contacts.length;
       if (profileSideFriendCount) profileSideFriendCount.textContent = CHAT_STATE.contacts.length;
@@ -5712,17 +6800,18 @@
           item.style.animationDelay = (idx * 0.05) + 's';
           item.dataset.id = c.id;
           item.dataset.contactId = c.id;
-          const avatar = escapeHtml(safeImageSrc(c.avatar, DEFAULT_PET_AVATAR));
+        const avatar = escapeHtml(safeImageSrc(c.avatar, DEFAULT_USER_AVATAR));
           const name = escapeHtml(c.name || 'Friend');
           const preview = escapeHtml(c.lastPreview || '');
           item.innerHTML = `
-              <img src="${avatar}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-secondary" />
+              <img src="${avatar}" data-fallback-src="${DEFAULT_USER_AVATAR}" loading="lazy" decoding="async" class="w-8 h-8 rounded-full object-cover pixel-border bg-secondary" alt="${name}" />
               <div class="flex-1 min-w-0">
                 <p class="font-semibold text-xs truncate">${name}</p>
                 <p class="text-[11px] text-gray-600 truncate">${preview}</p>
               </div>
             `;
             const showHover = (event) => {
+              if (!canShowContactHover()) return;
               const rect = item.getBoundingClientRect();
               const data = c;
               const avatarEl = hoverCard.querySelector('#hover-avatar');
@@ -5744,11 +6833,20 @@
               hoverCard.style.left = `${Math.min(window.innerWidth - 260, rect.left + window.scrollX + 10)}px`;
               hoverCard.classList.add('show');
             };
-            const hideHover = () => hoverCard.classList.remove('show');
+            const hideHover = () => {
+              if (!canShowContactHover()) return;
+              hoverCard.classList.remove('show');
+            };
             item.addEventListener('mouseenter', showHover);
             item.addEventListener('mouseleave', hideHover);
-            item.addEventListener('click', () => activateContact(c.id));
+            item.addEventListener('focus', showHover);
+            item.addEventListener('blur', hideHover);
+            item.addEventListener('click', () => {
+              hideHoverCard();
+              activateContact(c.id);
+            });
             listEl.appendChild(item);
+            setPreviewImageSource(item.querySelector('img'), c.avatar, DEFAULT_USER_AVATAR);
           });
       }
 
@@ -5803,7 +6901,7 @@
           button.className = 'chat-sticker-item';
           button.setAttribute('aria-label', sticker.label);
           button.innerHTML = `
-            <img src="${escapeHtml(sticker.src)}" loading="lazy" decoding="async" alt="" />
+            <img src="${escapeHtml(safeImageSrc(sticker.src, DEFAULT_STICKER_IMAGE))}" data-fallback-src="${DEFAULT_STICKER_IMAGE}" loading="lazy" decoding="async" alt="${escapeHtml(sticker.label)}" />
           `;
           button.addEventListener('click', () => {
             sendStickerMessage(sticker);
@@ -5825,17 +6923,17 @@
         bubble.className = `px-3 py-2 max-w-[70%] ${isUser ? 'bg-primary text-white rounded-br-none' : 'bg-secondary text-dark rounded-bl-none'}`;
         if (media?.type === 'image') {
           bubble.className += ' bubble-image';
-          const mediaSrc = escapeHtml(safeImageSrc(media.src, ''));
+          const mediaSrc = escapeHtml(safeImageSrc(media.src, DEFAULT_PET_AVATAR));
           bubble.innerHTML = `
-            <img src="${mediaSrc}" class="w-full h-auto object-cover rounded-sm border-2 border-dark mb-1" />
+            <img src="${mediaSrc}" data-fallback-src="${DEFAULT_PET_AVATAR}" class="w-full h-auto object-cover rounded-sm border-2 border-dark mb-1" alt="Shared image" />
             ${safeContent ? `<p class="text-[11px]">${safeContent}</p>` : ''}
           `;
         } else if (media?.type === 'sticker') {
           bubble.className += ' bubble-sticker';
-          const mediaSrc = escapeHtml(safeImageSrc(media.src, ''));
+          const mediaSrc = escapeHtml(safeImageSrc(media.src, DEFAULT_STICKER_IMAGE));
           const stickerLabel = escapeHtml(media.label || content || 'Sticker');
           bubble.innerHTML = `
-            <img src="${mediaSrc}" class="chat-sticker-image" alt="${stickerLabel}" />
+            <img src="${mediaSrc}" data-fallback-src="${DEFAULT_STICKER_IMAGE}" class="chat-sticker-image" alt="${stickerLabel}" />
           `;
         } else {
           bubble.innerHTML = `<p class="text-[11px]">${safeContent}</p>`;

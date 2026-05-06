@@ -37,7 +37,11 @@ async function main() {
     : (isProduction ? ["'self'"] : ["'self'", 'http:', 'https:', 'ws:', 'wss:']);
   const corsOptions = !config.CORS_ORIGIN || config.CORS_ORIGIN === '*'
     ? undefined
-    : { origin: config.CORS_ORIGINS.length > 1 ? config.CORS_ORIGINS : config.CORS_ORIGIN };
+    : {
+        origin(origin: string | undefined, callback: (err: Error | null, origin?: boolean) => void) {
+          callback(null, !origin || config.CORS_ORIGINS.includes(origin) || isPackagedAppOrigin(origin));
+        },
+      };
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
@@ -50,13 +54,20 @@ async function main() {
         fontSrc: ["'self'", 'https://cdn.bootcdn.net', 'data:'],
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
         mediaSrc: ["'self'", 'data:', 'blob:'],
+        frameSrc: ["'self'", 'https://www.openstreetmap.org'],
         connectSrc: cspConnectSrc,
       },
     },
   }));
   app.use(cors(corsOptions));
   app.use(express.json({ limit: '10mb' }));
-  app.use(compression());
+  app.use(compression({
+    filter: (req, res) => {
+      const acceptsEventStream = String(req.headers.accept || '').includes('text/event-stream');
+      if (req.path === '/api/device/telemetry/stream' || acceptsEventStream) return false;
+      return compression.filter(req, res);
+    },
+  }));
   app.set('etag', 'strong');
   app.use(requestContext);
   app.use(optionalAuth);
@@ -147,6 +158,28 @@ async function main() {
     }
     process.exit(1);
   });
+}
+
+const packagedAppOrigins = new Set([
+  'capacitor://localhost',
+  'ionic://localhost',
+  'pawtrace://app',
+]);
+
+function isPackagedAppOrigin(origin: string) {
+  if (packagedAppOrigins.has(origin)) return true;
+  try {
+    const url = new URL(origin);
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      (url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1' ||
+        url.hostname === '::1' ||
+        url.hostname === '[::1]')
+    );
+  } catch {
+    return false;
+  }
 }
 
 main().catch((err) => {

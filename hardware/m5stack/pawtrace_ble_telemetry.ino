@@ -11,7 +11,7 @@
 // Health/GPS telemetry must be uploaded by WiFi to /api/device/telemetry.
 #define DEVICE_NAME "PawTrace-001"
 #define DEVICE_ID "pawtrace_001"
-#define FIRMWARE_VERSION "10.0.0-ble-wifi-provision"
+#define FIRMWARE_VERSION "10.0.1-ble-wifi-provision-jeremy-iphone"
 #define SERVICE_UUID "7b9f0001-6f3a-4f8a-9f4d-111111111111"
 #define STATUS_UUID "7b9f0002-6f3a-4f8a-9f4d-222222222222"
 #define WIFI_CONFIG_UUID "7b9f0003-6f3a-4f8a-9f4d-333333333333"
@@ -29,7 +29,7 @@ uint32_t messageSeq = 0;
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 12000;
 const unsigned long STATUS_NOTIFY_MS = 2000;
 const char* DEFAULT_DEVICE_TOKEN = "pawtrace-m5-dev-token";
-const char* DEFAULT_UPLOAD_URL = "http://192.168.31.199:3000/api/device/telemetry";
+const char* DEFAULT_UPLOAD_URL = "http://172.20.10.6:3000/api/device/telemetry";
 
 String wifiSsid = "";
 String wifiPassword = "";

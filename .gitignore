@@ -51,6 +51,7 @@ output/
 
 # Misc
 *.local
+Users/
 
 # Local postgres cluster
 .local-pg/

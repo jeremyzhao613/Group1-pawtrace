@@ -29,7 +29,7 @@ These paths are part of the runtime, build, or deployment contract:
 | Long technical references, structure maps, known issues | `docs/reference/` |
 | Version logs and historical implementation records | `plans/` |
 | Shared source images used by the app | `assets/` |
-| Hardware shell and enclosure design assets | `hardware-design/` |
+| Hardware shell and enclosure design assets | `hardware-design（Core files for 3D printing and product modeling based on m5 hardware）/` |
 
 ## Root Directory Rule
 

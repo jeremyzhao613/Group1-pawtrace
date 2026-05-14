@@ -19,7 +19,7 @@ Python video-analysis service.
 | Desktop wrapper | `desktop/` | Electron main and preload scripts. |
 | Mobile packaging | `frontend/android/`, `frontend/ios/` | Capacitor generated/synced platform projects. |
 | M5Stack firmware | `hardware/m5stack/` | Arduino sketches for BLE and Wi-Fi telemetry. |
-| Hardware enclosure files | `hardware-design/` | Blender and Python design assets. |
+| Hardware enclosure files | `hardware-design（Core files for 3D printing and product modeling based on m5 hardware）/` | Core files for 3D printing and product modeling based on M5 hardware. |
 | Monitor page | `monitor/` | Static monitor UI served at `/monitor`. |
 | Python video service | `ai-video-service/` | FastAPI + OpenCV + YOLO service on port `8008`. |
 | Shared images/assets | `assets/` | Source static assets copied or served by app builds. |
@@ -45,7 +45,7 @@ The following folders are source or hand-maintained project files:
 - `cloudflare/pawtrace-api/`
 - `desktop/`
 - `hardware/`
-- `hardware-design/`
+- `hardware-design（Core files for 3D printing and product modeling based on m5 hardware）/`
 - `monitor/`
 - `ai-video-service/`
 - `assets/`

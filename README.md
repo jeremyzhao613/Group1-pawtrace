@@ -71,7 +71,7 @@ Guest access is also available from the login screen.
 | `pawtrace-glass/` | Separate digital-twin showcase app on port `3001`. |
 | `ai-video-service/` | FastAPI, OpenCV, and YOLO video behavior-risk service. |
 | `hardware/` | M5Stack firmware for Wi-Fi telemetry and BLE provisioning. |
-| `hardware-design/` | Hardware shell diagrams and enclosure assets. |
+| `hardware-design（Core files for 3D printing and product modeling based on m5 hardware）/` | Core files for 3D printing and product modeling based on M5 hardware. |
 | `cloudflare/` | Cloudflare Worker API and D1 schema. |
 | `desktop/` | Electron desktop wrapper. |
 | `monitor/` | Static monitor UI served at `/monitor`. |

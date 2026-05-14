@@ -1,5 +1,11 @@
 # PawTrace
 
+GitHub homepage: `README.md`.
+
+This text file is kept as the extended technical README. For the fastest review
+path, start with `README.md`, then use `docs/product/README.md`,
+`docs/project-structure.md`, and `docs/README.md`.
+
 PawTrace is a full-stack pet community and health-management prototype. It combines a campus pet map, pet profiles, social chat, Qwen-powered AI Assist, and a standalone YOLO-based pet video behavior-risk check.
 
 The main web app is a Vite + Tailwind single-page frontend. The backend is Node.js + Express + TypeScript with Prisma + PostgreSQL and JWT auth. By default, the backend runs as an API and monitor service only. It does not serve the frontend on port 3000 unless `SERVE_WEB=1` is enabled.

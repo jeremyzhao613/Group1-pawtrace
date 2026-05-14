@@ -25,6 +25,8 @@ Python video-analysis service.
 | Shared images/assets | `assets/` | Source static assets copied or served by app builds. |
 | Automation scripts | `scripts/` | Local DB, runtime config, packaging, telemetry test tools. |
 | Documentation | `docs/` | Deployment, packaging, telemetry, and structure docs. |
+| Product materials | `docs/product/` | Product overview, app module map, and MoSCoW prioritization. |
+| Validation evidence | `docs/validation-report/` | Survey summary and user validation documents. |
 | Plans and releases | `plans/` | Version plans, release notes, and startup guides. |
 
 ## Source vs Generated Folders
@@ -44,6 +46,8 @@ The following folders are source or hand-maintained project files:
 - `ai-video-service/`
 - `assets/`
 - `docs/`
+- `docs/product/`
+- `docs/validation-report/`
 - `scripts/`
 - `plans/`
 
@@ -104,6 +108,10 @@ npm run package:ios
 Release notes and plan Markdown belong in `plans/`, using names like
 `pawtrace-10.1.0.md`. Duplicate or legacy copies belong in
 `plans/archive/`, not in the repo root.
+
+Product and validation files belong under `docs/product/` and
+`docs/validation-report/`. Avoid adding PRD, MoSCoW, survey, or validation
+evidence files directly to the repository root.
 
 Avoid moving existing runtime folders casually. Several scripts and deployment
 configs reference paths directly, especially `frontend/dist`,

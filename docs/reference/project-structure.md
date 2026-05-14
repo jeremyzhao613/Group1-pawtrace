@@ -31,7 +31,7 @@ Python video-analysis service.
 | Hardware docs | `docs/hardware/` | M5Stack telemetry and device-flow documentation. |
 | Reference docs | `docs/reference/` | Project structure, tech stack, extended README, and maintenance rules. |
 | Validation evidence | `validation-report（User testing and product improvement）/` | Survey summary and user validation documents, kept at the root for quick review. |
-| Plans and releases | `plans/` | Version plans, release notes, and startup guides. |
+| Plans and releases | `plans（Product update and iteration logs）/` | Product update and iteration logs, release notes, and startup guides. |
 
 ## Source vs Generated Folders
 
@@ -57,7 +57,7 @@ The following folders are source or hand-maintained project files:
 - `docs/reference/`
 - `validation-report（User testing and product improvement）/`
 - `scripts/`
-- `plans/`
+- `plans（Product update and iteration logs）/`
 
 The following folders are generated, local, or dependency-heavy. They are useful
 locally, but they should not be treated as primary source folders:
@@ -113,9 +113,10 @@ npm run package:ios
 
 ## Naming Notes
 
-Release notes and plan Markdown belong in `plans/`, using names like
+Release notes and plan Markdown belong in
+`plans（Product update and iteration logs）/`, using names like
 `pawtrace-10.1.0.md`. Duplicate or legacy copies belong in
-`plans/archive/`, not in the repo root.
+`plans（Product update and iteration logs）/archive/`, not in the repo root.
 
 Product, deployment, packaging, hardware, and reference files belong under the
 matching `docs/` subfolder. Validation evidence belongs in the root

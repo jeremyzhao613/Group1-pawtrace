@@ -27,7 +27,7 @@ These paths are part of the runtime, build, or deployment contract:
 | Android, iOS, desktop, and release packaging notes | `docs/packaging/` |
 | M5Stack, sensors, firmware behavior, and hardware data-flow docs | `docs/hardware/` |
 | Long technical references, structure maps, known issues | `docs/reference/` |
-| Version logs and historical implementation records | `plans/` |
+| Version logs and historical implementation records | `plans（Product update and iteration logs）/` |
 | Shared source images used by the app | `assets/` |
 | Hardware shell and enclosure design assets | `hardware-design（Core files for 3D printing and product modeling based on m5 hardware）/` |
 
@@ -65,5 +65,5 @@ If a generated file is needed for a submission, put the final artifact under the
 
 - Prefer lowercase hyphenated filenames for new docs, for example `cloudflare-domain-notes.md`.
 - Keep evidence file names descriptive, for example `user-6-validation.docx`.
-- Keep release notes in `plans/` using `pawtrace-<version>.md`.
+- Keep release notes in `plans（Product update and iteration logs）/` using `pawtrace-<version>.md`.
 - Avoid duplicate names that differ only by spaces, capitalization, or file extension.

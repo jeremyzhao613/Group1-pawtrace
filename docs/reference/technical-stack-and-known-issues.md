@@ -157,7 +157,7 @@ desktop/              Electron desktop shell
 assets/               Shared static assets across sub-projects
 scripts/              One-command scripts (DB, APK, Cloudflare, M5, runtime config)
 docs/                 Architecture, deployment, packaging, M5Stack telemetry docs
-plans/                Per-release notes (English + Chinese)
+plans（Product update and iteration logs）/  Product update and iteration logs
 ```
 
 > See `docs/reference/project-structure.md` for the detailed sub-folder map.
@@ -181,7 +181,7 @@ plans/                Per-release notes (English + Chinese)
 
 ## 6. Fixed Bugs / Resolved Issues
 
-> Curated from the release notes in `plans/`, listed from older to newer.
+> Curated from the release notes in `plans（Product update and iteration logs）/`, listed from older to newer.
 
 ### 6.1 YOLO / Video Service
 
@@ -320,7 +320,7 @@ plans/                Per-release notes (English + Chinese)
 
 - This project is a **student / competition / demo prototype** and does not constitute medical, veterinary, legal, or commercial advice.
 - The root `package.json` is synchronized to `10.1.0`; subpackage versions may still lag.
-- A historical duplicate `plans/archive/pawtrace-10.1.0-duplicate-no-extension.md` is kept for archival reasons only and should not be edited further.
+- A historical duplicate `plans（Product update and iteration logs）/archive/pawtrace-10.1.0-duplicate-no-extension.md` is kept for archival reasons only and should not be edited further.
 
 ---
 
@@ -345,8 +345,8 @@ This result is only a behavior-risk hint and does not constitute veterinary diag
 - M5Stack telemetry: `docs/hardware/m5stack-telemetry.md`
 - Desktop EXE packaging: `docs/packaging/desktop-exe.md`
 - Mobile packaging: `docs/packaging/mobile.md` and `docs/packaging/release-checklist.md`
-- Release notes: `plans/pawtrace-4.0.1.plan.md` → `plans/pawtrace-10.1.0.md`
+- Release notes: `plans（Product update and iteration logs）/pawtrace-4.0.1.plan.md` -> `plans（Product update and iteration logs）/pawtrace-10.1.0.md`
 
 ---
 
-_Last updated: 2026-05-14 · Document curated from docs/reference/extended-technical-readme.md and the `plans/` release-notes folder._
+_Last updated: 2026-05-14 · Document curated from docs/reference/extended-technical-readme.md and the `plans（Product update and iteration logs）/` release-notes folder._

@@ -1,4 +1,4 @@
-# Plans
+# Plans (Product update and iteration logs)
 
 Project planning notes, release records, and supporting screenshots.
 

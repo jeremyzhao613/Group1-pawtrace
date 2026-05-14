@@ -62,7 +62,7 @@ ai-video-service/     Python FastAPI YOLO video behavior-analysis service
 assets/               Shared static assets, mounted as /assets in production
 monitor/              Static monitor UI, served at /monitor
 scripts/local-db.sh   Project-local PostgreSQL helper
-plans/                Release notes and project logs
+plans（Product update and iteration logs）/  Product update and iteration logs
 ```
 
 For a fuller folder map, source/generated folder guide, and common task paths,
@@ -376,7 +376,7 @@ Manual checks:
 
 ## Release Notes
 
-- 8.0.0: `plans/pawtrace-8.0.0.plan.md`
-- 7.1.0: `plans/pawtrace-7.1.0.plan.md`
-- 7.0.0: `plans/pawtrace-7.0.0.plan.md`
-- 6.0.0: `plans/pawtrace-6.0.0.plan.md`
+- 8.0.0: `plans（Product update and iteration logs）/pawtrace-8.0.0.plan.md`
+- 7.1.0: `plans（Product update and iteration logs）/pawtrace-7.1.0.plan.md`
+- 7.0.0: `plans（Product update and iteration logs）/pawtrace-7.0.0.plan.md`
+- 6.0.0: `plans（Product update and iteration logs）/pawtrace-6.0.0.plan.md`

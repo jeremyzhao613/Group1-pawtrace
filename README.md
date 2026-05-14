@@ -13,7 +13,7 @@ PawTrace is a full-stack campus pet care prototype. It combines a pet map, pet p
 | Deploy to Cloudflare | [Cloudflare deployment guide](docs/deployment/cloudflare.md) |
 | Package mobile, desktop, or release builds | [Docs index](docs/README.md) |
 | Keep the repository organized | [Repository maintenance guide](docs/reference/repository-maintenance.md) |
-| Read release notes | [Plans and releases](plans/README.md) |
+| Read release notes | [Plans and releases](<plans（Product update and iteration logs）/README.md>) |
 
 ## What The App Does
 
@@ -76,7 +76,7 @@ Guest access is also available from the login screen.
 | `desktop/` | Electron desktop wrapper. |
 | `monitor/` | Static monitor UI served at `/monitor`. |
 | `docs/` | Product, architecture, deployment, packaging, and validation docs. |
-| `plans/` | Release notes and project planning records. |
+| `plans（Product update and iteration logs）/` | Product update and iteration logs. |
 
 ## Product And Evidence Files
 

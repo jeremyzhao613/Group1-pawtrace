@@ -26,4 +26,4 @@ This folder contains the project documentation that should stay close to the cod
 - Hardware and device-flow docs go in `docs/hardware/`.
 - Validation evidence goes in the root `validation-report（User testing and product improvement）/` folder for quick reviewer access.
 - General reference material goes in `docs/reference/`.
-- Release notes and planning records stay in `plans/`.
+- Release notes and planning records stay in `plans（Product update and iteration logs）/`.

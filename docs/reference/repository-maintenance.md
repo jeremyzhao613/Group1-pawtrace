@@ -22,7 +22,7 @@ These paths are part of the runtime, build, or deployment contract:
 | File type | Location |
 | --- | --- |
 | Product overview, PRD, MoSCoW, screenshots for review | `docs/product/` |
-| User research, surveys, validation reports, interview notes | `validation-report/` |
+| User research, surveys, validation reports, interview notes | `validation-report（User testing and product improvement）/` |
 | Cloudflare, API hosting, domain, and deployment notes | `docs/deployment/` |
 | Android, iOS, desktop, and release packaging notes | `docs/packaging/` |
 | M5Stack, sensors, firmware behavior, and hardware data-flow docs | `docs/hardware/` |
@@ -44,7 +44,7 @@ The root should stay small. Keep only files that a reviewer or build tool expect
 - `wrangler*.jsonc`
 - runtime source folders
 
-Do not add loose PDFs, DOCX files, survey spreadsheets, screenshots, logs, generated builds, or local testing artifacts to the root. The exception is the root `validation-report/` folder, which intentionally keeps review evidence easy to open.
+Do not add loose PDFs, DOCX files, survey spreadsheets, screenshots, logs, generated builds, or local testing artifacts to the root. The exception is the root `validation-report（User testing and product improvement）/` folder, which intentionally keeps review evidence easy to open.
 
 ## Local Artifacts To Keep Out Of Git
 

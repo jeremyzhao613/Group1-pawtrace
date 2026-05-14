@@ -34,7 +34,7 @@ PawTrace is a campus pet care and health-management prototype. It helps pet owne
 | Document | Use |
 | --- | --- |
 | [MoSCoW prioritization PDF](pawtrace-moscow-prioritization.pdf) | Feature priority and scope discussion. |
-| [Validation evidence index](../../validation-report/README.md) | Survey summary and user validation documents. |
+| [Validation evidence index](<../../validation-report（User testing and product improvement）/README.md>) | Survey summary and user validation documents. |
 | [Tech stack and known issues](../reference/technical-stack-and-known-issues.md) | Technology choices, resolved bugs, known MVP limits, and safety notes. |
 | [Project structure](../reference/project-structure.md) | Source folder guide for contributors. |
 
@@ -52,4 +52,4 @@ PawTrace is a campus pet care and health-management prototype. It helps pet owne
 - AI and video outputs are behavior-risk hints, not diagnosis.
 - Guest mode should remain local-only unless the user explicitly signs in.
 - BLE is provisioning-only; Wi-Fi HTTP telemetry is the main M5Stack data path.
-- Some evidence files are coursework artifacts, so they live in the root `validation-report/` folder instead of the runtime source folders.
+- Some evidence files are coursework artifacts, so they live in the root `validation-report（User testing and product improvement）/` folder instead of the runtime source folders.

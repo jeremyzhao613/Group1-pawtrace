@@ -9,7 +9,7 @@ PawTrace is a full-stack campus pet care prototype. It combines a pet map, pet p
 | Understand the product in 2 minutes | [Product overview](docs/product/README.md) |
 | See the app modules and source folders | [Project structure](docs/reference/project-structure.md) |
 | Review technology choices and current limits | [Tech stack and known issues](docs/reference/technical-stack-and-known-issues.md) |
-| Check validation evidence | [Validation report files](validation-report/README.md) |
+| Check validation evidence | [Validation report files](<validation-report（User testing and product improvement）/README.md>) |
 | Deploy to Cloudflare | [Cloudflare deployment guide](docs/deployment/cloudflare.md) |
 | Package mobile, desktop, or release builds | [Docs index](docs/README.md) |
 | Keep the repository organized | [Repository maintenance guide](docs/reference/repository-maintenance.md) |
@@ -86,7 +86,7 @@ Product and coursework materials are intentionally grouped under `docs/` instead
 | --- | --- |
 | Product overview and module map | [docs/product/README.md](docs/product/README.md) |
 | MoSCoW prioritization PDF | [docs/product/pawtrace-moscow-prioritization.pdf](docs/product/pawtrace-moscow-prioritization.pdf) |
-| Validation report evidence | [validation-report/README.md](validation-report/README.md) |
+| Validation report evidence | [validation-report（User testing and product improvement）/README.md](<validation-report（User testing and product improvement）/README.md>) |
 | Tech stack and known issues | [docs/reference/technical-stack-and-known-issues.md](docs/reference/technical-stack-and-known-issues.md) |
 | Extended technical README | [docs/reference/extended-technical-readme.md](docs/reference/extended-technical-readme.md) |
 

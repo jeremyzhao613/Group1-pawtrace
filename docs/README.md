@@ -11,7 +11,7 @@ This folder contains the project documentation that should stay close to the cod
 | Tech stack, resolved issues, and known limits | [reference/technical-stack-and-known-issues.md](reference/technical-stack-and-known-issues.md) |
 | Extended technical README | [reference/extended-technical-readme.md](reference/extended-technical-readme.md) |
 | Repository organization rules | [reference/repository-maintenance.md](reference/repository-maintenance.md) |
-| Validation evidence | [../validation-report/README.md](../validation-report/README.md) |
+| Validation evidence | [../validation-report（User testing and product improvement）/README.md](<../validation-report（User testing and product improvement）/README.md>) |
 | Cloudflare Pages, Worker API, D1, and access notes | [deployment/cloudflare.md](deployment/cloudflare.md) |
 | M5Stack Wi-Fi telemetry flow | [hardware/m5stack-telemetry.md](hardware/m5stack-telemetry.md) |
 | Capacitor mobile packaging notes | [packaging/mobile.md](packaging/mobile.md) |
@@ -24,6 +24,6 @@ This folder contains the project documentation that should stay close to the cod
 - Deployment guides go in `docs/deployment/`.
 - Packaging guides go in `docs/packaging/`.
 - Hardware and device-flow docs go in `docs/hardware/`.
-- Validation evidence goes in the root `validation-report/` folder for quick reviewer access.
+- Validation evidence goes in the root `validation-report（User testing and product improvement）/` folder for quick reviewer access.
 - General reference material goes in `docs/reference/`.
 - Release notes and planning records stay in `plans/`.

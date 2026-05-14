@@ -30,7 +30,7 @@ Python video-analysis service.
 | Packaging docs | `docs/packaging/` | Mobile, desktop, and release packaging guides. |
 | Hardware docs | `docs/hardware/` | M5Stack telemetry and device-flow documentation. |
 | Reference docs | `docs/reference/` | Project structure, tech stack, extended README, and maintenance rules. |
-| Validation evidence | `validation-report/` | Survey summary and user validation documents, kept at the root for quick review. |
+| Validation evidence | `validation-report（User testing and product improvement）/` | Survey summary and user validation documents, kept at the root for quick review. |
 | Plans and releases | `plans/` | Version plans, release notes, and startup guides. |
 
 ## Source vs Generated Folders
@@ -55,7 +55,7 @@ The following folders are source or hand-maintained project files:
 - `docs/packaging/`
 - `docs/product/`
 - `docs/reference/`
-- `validation-report/`
+- `validation-report（User testing and product improvement）/`
 - `scripts/`
 - `plans/`
 
@@ -119,7 +119,7 @@ Release notes and plan Markdown belong in `plans/`, using names like
 
 Product, deployment, packaging, hardware, and reference files belong under the
 matching `docs/` subfolder. Validation evidence belongs in the root
-`validation-report/` folder for reviewer access. Avoid adding loose PRD,
+`validation-report（User testing and product improvement）/` folder for reviewer access. Avoid adding loose PRD,
 MoSCoW, survey, deployment, or packaging files directly to the repository root.
 See `docs/reference/repository-maintenance.md` for the full file-placement
 guide.

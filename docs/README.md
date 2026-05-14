@@ -1,24 +1,29 @@
 # PawTrace Docs
 
-This folder contains the project documentation that should stay close to the code. Product materials, validation evidence, deployment notes, and packaging guides belong here instead of the repository root.
+This folder contains the project documentation that should stay close to the code. Product materials, validation evidence, deployment notes, packaging guides, hardware docs, and reference material belong here instead of the repository root.
 
 ## Start Here
 
 | Need | File |
 | --- | --- |
 | Product purpose, modules, and demo flow | [product/README.md](product/README.md) |
-| Source folder map | [project-structure.md](project-structure.md) |
-| Tech stack, resolved issues, and known limits | [technical-stack-and-known-issues.md](technical-stack-and-known-issues.md) |
+| Source folder map | [reference/project-structure.md](reference/project-structure.md) |
+| Tech stack, resolved issues, and known limits | [reference/technical-stack-and-known-issues.md](reference/technical-stack-and-known-issues.md) |
+| Extended technical README | [reference/extended-technical-readme.md](reference/extended-technical-readme.md) |
+| Repository organization rules | [reference/repository-maintenance.md](reference/repository-maintenance.md) |
 | Validation evidence | [validation-report/README.md](validation-report/README.md) |
-| Cloudflare Pages, Worker API, D1, and access notes | [cloudflare-deployment.md](cloudflare-deployment.md) |
-| M5Stack Wi-Fi telemetry flow | [pawtrace-m5stack-telemetry.md](pawtrace-m5stack-telemetry.md) |
-| Capacitor mobile packaging notes | [pawtrace-mobile-packaging.md](pawtrace-mobile-packaging.md) |
-| Desktop packaging notes | [pawtrace-desktop-exe.md](pawtrace-desktop-exe.md) |
-| Release packaging checklist | [pawtrace-release-packaging.md](pawtrace-release-packaging.md) |
+| Cloudflare Pages, Worker API, D1, and access notes | [deployment/cloudflare.md](deployment/cloudflare.md) |
+| M5Stack Wi-Fi telemetry flow | [hardware/m5stack-telemetry.md](hardware/m5stack-telemetry.md) |
+| Capacitor mobile packaging notes | [packaging/mobile.md](packaging/mobile.md) |
+| Desktop packaging notes | [packaging/desktop-exe.md](packaging/desktop-exe.md) |
+| Release packaging checklist | [packaging/release-checklist.md](packaging/release-checklist.md) |
 
 ## Organization Rule
 
 - Product and review documents go in `docs/product/`.
+- Deployment guides go in `docs/deployment/`.
+- Packaging guides go in `docs/packaging/`.
+- Hardware and device-flow docs go in `docs/hardware/`.
 - Validation evidence goes in `docs/validation-report/`.
-- Technical guides and architecture notes stay directly under `docs/`.
+- General reference material goes in `docs/reference/`.
 - Release notes and planning records stay in `plans/`.

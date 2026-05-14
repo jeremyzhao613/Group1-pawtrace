@@ -24,8 +24,12 @@ Python video-analysis service.
 | Python video service | `ai-video-service/` | FastAPI + OpenCV + YOLO service on port `8008`. |
 | Shared images/assets | `assets/` | Source static assets copied or served by app builds. |
 | Automation scripts | `scripts/` | Local DB, runtime config, packaging, telemetry test tools. |
-| Documentation | `docs/` | Deployment, packaging, telemetry, and structure docs. |
+| Documentation index | `docs/README.md` | Main documentation table of contents. |
 | Product materials | `docs/product/` | Product overview, app module map, and MoSCoW prioritization. |
+| Deployment docs | `docs/deployment/` | Cloudflare and hosting notes. |
+| Packaging docs | `docs/packaging/` | Mobile, desktop, and release packaging guides. |
+| Hardware docs | `docs/hardware/` | M5Stack telemetry and device-flow documentation. |
+| Reference docs | `docs/reference/` | Project structure, tech stack, extended README, and maintenance rules. |
 | Validation evidence | `docs/validation-report/` | Survey summary and user validation documents. |
 | Plans and releases | `plans/` | Version plans, release notes, and startup guides. |
 
@@ -46,7 +50,11 @@ The following folders are source or hand-maintained project files:
 - `ai-video-service/`
 - `assets/`
 - `docs/`
+- `docs/deployment/`
+- `docs/hardware/`
+- `docs/packaging/`
 - `docs/product/`
+- `docs/reference/`
 - `docs/validation-report/`
 - `scripts/`
 - `plans/`
@@ -109,9 +117,11 @@ Release notes and plan Markdown belong in `plans/`, using names like
 `pawtrace-10.1.0.md`. Duplicate or legacy copies belong in
 `plans/archive/`, not in the repo root.
 
-Product and validation files belong under `docs/product/` and
-`docs/validation-report/`. Avoid adding PRD, MoSCoW, survey, or validation
-evidence files directly to the repository root.
+Product, deployment, packaging, hardware, reference, and validation files belong
+under the matching `docs/` subfolder. Avoid adding PRD, MoSCoW, survey,
+validation evidence, deployment notes, or packaging notes directly to the
+repository root. See `docs/reference/repository-maintenance.md` for the full
+file-placement guide.
 
 Avoid moving existing runtime folders casually. Several scripts and deployment
 configs reference paths directly, especially `frontend/dist`,

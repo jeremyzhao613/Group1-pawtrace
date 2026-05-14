@@ -18,5 +18,4 @@ npm run deploy:cloudflare:api
 npm run cloudflare:fix-access
 ```
 
-See `docs/cloudflare-deployment.md` for the full deployment architecture.
-
+See `docs/deployment/cloudflare.md` for the full deployment architecture.

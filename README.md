@@ -7,11 +7,12 @@ PawTrace is a full-stack campus pet care prototype. It combines a pet map, pet p
 | Need | Open |
 | --- | --- |
 | Understand the product in 2 minutes | [Product overview](docs/product/README.md) |
-| See the app modules and source folders | [Project structure](docs/project-structure.md) |
-| Review technology choices and current limits | [Tech stack and known issues](docs/technical-stack-and-known-issues.md) |
+| See the app modules and source folders | [Project structure](docs/reference/project-structure.md) |
+| Review technology choices and current limits | [Tech stack and known issues](docs/reference/technical-stack-and-known-issues.md) |
 | Check validation evidence | [Validation report files](docs/validation-report/README.md) |
-| Deploy to Cloudflare | [Cloudflare deployment guide](docs/cloudflare-deployment.md) |
+| Deploy to Cloudflare | [Cloudflare deployment guide](docs/deployment/cloudflare.md) |
 | Package mobile, desktop, or release builds | [Docs index](docs/README.md) |
+| Keep the repository organized | [Repository maintenance guide](docs/reference/repository-maintenance.md) |
 | Read release notes | [Plans and releases](plans/README.md) |
 
 ## What The App Does
@@ -86,7 +87,8 @@ Product and coursework materials are intentionally grouped under `docs/` instead
 | Product overview and module map | [docs/product/README.md](docs/product/README.md) |
 | MoSCoW prioritization PDF | [docs/product/pawtrace-moscow-prioritization.pdf](docs/product/pawtrace-moscow-prioritization.pdf) |
 | Validation report evidence | [docs/validation-report/README.md](docs/validation-report/README.md) |
-| Tech stack and known issues | [docs/technical-stack-and-known-issues.md](docs/technical-stack-and-known-issues.md) |
+| Tech stack and known issues | [docs/reference/technical-stack-and-known-issues.md](docs/reference/technical-stack-and-known-issues.md) |
+| Extended technical README | [docs/reference/extended-technical-readme.md](docs/reference/extended-technical-readme.md) |
 
 ## Common Commands
 

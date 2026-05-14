@@ -4,7 +4,7 @@ GitHub homepage: `README.md`.
 
 This text file is kept as the extended technical README. For the fastest review
 path, start with `README.md`, then use `docs/product/README.md`,
-`docs/project-structure.md`, and `docs/README.md`.
+`docs/reference/project-structure.md`, and `docs/README.md`.
 
 PawTrace is a full-stack pet community and health-management prototype. It combines a campus pet map, pet profiles, social chat, Qwen-powered AI Assist, and a standalone YOLO-based pet video behavior-risk check.
 
@@ -66,7 +66,7 @@ plans/                Release notes and project logs
 ```
 
 For a fuller folder map, source/generated folder guide, and common task paths,
-see `docs/project-structure.md`.
+see `docs/reference/project-structure.md`.
 
 ## Quick Start
 
@@ -123,7 +123,7 @@ Production Cloudflare builds write `PAWTRACE_API_BASE_URL` into
 `frontend/dist/app/runtime-config.js`; the default is the current Worker API.
 For a custom Node/Express API, set `PAWTRACE_API_BASE_URL` to that HTTPS URL and
 include the Pages domains in the backend `CORS_ORIGIN` value.
-See `docs/cloudflare-deployment.md` for the complete Cloudflare architecture.
+See `docs/deployment/cloudflare.md` for the complete Cloudflare architecture.
 
 If `pages.dev` cannot open on a Mac with Shadowrocket/VPN enabled, check for
 fake-ip DNS and apply the local hosts fix:
@@ -213,7 +213,7 @@ The frontend polls:
 GET /api/device/telemetry/latest
 ```
 
-and merges the latest device data into the map, health panel, and pet cards. The backend persists telemetry to PostgreSQL and keeps a temporary latest-value cache for fast display. See `docs/pawtrace-m5stack-telemetry.md`.
+and merges the latest device data into the map, health panel, and pet cards. The backend persists telemetry to PostgreSQL and keeps a temporary latest-value cache for fast display. See `docs/hardware/m5stack-telemetry.md`.
 
 BLE is provisioning-only: use `Health -> BLE WiFi Setup` to send the M5 Wi-Fi SSID, password, backend host, and token. BLE packets are not stored as telemetry.
 

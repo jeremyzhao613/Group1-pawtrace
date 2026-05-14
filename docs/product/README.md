@@ -35,8 +35,8 @@ PawTrace is a campus pet care and health-management prototype. It helps pet owne
 | --- | --- |
 | [MoSCoW prioritization PDF](pawtrace-moscow-prioritization.pdf) | Feature priority and scope discussion. |
 | [Validation evidence index](../validation-report/README.md) | Survey summary and user validation documents. |
-| [Tech stack and known issues](../technical-stack-and-known-issues.md) | Technology choices, resolved bugs, known MVP limits, and safety notes. |
-| [Project structure](../project-structure.md) | Source folder guide for contributors. |
+| [Tech stack and known issues](../reference/technical-stack-and-known-issues.md) | Technology choices, resolved bugs, known MVP limits, and safety notes. |
+| [Project structure](../reference/project-structure.md) | Source folder guide for contributors. |
 
 ## Demo Flow
 

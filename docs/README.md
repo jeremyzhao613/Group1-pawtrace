@@ -7,6 +7,8 @@ This folder contains the project documentation that should stay close to the cod
 | Need | File |
 | --- | --- |
 | Product purpose, modules, and demo flow | [product/README.md](product/README.md) |
+| Product requirements | [product/product-requirements.md](product/product-requirements.md) |
+| Feature prioritization | [product/feature-prioritization.md](product/feature-prioritization.md) |
 | Source folder map | [reference/project-structure.md](reference/project-structure.md) |
 | Tech stack, resolved issues, and known limits | [reference/technical-stack-and-known-issues.md](reference/technical-stack-and-known-issues.md) |
 | Extended technical README | [reference/extended-technical-readme.md](reference/extended-technical-readme.md) |

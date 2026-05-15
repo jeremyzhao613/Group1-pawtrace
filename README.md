@@ -85,6 +85,9 @@ Product and coursework materials are intentionally grouped under `docs/` instead
 | Material | Location |
 | --- | --- |
 | Product overview and module map | [docs/product/README.md](docs/product/README.md) |
+| Product requirements page | [docs/product/product-requirements.md](docs/product/product-requirements.md) |
+| PRD PDF | [docs/product/PRD.pdf](docs/product/PRD.pdf) |
+| Feature prioritization page | [docs/product/feature-prioritization.md](docs/product/feature-prioritization.md) |
 | MoSCoW prioritization PDF | [docs/product/pawtrace-moscow-prioritization.pdf](docs/product/pawtrace-moscow-prioritization.pdf) |
 | Validation report evidence | [validation-report（User testing and product improvement）/README.md](<validation-report（User testing and product improvement）/README.md>) |
 | Tech stack and known issues | [docs/reference/technical-stack-and-known-issues.md](docs/reference/technical-stack-and-known-issues.md) |

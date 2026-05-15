@@ -33,7 +33,10 @@ PawTrace is a campus pet care and health-management prototype. It helps pet owne
 
 | Document | Use |
 | --- | --- |
-| [MoSCoW prioritization PDF](pawtrace-moscow-prioritization.pdf) | Feature priority and scope discussion. |
+| [Product requirements page](product-requirements.md) | Web-readable PRD covering product purpose, user stories, must-have features, technical architecture, and success criteria. |
+| [PRD PDF](PRD.pdf) | Original uploaded Product Requirements Document. |
+| [Feature prioritization page](feature-prioritization.md) | Web-readable MoSCoW feature priority table. |
+| [MoSCoW prioritization PDF](pawtrace-moscow-prioritization.pdf) | Original uploaded feature priority and scope document. |
 | [Validation evidence index](<../../validation-report（User testing and product improvement）/README.md>) | Survey summary and user validation documents. |
 | [Tech stack and known issues](../reference/technical-stack-and-known-issues.md) | Technology choices, resolved bugs, known MVP limits, and safety notes. |
 | [Project structure](../reference/project-structure.md) | Source folder guide for contributors. |

@@ -25,7 +25,7 @@ Python video-analysis service.
 | Shared images/assets | `assets/` | Source static assets copied or served by app builds. |
 | Automation scripts | `scripts/` | Local DB, runtime config, packaging, telemetry test tools. |
 | Documentation index | `docs/README.md` | Main documentation table of contents. |
-| Product materials | `docs/product/` | Product overview, app module map, and MoSCoW prioritization. |
+| Product materials | `docs/product/` | Product overview, PRD, app module map, and MoSCoW prioritization. |
 | Deployment docs | `docs/deployment/` | Cloudflare and hosting notes. |
 | Packaging docs | `docs/packaging/` | Mobile, desktop, and release packaging guides. |
 | Hardware docs | `docs/hardware/` | M5Stack telemetry and device-flow documentation. |

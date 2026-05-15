@@ -6,6 +6,7 @@ This folder contains the project documentation that should stay close to the cod
 
 | Need | File |
 | --- | --- |
+| Reviewer-facing full project index | [project-review-index.md](project-review-index.md) |
 | Product purpose, modules, and demo flow | [product/README.md](product/README.md) |
 | Product requirements | [product/product-requirements.md](product/product-requirements.md) |
 | Feature prioritization | [product/feature-prioritization.md](product/feature-prioritization.md) |

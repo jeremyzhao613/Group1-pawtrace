@@ -6,6 +6,7 @@ PawTrace is a full-stack campus pet care prototype. It combines a pet map, pet p
 
 | Need | Open |
 | --- | --- |
+| Review the whole submission package | [Project review index](docs/project-review-index.md) |
 | Understand the product in 2 minutes | [Product overview](docs/product/README.md) |
 | See the app modules and source folders | [Project structure](docs/reference/project-structure.md) |
 | Review technology choices and current limits | [Tech stack and known issues](docs/reference/technical-stack-and-known-issues.md) |
@@ -76,6 +77,7 @@ Guest access is also available from the login screen.
 | `desktop/` | Electron desktop wrapper. |
 | `monitor/` | Static monitor UI served at `/monitor`. |
 | `docs/` | Product, architecture, deployment, packaging, and validation docs. |
+| `validation-report（User testing and product improvement）/` | User testing report, survey summary, and validation evidence. |
 | `plans（Product update and iteration logs）/` | Product update and iteration logs. |
 
 ## Product And Evidence Files
@@ -84,12 +86,13 @@ Product and coursework materials are intentionally grouped under `docs/` instead
 
 | Material | Location |
 | --- | --- |
+| Review index | [docs/project-review-index.md](docs/project-review-index.md) |
 | Product overview and module map | [docs/product/README.md](docs/product/README.md) |
 | Product requirements page | [docs/product/product-requirements.md](docs/product/product-requirements.md) |
 | PRD PDF | [docs/product/PRD.pdf](docs/product/PRD.pdf) |
 | Feature prioritization page | [docs/product/feature-prioritization.md](docs/product/feature-prioritization.md) |
 | MoSCoW prioritization PDF | [docs/product/pawtrace-moscow-prioritization.pdf](docs/product/pawtrace-moscow-prioritization.pdf) |
-| Validation report evidence | [validation-report（User testing and product improvement）/README.md](<validation-report（User testing and product improvement）/README.md>) |
+| Complete validation report and evidence | [validation-report（User testing and product improvement）/README.md](<validation-report（User testing and product improvement）/README.md>) |
 | Tech stack and known issues | [docs/reference/technical-stack-and-known-issues.md](docs/reference/technical-stack-and-known-issues.md) |
 | Extended technical README | [docs/reference/extended-technical-readme.md](docs/reference/extended-technical-readme.md) |
 

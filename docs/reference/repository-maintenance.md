@@ -65,5 +65,6 @@ If a generated file is needed for a submission, put the final artifact under the
 
 - Prefer lowercase hyphenated filenames for new docs, for example `cloudflare-domain-notes.md`.
 - Keep evidence file names descriptive, for example `user-6-validation.docx`.
+- When a complete report is uploaded, keep it in `validation-report（User testing and product improvement）/` and add it to that folder's README plus `docs/project-review-index.md`.
 - Keep release notes in `plans（Product update and iteration logs）/` using `pawtrace-<version>.md`.
 - Avoid duplicate names that differ only by spaces, capitalization, or file extension.
